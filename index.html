@@ -6,6 +6,12 @@
     <title>RehabFlow</title>
     <meta name="description" content="AI-driven fysioterapi och rehabiliteringsprogram anpassade efter din skada.">
     <meta name="theme-color" content="#0ea5e9">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="RehabFlow">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
@@ -127,5 +133,15 @@
 </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Register Service Worker
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('[SW] Registered:', reg.scope))
+            .catch(err => console.error('[SW] Registration failed:', err));
+        });
+      }
+    </script>
   </body>
 </html>
