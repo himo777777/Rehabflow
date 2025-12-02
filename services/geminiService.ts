@@ -3,6 +3,50 @@ import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { UserAssessment, GeneratedProgram, Exercise, ExerciseAdjustmentType, WeeklyAnalysis } from "../types";
 import { EXERCISE_DATABASE } from "../data/exerciseDatabase";
 
+// --- API KEY HELPER ---
+// Supports both Google AI Studio (process.env.API_KEY) and local Vite development
+const getApiKey = (): string => {
+  // Google AI Studio provides API_KEY via process.env
+  if (typeof process !== 'undefined' && process.env?.API_KEY) {
+    return process.env.API_KEY;
+  }
+  // Vite local development uses import.meta.env
+  if (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_GEMINI_API_KEY) {
+    return (import.meta as any).env.VITE_GEMINI_API_KEY;
+  }
+  console.warn('No API key found. Set VITE_GEMINI_API_KEY in .env.local for local development.');
+  return '';
+};
+
+// --- RETRY HELPER ---
+// Retries async operations with exponential backoff
+const withRetry = async <T>(
+  fn: () => Promise<T>,
+  options: { maxRetries?: number; baseDelayMs?: number; onRetry?: (attempt: number, error: Error) => void } = {}
+): Promise<T> => {
+  const { maxRetries = 3, baseDelayMs = 1000, onRetry } = options;
+  let lastError: Error;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error as Error;
+
+      if (attempt === maxRetries) {
+        throw lastError;
+      }
+
+      const delay = baseDelayMs * Math.pow(2, attempt - 1);
+      onRetry?.(attempt, lastError);
+      console.warn(`Attempt ${attempt} failed, retrying in ${delay}ms...`, lastError.message);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+
+  throw lastError!;
+};
+
 // --- JSON SANITIZER ---
 // Robustly cleans AI response to remove markdown blocks (```json ... ```) which often break parsing.
 const cleanJson = (text: string): string => {
@@ -107,7 +151,7 @@ const weeklyAnalysisSchema: Schema = {
 };
 
 export const generateRehabProgram = async (assessment: UserAssessment): Promise<GeneratedProgram> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: getApiKey() });
   
   const clinicalDetails = Object.entries(assessment.specificAnswers || {})
     .map(([key, value]) => `- ${key}: ${value}`)
@@ -218,7 +262,7 @@ export const searchExercises = async (query: string): Promise<Exercise[]> => {
   }
 
   // AI FALLBACK (The Infinite Database)
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: getApiKey() });
   
   const prompt = `
     Agera som en expertfysioterapeut med tillgång till en databas på 10 000+ evidensbaserade övningar.
@@ -263,11 +307,11 @@ export const searchExercises = async (query: string): Promise<Exercise[]> => {
 }
 
 export const generateAlternativeExercise = async (
-    originalExercise: Exercise, 
+    originalExercise: Exercise,
     reason: string,
     adjustment: ExerciseAdjustmentType
 ): Promise<Exercise> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: getApiKey() });
 
     let directive = "";
     if (adjustment === 'easier') {
@@ -317,7 +361,7 @@ export const generateWeeklyAnalysis = async (
     history: { total: number, completed: number }[],
     currentPhaseName: string
 ): Promise<WeeklyAnalysis> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: getApiKey() });
 
     const totalAssigned = history.reduce((sum, h) => sum + h.total, 0);
     const totalDone = history.reduce((sum, h) => sum + h.completed, 0);
@@ -366,7 +410,7 @@ export const generateWeeklyAnalysis = async (
 }
 
 export const chatWithPT = async (history: {role: 'user' | 'model', text: string}[], userContext: string): Promise<string> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: getApiKey() });
     
     const systemPrompt = `
         Du är "RehabFlow Coach", en empatisk, extremt kunnig fysioterapeut.

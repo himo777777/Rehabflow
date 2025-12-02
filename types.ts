@@ -14,6 +14,14 @@ export enum PainLevel {
   EXTREME = 10
 }
 
+export interface SurgicalDetails {
+  procedure: string; // Type of surgery performed
+  date: string; // Surgery date
+  surgeonRestrictions: string; // Any restrictions from surgeon
+  weightBearing: 'Fullt' | 'Partiell' | 'Avlastad'; // Weight bearing status
+  riskFactors: string[]; // Risk factors affecting healing
+}
+
 export interface UserAssessment {
   name: string;
   age: number;
@@ -23,6 +31,7 @@ export interface UserAssessment {
   painLevel: number; // Resting pain
   activityPainLevel: number; // Pain during movement/load
   surgeryDate?: string; // Only if POST_OP
+  surgicalDetails?: SurgicalDetails; // Detailed post-op information
   goals: string;
   activityLevel: string;
   redFlags?: string[]; // Potential serious symptoms caught in onboarding
