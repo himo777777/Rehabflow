@@ -94,9 +94,9 @@ export const combineValidators = <T>(
 };
 
 // Validate an object against a schema
-export interface ValidationSchema<T> {
+export type ValidationSchema<T> = {
   [K in keyof T]?: ((value: T[K]) => ValidationResult)[];
-}
+};
 
 export const validateObject = <T extends Record<string, unknown>>(
   obj: T,

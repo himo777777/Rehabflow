@@ -1,8 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { UserAssessment, InjuryType } from '../types';
-import { 
-  User, ShieldCheck, 
-  Activity as Pulse, Zap, Target, 
+import {
+  User, ShieldCheck,
+  Activity as Pulse, Zap, Target,
   Smile, Meh, Frown,
   ChevronLeft, ChevronRight, CheckCircle2,
   ZoomIn, ZoomOut, Rotate3d, Scan, MousePointer2,
@@ -10,6 +10,9 @@ import {
   Flame, Activity, Siren, MessageSquare, Info, Move3d, Undo2,
   Thermometer, Hammer, Wind, Cigarette
 } from 'lucide-react';
+
+// Lazy load the 3D skeleton component for better performance
+const RealisticSkeleton3D = lazy(() => import('./RealisticSkeleton3D'));
 
 interface OnboardingProps {
   onSubmit: (assessment: UserAssessment) => void;
@@ -628,8 +631,17 @@ const Onboarding: React.FC<OnboardingProps> = ({ onSubmit, isLoading }) => {
       </div>
 
       <div className="flex flex-col xl:flex-row gap-10 items-center xl:items-start">
-        <div className="w-full max-w-[400px] flex justify-center order-2 xl:order-1">
-            <HolographicBodyScanner selected={data.injuryLocation} onSelect={(part) => { updateData('injuryLocation', part); setShowCustomBodyInput(false); }} />
+        <div className="w-full max-w-[450px] flex justify-center order-2 xl:order-1">
+            <Suspense fallback={
+              <div className="w-full h-[550px] bg-black rounded-[2rem] flex items-center justify-center">
+                <div className="text-white/50 text-sm font-medium animate-pulse">Laddar 3D-modell...</div>
+              </div>
+            }>
+              <RealisticSkeleton3D
+                selected={data.injuryLocation}
+                onSelect={(part) => { updateData('injuryLocation', part); setShowCustomBodyInput(false); }}
+              />
+            </Suspense>
         </div>
         
         <div className="w-full xl:flex-1 space-y-6 order-1 xl:order-2">
