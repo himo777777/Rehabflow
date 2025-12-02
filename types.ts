@@ -30,6 +30,8 @@ export interface UserAssessment {
   injuryMechanism?: string; // How did it happen?
   additionalInfo?: string; // Free text from patient
   // New Adaptive Fields
+  painCharacter?: string; // 'molande', 'huggande' etc.
+  functionalLimitations?: string[]; // e.g. 'Can't sit', 'Can't run'
   specificAnswers: Record<string, string>; // Dynamic answers based on body part
   lifestyle: {
     sleep: 'Dålig' | 'Okej' | 'Bra';
@@ -80,7 +82,7 @@ export interface RehabPhase {
 
 export interface PatientEducation {
   diagnosis: string; // Specific medical name (e.g., "Patellofemoralt smärtsyndrom")
-  explanation: string; // Simple explanation of the condition
+  explanation: string; // Simple explanation for the patient
   pathology: string; // What is happening biologically? (Tissue healing, etc.)
   prognosis: string; // Expected timeline and outcome
   scienceBackground: string; // Why exercise helps (mechanotransduction, etc.)

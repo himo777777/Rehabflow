@@ -1,5 +1,8 @@
 {
   "name": "RehabFlow",
   "description": "En sofistikerad, AI-driven rehabiliteringsplattform som skapar personliga återhämtningsprogram baserade på kliniska riktlinjer och den senaste forskningen för akuta, kroniska och postoperativa tillstånd.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
 }

@@ -137,35 +137,47 @@ export const generateRehabProgram = async (assessment: UserAssessment): Promise<
   }
 
   const prompt = `
-    Agera som en specialistfysioterapeut (OMT) och ortopedisk expert. Skapa ett rehabprogram och PATIENTUTBILDNING på SVENSKA.
+    Agera som ett MULTI-DISCIPLINÄRT TEAM bestående av en Senior Ortopedläkare och en Specialistfysioterapeut (OMT).
+    Er uppgift är att ställa en hypotetisk diagnos och skapa ett rehabprogram i världsklass.
 
-    Patient:
+    PATIENTPROFIL:
     - ${assessment.name}, ${assessment.age} år.
     - Skada: ${assessment.injuryLocation} (${assessment.injuryType}).
-    - Debut: ${assessment.symptomDuration || 'Okänt'}
-    - Uppkomstmekanism: ${assessment.injuryMechanism || 'Okänt'}
-    - Symtom: ${assessment.symptoms.join(', ')}.
-    - Smärta (Vila): ${assessment.painLevel}/10.
-    - Smärta (Aktivitet): ${assessment.activityPainLevel}/10.
-    - Kliniska detaljer: ${clinicalDetails}
-    - Patientens egna ord/noteringar: "${assessment.additionalInfo || 'Inga'}"
+    - Smärtkaraktär: ${assessment.painCharacter || 'Okänd'} (Viktigt för diagnos: Molande=Led/Muskel, Brännande=Nerv, Huggande=Struktur).
+    - Funktionella begränsningar: ${(assessment.functionalLimitations || []).join(', ')}.
     
-    Biopsykosocial status:
+    KLINISK ANAMNES (Viktigt för differentialdiagnostik):
+    ${clinicalDetails}
+    
+    PATIENTENS NOTERINGAR:
+    "${assessment.additionalInfo || 'Inga'}"
+    
+    BIOPSYKOSOCIALT:
     - Stress: ${assessment.lifestyle?.stress}, Sömn: ${assessment.lifestyle?.sleep}.
-    - Rörelserädsla: ${assessment.lifestyle?.fearAvoidance ? 'JA' : 'Nej'}.
+    - Rörelserädsla: ${assessment.lifestyle?.fearAvoidance ? 'JA - Använd tryggande ord' : 'Nej'}.
 
-    Instruktioner:
+    DIREKTIV:
     1. ${intensityDirective}
     2. ${painDirective}
     3. ${safetyDirective}
-    4. GENERERA 'patientEducation' noggrant:
-       - Sätt en specifik hypotetisk diagnos baserat på anamnesen (t.ex. "Patellofemoralt smärtsyndrom" istället för bara "Ont i knät").
-       - Förklara 'pathology' pedagogiskt (vävnadsläkning, inflammation, sensitivitet).
-       - Ange källor (Guidelines) som 'sources' (t.ex. "Svenska Fysioterapiförbundet", "NICE Guidelines", "Osteoarthritis Research Society International").
-       - Förklara 'scienceBackground': Varför fungerar träning? (Mekanotransduktion, Gate Control Theory, etc.).
-    5. Skapa 2-3 faser enligt 'Peace & Love' eller 'Graded Exposure'.
-    6. Fyll i 'risks', 'advancedTips', 'difficulty', 'calories' noga för varje övning.
-    7. För 'videoUrl', försök ange en korrekt YouTube Embed-länk (https://www.youtube.com/embed/VIDEO_ID) om du känner till en specifik, korrekt teknikvideo. Annars lämna tomt.
+    4. ANALYSERA SVAREN:
+       - Om knäsmärta ökar vid "Uppvärmning" -> Misstänk Tendinopati.
+       - Om "Låsningar" finns -> Misstänk Menisk.
+       - Om "Nattlig smärta" i axel -> Misstänk Frozen Shoulder/Cuff.
+       - Om "Brännande" smärta -> Misstänk Nervpåverkan.
+    
+    5. SKAPA 'patientEducation':
+       - Sätt en specifik diagnos (t.ex. "Patellofemoralt smärtsyndrom" istället för "Ont i knät").
+       - Förklara varför diagnosen stämmer baserat på svaren ovan.
+       - Citera riktiga källor (Svenska Fysioterapiförbundet, FYSS, NICE).
+
+    6. SKAPA PROGRAMMET:
+       - 2-3 Faser (Akut -> Uppbyggnad -> Återgång).
+       - Övningarna måste matcha diagnosen exakt (t.ex. Isometrisk för senor, Cirkulation för ryggskott).
+       - Fyll i 'risks', 'advancedTips' noggrant.
+
+    7. VIDEO:
+       - Försök ange en korrekt YouTube Embed-länk om du vet en specifik, korrekt teknikvideo. Annars lämna tomt.
 
     Returnera JSON enligt schema.
   `;

@@ -1,3 +1,4 @@
+
 import { GeneratedProgram, ProgressHistory, UserAssessment } from '../types';
 import { supabase, getUserId } from './supabaseClient';
 
@@ -89,14 +90,19 @@ export const storageService = {
   },
 
   clearProgram: async (): Promise<void> => {
+    // Clear all local data immediately
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(ASSESSMENT_KEY);
+    localStorage.removeItem(HISTORY_KEY);
+    
+    // Clear cloud data in background
     if (supabase && isOnline()) {
         try {
             const userId = getUserId();
             await supabase.from('programs').delete().eq('user_id', userId);
             await supabase.from('progress').delete().eq('user_id', userId);
         } catch (e) {
-            console.error(e);
+            console.error('Failed to clear cloud data', e);
         }
     }
   },

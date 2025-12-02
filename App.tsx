@@ -1,16 +1,16 @@
-
 import React, { useState, useEffect } from 'react';
+import { Routes, Route, Navigate, useNavigate, useLocation, Link } from 'react-router-dom';
 import Onboarding from './components/Onboarding';
 import ProgramView from './components/ProgramView';
 import ExerciseLibrary from './components/ExerciseLibrary';
 import ProgressDashboard from './components/ProgressDashboard';
 import AIChat from './components/AIChat';
+import Logo from './components/Logo';
+import Toast, { ToastMessage, ToastType } from './components/Toast';
 import { UserAssessment, GeneratedProgram } from './types';
 import { generateRehabProgram } from './services/geminiService';
 import { storageService } from './services/storageService';
-import { Stethoscope, HeartPulse, UserCircle, BookOpen, Home, RefreshCw, Loader2, LogOut, TrendingUp, Sparkles, Cloud, ShieldAlert } from 'lucide-react';
-
-type View = 'program' | 'library' | 'progress';
+import { BookOpen, Home, RefreshCw, LogOut, TrendingUp, Sparkles, Cloud, ShieldAlert } from 'lucide-react';
 
 const LOADING_MESSAGES = [
   "Analyserar din skadeprofil...",
@@ -23,20 +23,47 @@ const LOADING_MESSAGES = [
 
 export default function App() {
   const [program, setProgram] = useState<GeneratedProgram | null>(null);
-  const [currentView, setCurrentView] = useState<View>('program');
   const [isLoading, setIsLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Toast State
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  // Load saved program on startup (Async now)
+  const addToast = (type: ToastType, title: string, message: string) => {
+      const id = Math.random().toString(36).substring(2, 9);
+      setToasts(prev => [...prev, { id, type, title, message }]);
+      // Auto remove after 4s
+      setTimeout(() => {
+          setToasts(prev => prev.filter(t => t.id !== id));
+      }, 4000);
+  };
+
+  const removeToast = (id: string) => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+  };
+
+  // Load saved program on startup (Async)
   useEffect(() => {
     const initApp = async () => {
-        const savedProgram = await storageService.getProgram();
-        if (savedProgram) {
-            setProgram(savedProgram);
+        try {
+            const savedProgram = await storageService.getProgram();
+            if (savedProgram) {
+                setProgram(savedProgram);
+                // If we are at root and have a program, go to program view
+                if (location.pathname === '/') {
+                   navigate('/program', { replace: true });
+                }
+            }
+        } catch (e) {
+            console.error("Init failed", e);
+        } finally {
+            setIsInitializing(false);
         }
-        setIsInitializing(false);
     };
     initApp();
   }, []);
@@ -59,21 +86,23 @@ export default function App() {
     try {
       const result = await generateRehabProgram(assessment);
       setProgram(result);
-      // Save program AND the assessment data to Supabase/Local
       await storageService.saveProgram(result, assessment);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      addToast('success', 'Program skapat', 'Din rehabplan är klar och sparad.');
+      navigate('/program');
     } catch (err) {
       setError("Misslyckades med att skapa program. Kontrollera din anslutning och försök igen.");
+      addToast('error', 'Fel vid generering', 'Kunde inte skapa programmet. Försök igen.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleReset = async () => {
+  const handleReset = () => {
     if (confirm("Är du säker på att du vill radera ditt nuvarande program och börja om? Detta raderar även din data från molnet.")) {
-      await storageService.clearProgram();
       setProgram(null);
-      setCurrentView('program');
+      storageService.clearProgram().catch(console.error);
+      addToast('info', 'Återställd', 'Ditt program har raderats.');
+      navigate('/');
     }
   };
 
@@ -106,7 +135,7 @@ export default function App() {
           <div className="relative w-24 h-24 mx-auto mb-8">
              <div className="absolute inset-0 border-[6px] border-slate-100 rounded-full"></div>
              <div className="absolute inset-0 border-[6px] border-primary-500 rounded-full border-t-transparent animate-spin"></div>
-             <HeartPulse className="absolute inset-0 m-auto text-primary-500 animate-pulse" size={36} />
+             <Logo className="absolute inset-0 m-auto text-primary-500 animate-pulse" size={40} />
           </div>
           <h2 className="text-2xl font-bold text-slate-800 mb-3">Skapar ditt program</h2>
           <p className="text-slate-500 h-6 transition-all duration-500 fade-in font-medium">
@@ -125,6 +154,9 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50/50 text-slate-900 font-sans flex flex-col relative overflow-x-hidden w-full">
       
+      {/* Toast Container */}
+      <Toast toasts={toasts} removeToast={removeToast} />
+
       {/* Decorative Background Elements */}
       <div className="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
           <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] bg-primary-200/20 rounded-full blur-[100px]"></div>
@@ -135,45 +167,45 @@ export default function App() {
       <nav className="sticky top-4 z-50 px-4 sm:px-6 lg:px-8 mb-6 print:hidden">
         <div className="max-w-6xl mx-auto">
           <div className="bg-white/70 backdrop-blur-lg border border-white/40 shadow-lg rounded-2xl px-6 h-16 flex justify-between items-center transition-all duration-300">
-            <button 
-                onClick={() => setCurrentView('program')}
+            <Link 
+                to="/"
                 className="flex items-center gap-3 focus:outline-none group"
             >
-              <div className="bg-gradient-to-br from-primary-500 to-indigo-600 p-2.5 rounded-xl text-white shadow-lg shadow-primary-500/30 group-hover:shadow-primary-500/50 transition-all duration-300 group-hover:scale-105">
-                <HeartPulse size={22} />
+              <div className="text-primary-600 transition-transform duration-300 group-hover:scale-105">
+                <Logo size={32} />
               </div>
-              <span className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-700 tracking-tight">
+              <span className="text-xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-700 tracking-tight">
                 RehabFlow
               </span>
-            </button>
+            </Link>
             
             <div className="flex items-center gap-2">
                <div className="hidden md:flex items-center bg-slate-100/50 p-1 rounded-xl">
-                 <button 
-                    onClick={() => setCurrentView('program')}
-                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${currentView === 'program' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/50'}`}
+                 <Link 
+                    to="/program"
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${location.pathname === '/program' || (location.pathname === '/' && program) ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/50'}`}
                  >
                     <Home size={18} /> <span className="hidden lg:inline">Hem</span>
-                 </button>
+                 </Link>
                  
                  {program && (
-                    <button 
-                        onClick={() => setCurrentView('progress')}
-                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${currentView === 'progress' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/50'}`}
+                    <Link 
+                        to="/progress"
+                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${location.pathname === '/progress' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/50'}`}
                     >
                         <TrendingUp size={18} /> <span className="hidden lg:inline">Framsteg</span>
-                    </button>
+                    </Link>
                  )}
 
-                 <button 
-                    onClick={() => setCurrentView('library')}
-                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${currentView === 'library' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/50'}`}
+                 <Link 
+                    to="/library"
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${location.pathname === '/library' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/50'}`}
                  >
                     <BookOpen size={18} /> <span className="hidden lg:inline">Bibliotek</span>
-                 </button>
+                 </Link>
                </div>
                
-               {program && currentView === 'program' && (
+               {program && (
                   <button 
                     onClick={handleReset}
                     className="ml-4 px-3 py-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all flex items-center gap-2 border border-transparent hover:border-red-100"
@@ -195,33 +227,44 @@ export default function App() {
             </div>
         )}
 
-        {currentView === 'library' ? (
-          <ExerciseLibrary />
-        ) : currentView === 'progress' ? (
-          <ProgressDashboard totalExercisesInRoutine={totalExercises} />
-        ) : (
-          /* Program View Logic */
-          !program ? (
-            <div className="pt-8 px-4 max-w-5xl mx-auto">
-              <div className="text-center mb-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-50 text-primary-700 text-xs font-bold uppercase tracking-wider mb-6 border border-primary-100">
-                      <Sparkles size={12} /> AI-Driven Fysioterapi
-                  </div>
-                  <h1 className="text-5xl md:text-6xl font-extrabold text-slate-900 tracking-tight mb-6 leading-tight">
-                    Rehabilitering på <br className="hidden sm:block" />
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-indigo-600">din kropps villkor.</span>
-                  </h1>
-                  <p className="mt-6 max-w-2xl mx-auto text-xl text-slate-500 leading-relaxed">
-                    Få ett skräddarsytt återhämtningsprogram baserat på klinisk evidens, din skadehistorik och den senaste medicinska forskningen.
-                  </p>
-              </div>
-              
-              <Onboarding onSubmit={handleAssessmentSubmit} isLoading={isLoading} />
-            </div>
-          ) : (
-            <ProgramView program={program} />
-          )
-        )}
+        <Routes>
+            {/* Onboarding / Home Route */}
+            <Route path="/" element={
+                program ? <Navigate to="/program" replace /> : (
+                    <div className="pt-8 px-4 max-w-5xl mx-auto">
+                      <div className="text-center mb-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+                          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-50 text-primary-700 text-xs font-bold uppercase tracking-wider mb-6 border border-primary-100">
+                              <Sparkles size={12} /> AI-Driven Fysioterapi
+                          </div>
+                          <h1 className="text-5xl md:text-6xl font-extrabold text-slate-900 tracking-tight mb-6 leading-tight">
+                            Rehabilitering på <br className="hidden sm:block" />
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-indigo-600">din kropps villkor.</span>
+                          </h1>
+                          <p className="mt-6 max-w-2xl mx-auto text-xl text-slate-500 leading-relaxed">
+                            Få ett skräddarsytt återhämtningsprogram baserat på klinisk evidens, din skadehistorik och den senaste medicinska forskningen.
+                          </p>
+                      </div>
+                      <Onboarding onSubmit={handleAssessmentSubmit} isLoading={isLoading} />
+                    </div>
+                )
+            } />
+
+            {/* Program Route - Protected */}
+            <Route path="/program" element={
+                program ? <ProgramView program={program} /> : <Navigate to="/" replace />
+            } />
+
+            {/* Library Route */}
+            <Route path="/library" element={<ExerciseLibrary />} />
+
+            {/* Progress Route - Protected */}
+            <Route path="/progress" element={
+                program ? <ProgressDashboard totalExercisesInRoutine={totalExercises} /> : <Navigate to="/" replace />
+            } />
+            
+            {/* Fallback */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
         
         {/* GLOBAL AI CHAT COMPONENT */}
         {program && <AIChat program={program} />}
@@ -230,8 +273,8 @@ export default function App() {
       {/* Footer */}
       <footer className="mt-auto py-12 print:hidden bg-slate-100/50 border-t border-slate-200/50">
         <div className="max-w-7xl mx-auto px-4 text-center">
-            <div className="flex justify-center items-center gap-2 mb-4 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
-                <HeartPulse size={24} className="text-primary-600"/>
+            <div className="flex justify-center items-center gap-2 mb-4 opacity-60 grayscale hover:grayscale-0 transition-all duration-500 text-primary-600">
+                <Logo size={32} />
                 <span className="font-bold text-lg text-slate-700">RehabFlow</span>
             </div>
             

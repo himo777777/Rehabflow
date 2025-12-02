@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { UserAssessment, InjuryType } from '../types';
 import { 
@@ -8,7 +7,8 @@ import {
   ChevronLeft, ChevronRight, CheckCircle2,
   ZoomIn, ZoomOut, Rotate3d, Scan, MousePointer2,
   Moon, Brain, Briefcase, AlertTriangle, Stethoscope,
-  Flame, Activity, Siren, MessageSquare, Info, Move3d, Undo2
+  Flame, Activity, Siren, MessageSquare, Info, Move3d, Undo2,
+  Thermometer, Hammer, Wind, Cigarette
 } from 'lucide-react';
 
 interface OnboardingProps {
@@ -17,100 +17,92 @@ interface OnboardingProps {
 }
 
 const INJURY_DESCRIPTIONS: Record<string, string> = {
-  [InjuryType.ACUTE]: "Plötslig skada (t.ex. vrickning, sträckning)",
-  [InjuryType.CHRONIC]: "Långvarig smärta (>3 mån) eller återkommande",
-  [InjuryType.POST_OP]: "Rehabilitering efter operation",
-  [InjuryType.PREHAB]: "Förebyggande träning"
+  [InjuryType.ACUTE]: "Plötslig skada (t.ex. vrickning, sträckning, smäll)",
+  [InjuryType.CHRONIC]: "Långvarig smärta (>3 mån) eller återkommande besvär",
+  [InjuryType.POST_OP]: "Rehabilitering efter operation (t.ex. Artroskopi, Protes)",
+  [InjuryType.PREHAB]: "Förebyggande träning inför säsong eller op."
 };
 
 const BODY_PART_SYMPTOMS: Record<string, string> = {
-    'Nacke': 'Vanligt vid nackspärr, whiplash eller "gamnacke" (mobilanvändande).',
-    'Axlar': 'Kan indikera impingement, rotatorcuff-skador eller frusen axel.',
-    'Bröstrygg': 'Ofta kopplat till hållning, låsningar eller stress.',
-    'Armbåge': 'T.ex. tennisarmbåge (utsida) eller golfarmbåge (insida).',
-    'Handled': 'Kan vara karpaltunnelsyndrom eller överbelastning vid datorarbete.',
-    'Ländrygg': 'Vanligt vid ryggskott, diskbråck eller ischias-känningar.',
-    'Ljumskar': 'Ofta sträckningar vid idrott eller höftledsproblematik.',
-    'Säte': 'Kan vara piriformis-syndrom eller smärta från höftleden.',
-    'Lår (Bak)': 'Hamstringsbristningar är vanliga här vid löpning/sprint.',
-    'Knä': 'Hopparknä, löparknä, menisk eller ledbandsskador.',
-    'Underben': 'Benhinneproblem eller stressfrakturer.',
-    'Vad': 'Gubbvad (bristning) eller kramp är vanligt här.',
-    'Häl': 'Hälsporre (Plantar fasciit) eller hälseneinflammation.',
-    'Fot': 'Stukningar eller nedsjunkna fotvalv.'
+    'Nacke': 'Cervikalgi, Whiplash, Diskbråck eller Spänningshuvudvärk.',
+    'Axlar': 'Impingement, Rotatorcuff-ruptur, Frozen Shoulder eller AC-led.',
+    'Bröstrygg': 'Thorakal segmentell dysfunktion, "Låsning" eller Stress.',
+    'Armbåge': 'Lateral epikondylit (Tennis), Medial (Golf) eller Bursit.',
+    'Handled': 'Karpaltunnelsyndrom, TFCC-skada eller Överbelastning.',
+    'Ländrygg': 'Lumbago (Ryggskott), Ischias, Diskbråck eller Spinal stenos.',
+    'Ljumskar': 'FAI (Impingement), Adduktor-tendinopati eller Sportbråck.',
+    'Säte': 'Gluteal tendinopati, Piriformis-syndrom eller Höftledsartros.',
+    'Lår (Bak)': 'Hamstrings-ruptur/tendinopati (Löparskada).',
+    'Knä': 'Patellofemoralt smärtsyndrom (PFSS), Menisk, Korsband eller Artros.',
+    'Underben': 'Medialt Tibialt Stressyndrom (Benhinnor) eller Kompartment.',
+    'Vad': 'Gastrocnemius-ruptur (Gubbvad) eller Akillestendinopati.',
+    'Häl': 'Plantar fasciit (Hälsporre), Haglunds häl eller Fettkudde.',
+    'Fot': 'Metatarsalgi, Morton\'s neurom eller Fotledsstukning.'
+};
+
+const PAIN_CHARACTERS = [
+    { id: 'molande', label: 'Molande / Värkande', icon: Moon, desc: 'Vanligt vid inflammation/artros' },
+    { id: 'huggande', label: 'Huggande / Skarp', icon: Zap, desc: 'Vid vissa rörelser/låsningar' },
+    { id: 'brannande', label: 'Brännande / Elektrisk', icon: Flame, desc: 'Kan tyda på nervpåverkan' },
+    { id: 'bultande', label: 'Bultande / Pulserande', icon: Activity, desc: 'Hög inflammation/akut fas' }
+];
+
+const FUNCTIONAL_LIMITS: Record<string, string[]> = {
+    'Knä': ['Gå i trappor', 'Sitta på huk', 'Springa/Hoppa', 'Sitta stilla länge (bio)'],
+    'Ländrygg': ['Ta på strumpor', 'Lyfta tungt', 'Sitta vid skrivbord', 'Sova hela natten'],
+    'Axlar': ['Kamma håret/tvätta rygg', 'Sova på sidan', 'Lyfta armen över axelhöjd', 'Bära matkassar'],
+    'Nacke': ['Vrida huvudet vid bilkörning', 'Titta ner i mobilen', 'Sova på mage', 'Jobba vid datorn'],
+    'General': ['Sova', 'Gå promenader', 'Lyfta barn/barnbarn', 'Utöva min sport']
 };
 
 const RED_FLAGS: Record<string, string[]> = {
     'Ländrygg': [
-        'Har du tappat känseln i underlivet/ljumskarna?',
-        'Har du svårt att hålla tätt (urin/avföring)?',
-        'Har du plötslig svaghet i båda benen?'
+        'Har du tappat känseln i underlivet/ljumskarna? (Ridbyxeanestesi)',
+        'Har du svårt att kontrollera urin eller avföring?',
+        'Har du plötslig kraftlöshet i båda benen?'
     ],
     'Nacke': [
-        'Har du svårt att prata eller svälja?',
-        'Har du domningar runt munnen?',
-        'Har du svimmat i samband med huvudvridning?'
+        'Upplever du svårigheter att prata eller svälja?',
+        'Har du domningar runt munnen eller i ansiktet?',
+        'Har du svimmat (drop attack) vid huvudvridning?'
     ],
     'Generic': [
-        'Har du feber eller allmän sjukdomskänsla?',
-        'Har du oförklarlig viktnedgång?',
-        'Är smärtan konstant och opåverkbar av läge?',
-        'Har du haft cancer tidigare?'
+        'Har du feber eller allmän sjukdomskänsla ihop med smärtan?',
+        'Har du haft oväntad viktnedgång den senaste tiden?',
+        'Är smärtan konstant dygnet runt och påverkas inte av läge?',
+        'Har du tidigare cancerhistorik?'
     ]
 };
 
-const BODY_SPECIFIC_QUESTIONS: Record<string, { id: string, label: string, options: string[] }[]> = {
+const BODY_SPECIFIC_QUESTIONS: Record<string, { id: string, label: string, options: string[], hint?: string }[]> = {
     'Knä': [
-        { id: 'stairs', label: 'Hur känns det att gå i trappor?', options: ['Inga problem', 'Smärta nerför', 'Smärta uppför', 'Smärta både upp/ner'] },
-        { id: 'locking', label: 'Upplever du låsningar eller att knät "viker sig"?', options: ['Nej', 'Ja, låsningar', 'Ja, viker sig', 'Båda'] },
-        { id: 'swelling', label: 'Svullnar knät upp efter aktivitet?', options: ['Nej', 'Lite grann', 'Ja, tydligt'] }
+        { id: 'warmup_effect', label: 'Hur reagerar smärtan på aktivitet?', options: ['Värst i början, blir bättre när jag är varm', 'Gör mer och mer ont ju längre jag håller på', 'Gör ont direkt och släpper aldrig', 'Kommer smygande efter passet'], hint: 'Skiljer på Senor (Warm-up) vs Led/Ben (Värre)' },
+        { id: 'stairs', label: 'Var gör det ont i trappor?', options: ['Mest nerför (Framsida knä)', 'Mest uppför (Belastning)', 'Inga problem i trappor', 'Det hugger till plötsligt'], hint: 'Nerförsmärta indikerar ofta PFSS/Hopparknä' },
+        { id: 'locking', label: 'Mekaniska symptom?', options: ['Knät låser sig helt', 'Det knäpper/klickar ljudligt', 'Känsla av att det viker sig (Giving way)', 'Nej, bara smärta'], hint: 'Låsningar = Menisk? Viker sig = Korsband/Muskelsvaghet?' },
+        { id: 'swelling', label: 'Svullnad?', options: ['Nej', 'Ja, direkt efter skada (inom 2h)', 'Ja, kommer dagen efter', 'Konstant svullet'], hint: 'Snabbt = Blödning (ACL). Långsamt = Synovit/Menisk.' }
     ],
     'Ländrygg': [
-        { id: 'radiation', label: 'Strålar smärtan ner i benen?', options: ['Nej', 'Ja, till skinkan', 'Ja, nedanför knät'] },
-        { id: 'movement', label: 'Vad förvärrar smärtan?', options: ['Sitta stilla', 'Stå/Gå', 'Framåtböjning', 'Bakåtböjning'] },
-        { id: 'morning', label: 'Hur känns ryggen på morgonen?', options: ['Bra', 'Lite stel (<30 min)', 'Mycket stel (>60 min)'] }
+        { id: 'radiation', label: 'Utstrålning i benen?', options: ['Nej, bara i ryggen', 'Ja, ner till skinkan/baksida lår', 'Ja, nedanför knät/till foten', 'Domningar/sockerdricka'], hint: 'Nedanför knät = Rotpåverkan (Diskbråck/Stenos)' },
+        { id: 'directional', label: 'Vad känns BÄST?', options: ['Att gå/stå (Extension)', 'Att sitta/ligga med böjda ben (Flexion)', 'Att ligga helt stilla', 'Variera position ofta'], hint: 'Gilla Flexion = Stenos? Gilla Extension = Disk?' },
+        { id: 'cough', label: 'Gör det ont att hosta/nysa?', options: ['Nej', 'Ja, det hugger i ryggen', 'Ja, det strålar ner i benet'], hint: 'Bukhöjningstryck indikerar diskinvolvering' }
     ],
     'Axlar': [
-        { id: 'overhead', label: 'Kan du lyfta armen över huvudet?', options: ['Ja, smärtfritt', 'Ja, men det gör ont', 'Nej, det tar stopp'] },
-        { id: 'night', label: 'Vaknar du av smärta om du ligger på axeln?', options: ['Nej', 'Ibland', 'Ja, ofta'] },
-        { id: 'instability', label: 'Känns axeln "lös" eller instabil?', options: ['Nej', 'Lite', 'Ja, mycket'] }
-    ],
-    'Nacke': [
-        { id: 'headache', label: 'Har du huvudvärk kopplat till nacken?', options: ['Nej', 'Ibland (Spänningshuvudvärk)', 'Ja, ofta'] },
-        { id: 'driving', label: 'Gör det ont att vrida på huvudet (t.ex. vid bilkörning)?', options: ['Nej', 'Lite stelt', 'Ja, smärtsamt'] }
-    ],
-    'Fot': [
-        { id: 'morning_steps', label: 'Gör de första stegen på morgonen ont?', options: ['Nej', 'Ja, under hälen', 'Ja, i senan'] },
-        { id: 'load', label: 'När gör det mest ont?', options: ['Vid frånskjut', 'Vid landning', 'I vila'] }
+        { id: 'pain_arc', label: 'När gör det ont i lyftet (Painful Arc)?', options: ['Gör inte ont att lyfta', 'Ont i mitten av lyftet (70-120 grader)', 'Ont allra högst upp (170-180 grader)', 'Kan inte lyfta armen'], hint: 'Mitten = Subacromiell (Impingement). Toppen = AC-led.' },
+        { id: 'night', label: 'Nattlig smärta?', options: ['Nej', 'Kan inte ligga på axeln', 'Vaknar av värk oavsett läge'], hint: 'Vilo/nattsmärta indikerar Frozen Shoulder eller inflammatorisk process.' },
+        { id: 'sudden', label: 'Känns axeln instabil?', options: ['Nej, den sitter fast', 'Känns "glapp" vid kaströrelser', 'Känns som den ska hoppa ur led'], hint: 'Instabilitet vs Smärta.' }
     ],
     'Häl': [
-        { id: 'morning_steps', label: 'Gör de första stegen på morgonen ont?', options: ['Nej', 'Ja, under hälen', 'Ja, i senan'] },
-        { id: 'stiffness', label: 'Är hälsenan stel?', options: ['Nej', 'Ja, på morgonen', 'Ja, hela tiden'] }
-    ],
-    'Säte': [
-        { id: 'sitting', label: 'Gör det ont att sitta länge?', options: ['Nej', 'Ja, djupt i sätet', 'Ja, strålar ner i benet'] },
-        { id: 'crossing', label: 'Gör det ont att korsa benen?', options: ['Nej', 'Ja, stramar', 'Ja, smärta'] }
-    ],
-    'Ljumskar': [
-        { id: 'kick', label: 'Gör det ont att föra benet inåt (t.ex. sparka boll)?', options: ['Nej', 'Ja'] },
-        { id: 'stiffness', label: 'Känner du stelhet på morgonen?', options: ['Nej', 'Lite', 'Ja, mycket'] }
-    ],
-    'Armbåge': [
-         { id: 'grip', label: 'Gör det ont att greppa saker hårt?', options: ['Nej', 'Ja, utsidan', 'Ja, insidan'] },
-         { id: 'mouse', label: 'Gör det ont vid datorarbete?', options: ['Nej', 'Ja'] }
-    ],
-     'Handled': [
-         { id: 'support', label: 'Gör det ont att stödja på handen (t.ex. armhävning)?', options: ['Nej', 'Ja', 'Omöjligt'] },
-         { id: 'numbness', label: 'Domnar fingrarna?', options: ['Nej', 'Ja, tumme/pekfinger', 'Ja, lillfinger'] }
+        { id: 'morning', label: 'Morgonstelhet/Smärta?', options: ['De första stegen är värst, sen mjuknar det', 'Ingen skillnad på morgonen', 'Stel men inte smärtsam'], hint: 'Klassiskt tecken på Plantar Fasciit' },
+        { id: 'location', label: 'Var sitter smärtan exakt?', options: ['Under hälen (trampdynan)', 'Bak på hälen (fästet)', 'Några cm upp på hälsenan'], hint: 'Under = PF. Bak = Haglund/Bursit. Upp = Akilles.' }
     ]
 };
 
-const GENERIC_QUESTIONS = [
+const GENERIC_QUESTIONS: { id: string, label: string, options: string[], hint?: string }[] = [
     { id: 'load', label: 'När gör det mest ont?', options: ['I vila', 'Vid belastning', 'Efter aktivitet', 'Hela tiden'] },
     { id: 'stiffness', label: 'Upplever du stelhet?', options: ['Ingen', 'På morgonen', 'Efter stillasittande', 'Konstant'] }
 ];
 
-// --- HOLOGRAPHIC 3D BODY SCANNER ---
+// --- HOLOGRAPHIC 3D BODY SCANNER (DETAILED LINE ART STYLE) ---
 interface BodyPoint { id: string; x: number; y: number; view: 'front' | 'back'; label: string; }
 const BODY_POINTS: BodyPoint[] = [
   // FRONT POINTS
@@ -188,48 +180,47 @@ const HolographicBodyScanner = ({ selected, onSelect }: { selected: string, onSe
         <div className="flex flex-col items-center w-full animate-in fade-in zoom-in duration-700">
             <div 
                 ref={containerRef}
-                className={`relative h-[550px] w-full max-w-[380px] bg-slate-900 rounded-[2.5rem] overflow-hidden shadow-2xl shadow-slate-900/40 border border-slate-700/50 group select-none ring-4 ring-slate-100 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                className={`relative h-[550px] w-full max-w-[380px] bg-black rounded-[2.5rem] overflow-hidden shadow-2xl shadow-slate-900 border border-slate-800 group select-none ring-4 ring-slate-100 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseUp}
                 onWheel={handleWheel}
             >
-                {/* Holographic Effects */}
-                <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,255,0.03)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none"></div>
-                <div className="absolute top-0 w-full h-1 bg-cyan-400/50 blur-md animate-[scan_4s_ease-in-out_infinite] z-20 pointer-events-none shadow-[0_0_15px_rgba(34,211,238,0.5)]"></div>
-                <div className="absolute inset-0 bg-radial-gradient from-transparent via-slate-900/20 to-slate-900 pointer-events-none z-10"></div>
+                {/* Background Grid - Dark */}
+                <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none"></div>
+                <div className="absolute inset-0 bg-radial-gradient from-transparent via-black/80 to-black pointer-events-none z-10"></div>
                 
                 {/* 3D Tools UI */}
                 <div className="absolute top-6 right-6 z-30 flex flex-col gap-2">
-                    <button onClick={(e) => { e.stopPropagation(); setZoom(z => Math.min(z + 0.2, 2.5)); }} className="p-2.5 bg-slate-800/90 text-cyan-400 rounded-xl hover:bg-slate-700 border border-slate-600 backdrop-blur-md shadow-lg active:scale-95 transition-all" title="Zooma in"><ZoomIn size={18} /></button>
-                    <button onClick={(e) => { e.stopPropagation(); setZoom(z => Math.max(z - 0.2, 0.6)); }} className="p-2.5 bg-slate-800/90 text-cyan-400 rounded-xl hover:bg-slate-700 border border-slate-600 backdrop-blur-md shadow-lg active:scale-95 transition-all" title="Zooma ut"><ZoomOut size={18} /></button>
+                    <button onClick={(e) => { e.stopPropagation(); setZoom(z => Math.min(z + 0.2, 2.5)); }} className="p-2.5 bg-white/10 text-white rounded-xl hover:bg-white/20 border border-white/10 backdrop-blur-md shadow-lg active:scale-95 transition-all" title="Zooma in"><ZoomIn size={18} /></button>
+                    <button onClick={(e) => { e.stopPropagation(); setZoom(z => Math.max(z - 0.2, 0.6)); }} className="p-2.5 bg-white/10 text-white rounded-xl hover:bg-white/20 border border-white/10 backdrop-blur-md shadow-lg active:scale-95 transition-all" title="Zooma ut"><ZoomOut size={18} /></button>
                 </div>
                 
                 <div className="absolute top-6 left-6 z-30 flex flex-col gap-2">
-                     <button onClick={(e) => { e.stopPropagation(); snapToView('front'); }} className={`px-3 py-2 text-xs font-bold rounded-xl border backdrop-blur-md transition-all ${!isBackView ? 'bg-cyan-500 text-white border-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.5)]' : 'bg-slate-800/90 text-slate-400 border-slate-600 hover:text-cyan-400'}`}>Framsida</button>
-                     <button onClick={(e) => { e.stopPropagation(); snapToView('back'); }} className={`px-3 py-2 text-xs font-bold rounded-xl border backdrop-blur-md transition-all ${isBackView ? 'bg-cyan-500 text-white border-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.5)]' : 'bg-slate-800/90 text-slate-400 border-slate-600 hover:text-cyan-400'}`}>Baksida</button>
+                     <button onClick={(e) => { e.stopPropagation(); snapToView('front'); }} className={`px-3 py-2 text-xs font-bold rounded-xl border backdrop-blur-md transition-all ${!isBackView ? 'bg-cyan-500 text-black border-cyan-400' : 'bg-white/10 text-slate-400 border-white/10 hover:text-white'}`}>Framsida</button>
+                     <button onClick={(e) => { e.stopPropagation(); snapToView('back'); }} className={`px-3 py-2 text-xs font-bold rounded-xl border backdrop-blur-md transition-all ${isBackView ? 'bg-cyan-500 text-black border-cyan-400' : 'bg-white/10 text-slate-400 border-white/10 hover:text-white'}`}>Baksida</button>
                 </div>
 
                 {/* Info HUD */}
                 {selected && infoText && (
-                    <div className="absolute bottom-6 left-6 right-6 z-40 bg-slate-900/80 backdrop-blur-md border border-cyan-500/30 p-4 rounded-2xl shadow-2xl animate-in slide-in-from-bottom-4 duration-300 pointer-events-none">
+                    <div className="absolute bottom-6 left-6 right-6 z-40 bg-black/90 backdrop-blur-md border border-cyan-500/50 p-4 rounded-2xl shadow-2xl animate-in slide-in-from-bottom-4 duration-300 pointer-events-none">
                         <div className="flex items-start gap-3">
-                            <div className="p-2 bg-cyan-900/50 rounded-lg text-cyan-400 mt-1">
+                            <div className="p-2 bg-cyan-900/50 rounded-lg text-cyan-400 mt-1 border border-cyan-800">
                                 <Info size={16} />
                             </div>
                             <div>
-                                <h4 className="text-cyan-50 font-bold text-sm mb-1 uppercase tracking-wide">{selected}</h4>
-                                <p className="text-cyan-100/70 text-xs leading-relaxed">{infoText}</p>
+                                <h4 className="text-white font-bold text-sm mb-1 uppercase tracking-wide">{selected}</h4>
+                                <p className="text-gray-300 text-xs leading-relaxed">{infoText}</p>
                             </div>
                         </div>
                     </div>
                 )}
 
                 {!hasInteracted && (
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center gap-2 text-cyan-300 pointer-events-none animate-pulse opacity-80">
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center gap-2 text-white/50 pointer-events-none animate-pulse">
                         <Move3d size={40} />
-                        <span className="font-bold tracking-widest text-sm uppercase bg-slate-900/50 px-3 py-1 rounded-full backdrop-blur-sm">Dra för att rotera</span>
+                        <span className="font-bold tracking-widest text-sm uppercase bg-black/60 px-3 py-1 rounded-full backdrop-blur-sm border border-white/10">Dra för att rotera</span>
                     </div>
                 )}
 
@@ -238,127 +229,203 @@ const HolographicBodyScanner = ({ selected, onSelect }: { selected: string, onSe
                     className="w-full h-full flex items-center justify-center transition-transform duration-100 ease-out will-change-transform cursor-grab active:cursor-grabbing"
                     style={{ perspective: '1000px', transform: `scale(${zoom})` }}
                 >
-                    <div className="relative w-[240px] h-[500px]" style={{ transformStyle: 'preserve-3d', transform: `rotateY(${rotation}deg)` }}>
+                    <div className="relative w-[280px] h-[550px]" style={{ transformStyle: 'preserve-3d', transform: `rotateY(${rotation}deg)` }}>
                         
-                        {/* FRONT SKELETON - ANATOMICAL VECTOR */}
+                        {/* FRONT SKELETON - ANATOMICAL LINE ART (STROKE BASED) */}
                         <div className="absolute inset-0" style={{ backfaceVisibility: 'hidden' }}>
-                             <svg viewBox="0 0 200 450" className="w-full h-full drop-shadow-[0_0_15px_rgba(34,211,238,0.2)]">
+                             <svg viewBox="0 0 200 450" className="w-full h-full drop-shadow-[0_0_5px_rgba(255,255,255,0.3)]">
                                 <defs>
-                                    <linearGradient id="boneGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                        <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0.2" />
-                                        <stop offset="50%" stopColor="#0ea5e9" stopOpacity="0.6" />
-                                        <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0.2" />
-                                    </linearGradient>
-                                    <filter id="glow">
-                                        <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                                    <filter id="glowLine">
+                                        <feGaussianBlur stdDeviation="0.5" result="coloredBlur"/>
                                         <feMerge>
                                             <feMergeNode in="coloredBlur"/>
                                             <feMergeNode in="SourceGraphic"/>
                                         </feMerge>
                                     </filter>
                                 </defs>
-                                <g fill="url(#boneGradient)" stroke="#0ea5e9" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" filter="url(#glow)">
-                                    {/* Skull */}
-                                    <path d="M75,20 C75,5 125,5 125,20 C125,45 110,60 100,65 C90,60 75,45 75,20 Z" />
-                                    <path d="M90,35 A5,5 0 1,1 90,45" fill="none" opacity="0.5"/>
-                                    <path d="M110,35 A5,5 0 1,1 110,45" fill="none" opacity="0.5"/>
+                                
+                                <g stroke="#e2e8f0" strokeWidth="1.2" fill="none" strokeLinecap="round" strokeLinejoin="round" filter="url(#glowLine)">
                                     
-                                    {/* Spine Cervical */}
-                                    <path d="M96,65 L96,80 L104,80 L104,65" strokeWidth="0.5"/>
-                                    
-                                    {/* Clavicles */}
-                                    <path d="M100,80 C120,75 140,80 155,85" fill="none" strokeWidth="2" />
-                                    <path d="M100,80 C80,75 60,80 45,85" fill="none" strokeWidth="2" />
+                                    {/* SKULL */}
+                                    <g transform="translate(100, 30)">
+                                        {/* Cranium */}
+                                        <path d="M0,-22 C-15,-22 -22,-12 -22,0 C-22,20 -12,32 0,35 C12,32 22,20 22,0 C22,-12 15,-22 0,-22 Z" />
+                                        {/* Jaw / Mandible */}
+                                        <path d="M-22,0 Q-22,15 -10,32 L0,38 L10,32 Q22,15 22,0" />
+                                        <path d="M-10,25 Q0,28 10,25" strokeWidth="0.5" /> {/* Teeth */}
+                                        {/* Orbits */}
+                                        <path d="M-12,2 A5,4 0 1,1 -4,2 A5,4 0 1,1 -12,2" />
+                                        <path d="M4,2 A5,4 0 1,1 12,2 A5,4 0 1,1 4,2" />
+                                        {/* Nose */}
+                                        <path d="M0,12 L-2,18 L2,18 Z" strokeWidth="0.8" />
+                                    </g>
 
-                                    {/* Sternum & Ribs */}
-                                    <path d="M95,85 L105,85 L102,120 L98,120 Z" />
-                                    <path d="M98,90 C80,95 70,110 75,130" fill="none" />
-                                    <path d="M102,90 C120,95 130,110 125,130" fill="none" />
-                                    <path d="M98,100 C80,105 75,120 80,135" fill="none" />
-                                    <path d="M102,100 C120,105 125,120 120,135" fill="none" />
-                                    
-                                    {/* Spine Lumbar */}
-                                    <rect x="94" y="120" width="12" height="30" rx="3" />
+                                    {/* CERVICAL SPINE */}
+                                    <path d="M100,68 L100,85" strokeWidth="6" stroke="black" /> {/* Spacer */}
+                                    <path d="M96,72 H104 M96,76 H104 M96,80 H104" strokeWidth="1.5" />
 
-                                    {/* Pelvis */}
-                                    <path d="M70,150 C60,140 140,140 130,150 C140,165 120,175 100,180 C80,175 60,165 70,150" />
+                                    {/* CLAVICLES */}
+                                    <path d="M100,85 C85,82 70,88 55,85" />
+                                    <path d="M100,85 C115,82 130,88 145,85" />
 
-                                    {/* Arms */}
-                                    {/* Humerus */}
-                                    <path d="M45,85 C40,90 35,130 40,145" strokeWidth="4" fill="none"/> 
-                                    <path d="M155,85 C160,90 165,130 160,145" strokeWidth="4" fill="none"/>
-                                    {/* Radius/Ulna */}
-                                    <path d="M40,145 C35,160 30,190 25,200" strokeWidth="3" fill="none"/>
-                                    <path d="M160,145 C165,160 170,190 175,200" strokeWidth="3" fill="none"/>
-                                    
-                                    {/* Hands */}
-                                    <path d="M25,200 L20,215" strokeWidth="2" />
-                                    <path d="M175,200 L180,215" strokeWidth="2" />
+                                    {/* THORAX / RIBCAGE */}
+                                    <g transform="translate(100, 110)">
+                                        <path d="M0,-25 L0,20" strokeWidth="3" /> {/* Sternum */}
+                                        
+                                        {/* Ribs L */}
+                                        <path d="M-2,-20 C-15,-22 -30,-10 -25,0" />
+                                        <path d="M-2,-12 C-20,-12 -35,0 -28,10" />
+                                        <path d="M-2,-4 C-22,-2 -38,10 -32,20" />
+                                        <path d="M-2,4 C-20,8 -32,18 -25,28" />
+                                        <path d="M-2,12 C-15,15 -25,22 -20,28" />
+                                        
+                                        {/* Ribs R */}
+                                        <path d="M2,-20 C15,-22 30,-10 25,0" />
+                                        <path d="M2,-12 C20,-12 35,0 28,10" />
+                                        <path d="M2,-4 C22,-2 38,10 32,20" />
+                                        <path d="M2,4 C20,8 32,18 25,28" />
+                                        <path d="M2,12 C15,15 25,22 20,28" />
+                                    </g>
 
-                                    {/* Legs */}
-                                    {/* Femur */}
-                                    <path d="M80,170 C75,200 70,240 75,260" strokeWidth="5" fill="none"/>
-                                    <path d="M120,170 C125,200 130,240 125,260" strokeWidth="5" fill="none"/>
-                                    
-                                    {/* Patella */}
-                                    <circle cx="75" cy="260" r="6" fill="#0ea5e9" />
-                                    <circle cx="125" cy="260" r="6" fill="#0ea5e9" />
-                                    
-                                    {/* Tibia/Fibula */}
-                                    <path d="M75,260 C70,290 70,330 72,360" strokeWidth="4" fill="none"/>
-                                    <path d="M125,260 C130,290 130,330 128,360" strokeWidth="4" fill="none"/>
-                                    
-                                    {/* Feet */}
-                                    <path d="M72,360 L60,375" strokeWidth="3" />
-                                    <path d="M128,360 L140,375" strokeWidth="3" />
+                                    {/* LUMBAR SPINE */}
+                                    <path d="M100,140 L100,170" strokeWidth="8" stroke="black" /> {/* Spacer */}
+                                    <path d="M95,145 H105 M94,152 H106 M93,159 H107 M94,166 H106" strokeWidth="1.5" />
+
+                                    {/* PELVIS - Detailed */}
+                                    <g transform="translate(100, 185)">
+                                        {/* Iliac Crests */}
+                                        <path d="M-5,0 C-20,-10 -40,0 -35,25 C-32,35 -20,40 -5,42" />
+                                        <path d="M5,0 C20,-10 40,0 35,25 C32,35 20,40 5,42" />
+                                        {/* Sacrum */}
+                                        <path d="M-5,0 L5,0 L0,25 Z" />
+                                        {/* Pubis/Ischium */}
+                                        <path d="M-5,42 Q-10,50 0,52 Q10,50 5,42" />
+                                        <circle cx="-25" cy="25" r="4" strokeWidth="0.8" /> {/* Hip Socket L */}
+                                        <circle cx="25" cy="25" r="4" strokeWidth="0.8" /> {/* Hip Socket R */}
+                                    </g>
+
+                                    {/* ARMS */}
+                                    <g>
+                                        {/* Left Humerus */}
+                                        <path d="M55,85 L45,145" strokeWidth="1.5" />
+                                        <path d="M57,87 L47,147" strokeWidth="0.5" strokeOpacity="0.5" /> {/* Bone thickness hint */}
+                                        {/* Elbow */}
+                                        <path d="M45,145 Q42,150 48,150" strokeWidth="1" />
+                                        {/* Forearm (Radius/Ulna) */}
+                                        <path d="M48,150 L42,200" /> 
+                                        <path d="M44,150 L38,198" />
+                                        
+                                        {/* Right Humerus */}
+                                        <path d="M145,85 L155,145" strokeWidth="1.5" />
+                                        {/* Elbow */}
+                                        <path d="M155,145 Q158,150 152,150" strokeWidth="1" />
+                                        {/* Forearm */}
+                                        <path d="M152,150 L158,200" />
+                                        <path d="M156,150 L162,198" />
+                                    </g>
+
+                                    {/* HANDS */}
+                                    <g>
+                                        <path d="M42,200 L35,215" /> {/* Wrist/Palm L */}
+                                        <path d="M35,215 L30,225 M37,215 L35,225 M40,215 L40,225" strokeWidth="0.8" /> {/* Fingers L */}
+                                        
+                                        <path d="M158,200 L165,215" /> {/* Wrist/Palm R */}
+                                        <path d="M165,215 L170,225 M163,215 L165,225 M160,215 L160,225" strokeWidth="0.8" /> {/* Fingers R */}
+                                    </g>
+
+                                    {/* LEGS */}
+                                    <g>
+                                        {/* Left Femur */}
+                                        <path d="M75,210 Q68,260 75,310" strokeWidth="1.5" />
+                                        {/* Patella */}
+                                        <circle cx="75" cy="315" r="2.5" fill="black" stroke="white" />
+                                        {/* Tibia */}
+                                        <path d="M75,320 L73,390" strokeWidth="1.5" />
+                                        {/* Fibula */}
+                                        <path d="M78,320 L76,385" strokeWidth="1" />
+                                        
+                                        {/* Right Femur */}
+                                        <path d="M125,210 Q132,260 125,310" strokeWidth="1.5" />
+                                        {/* Patella */}
+                                        <circle cx="125" cy="315" r="2.5" fill="black" stroke="white" />
+                                        {/* Tibia */}
+                                        <path d="M125,320 L127,390" strokeWidth="1.5" />
+                                        {/* Fibula */}
+                                        <path d="M122,320 L124,385" strokeWidth="1" />
+                                    </g>
+
+                                    {/* FEET */}
+                                    <g>
+                                        <path d="M73,390 L65,405 L80,405 Z" strokeWidth="1" />
+                                        <path d="M127,390 L135,405 L120,405 Z" strokeWidth="1" />
+                                    </g>
                                 </g>
                              </svg>
                         </div>
                         
-                        {/* BACK SKELETON - ANATOMICAL VECTOR */}
+                        {/* BACK SKELETON - DETAILED LINE ART */}
                         <div className="absolute inset-0" style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
-                            <svg viewBox="0 0 200 450" className="w-full h-full drop-shadow-[0_0_15px_rgba(34,211,238,0.2)]">
-                                <g fill="url(#boneGradient)" stroke="#64748b" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" filter="url(#glow)">
-                                    {/* Skull Back */}
-                                    <path d="M75,20 C75,5 125,5 125,20 C125,50 75,50 75,20 Z" />
+                            <svg viewBox="0 0 200 450" className="w-full h-full drop-shadow-[0_0_5px_rgba(255,255,255,0.3)]">
+                                <g stroke="#e2e8f0" strokeWidth="1.2" fill="none" strokeLinecap="round" strokeLinejoin="round" filter="url(#glowLine)">
+                                    {/* SKULL BACK */}
+                                    <g transform="translate(100, 30)">
+                                        <path d="M0,-22 C-15,-22 -22,-12 -22,0 C-22,25 -12,38 0,40 C12,38 22,25 22,0 C22,-12 15,-22 0,-22 Z" />
+                                        <path d="M-5,40 L0,25 L5,40" strokeWidth="0.5" /> {/* Occipital bone hint */}
+                                    </g>
+
+                                    {/* SPINE COLUMN (Spinous Processes) */}
+                                    <path d="M100,45 L100,175" strokeWidth="4" stroke="black" />
+                                    {/* Vertebrae markers */}
+                                    {[...Array(18)].map((_, i) => (
+                                        <path key={i} d={`M97,${50 + i*7} L100,${53 + i*7} L103,${50 + i*7}`} strokeWidth="1" />
+                                    ))}
+
+                                    {/* SCAPULA */}
+                                    <path d="M70,90 L90,90 L85,120 Z" strokeWidth="1.5" />
+                                    <path d="M72,95 L88,95" strokeWidth="0.5" /> {/* Spine of scapula */}
                                     
-                                    {/* Spine Complete */}
-                                    <path d="M100,50 L100,150" strokeWidth="6" strokeDasharray="3,2" />
+                                    <path d="M130,90 L110,90 L115,120 Z" strokeWidth="1.5" />
+                                    <path d="M128,95 L112,95" strokeWidth="0.5" />
 
-                                    {/* Scapula */}
-                                    <path d="M60,85 L85,85 L80,115 Z" fill="rgba(100,116,139,0.3)" />
-                                    <path d="M140,85 L115,85 L120,115 Z" fill="rgba(100,116,139,0.3)" />
+                                    {/* RIBS BACK */}
+                                    <g transform="translate(100, 110)">
+                                        <path d="M-5,0 C-20,5 -30,15 -25,25" strokeWidth="1" strokeOpacity="0.5" />
+                                        <path d="M5,0 C20,5 30,15 25,25" strokeWidth="1" strokeOpacity="0.5" />
+                                    </g>
 
-                                    {/* Ribs Back */}
-                                    <path d="M85,90 C70,95 60,110 65,125" fill="none" />
-                                    <path d="M115,90 C130,95 140,110 135,125" fill="none" />
+                                    {/* PELVIS BACK (Sacrum & Ilium) */}
+                                    <g transform="translate(100, 175)">
+                                        <path d="M0,0 C-15,-5 -35,5 -35,25 C-30,40 -10,40 0,45 C10,40 30,40 35,25 C35,5 15,-5 0,0" strokeWidth="2" />
+                                        <path d="M0,0 L-8,30 L0,40 L8,30 L0,0" strokeWidth="1.5" /> {/* Sacrum Triangle */}
+                                        <path d="M-30,25 L-10,35" strokeWidth="0.5" opacity="0.5" />
+                                        <path d="M30,25 L10,35" strokeWidth="0.5" opacity="0.5" />
+                                    </g>
 
-                                    {/* Pelvis Back */}
-                                    <path d="M70,150 C60,140 140,140 130,150 C135,170 115,180 100,185 C85,180 65,170 70,150" />
-                                    <path d="M100,150 L100,175" strokeWidth="2" /> {/* Sacrum */}
-
-                                    {/* Arms */}
-                                    <path d="M45,85 C40,90 35,130 40,145" strokeWidth="4" fill="none"/> 
-                                    <path d="M155,85 C160,90 165,130 160,145" strokeWidth="4" fill="none"/>
-                                    <path d="M40,145 C35,160 30,190 25,200" strokeWidth="3" fill="none"/>
-                                    <path d="M160,145 C165,160 170,190 175,200" strokeWidth="3" fill="none"/>
-
-                                    {/* Legs */}
-                                    <path d="M80,170 C75,200 70,240 75,260" strokeWidth="5" fill="none"/>
-                                    <path d="M120,170 C125,200 130,240 125,260" strokeWidth="5" fill="none"/>
-                                    <path d="M75,260 C70,290 70,330 72,360" strokeWidth="4" fill="none"/>
-                                    <path d="M125,260 C130,290 130,330 128,360" strokeWidth="4" fill="none"/>
-                                    
-                                    {/* Heels */}
-                                    <path d="M72,360 L75,370" strokeWidth="4" />
-                                    <path d="M128,360 L125,370" strokeWidth="4" />
+                                    {/* LIMBS BACK */}
+                                    <g>
+                                        <path d="M55,85 L45,145" strokeWidth="1.5" />
+                                        <path d="M45,145 L40,195" />
+                                        <path d="M42,145 L36,193" />
+                                        
+                                        <path d="M145,85 L155,145" strokeWidth="1.5" />
+                                        <path d="M155,145 L160,195" />
+                                        <path d="M158,145 L164,193" />
+                                        
+                                        <path d="M75,205 Q68,255 75,305" strokeWidth="1.5" />
+                                        <path d="M75,315 L73,385" />
+                                        <path d="M78,315 L76,380" />
+                                        
+                                        <path d="M125,205 Q132,255 125,305" strokeWidth="1.5" />
+                                        <path d="M125,315 L127,385" />
+                                        <path d="M122,315 L124,380" />
+                                    </g>
                                 </g>
                             </svg>
                         </div>
                     </div>
                 </div>
 
-                {/* Hotspots */}
+                {/* Hotspots - Enhanced Visibility for Line Art */}
                 <div className="absolute inset-0 pointer-events-none" style={{ transform: `scale(${zoom})`, transformOrigin: 'center center' }}>
                     {BODY_POINTS.map((point, idx) => {
                         if (point.view === 'front' && isBackView) return null;
@@ -373,24 +440,24 @@ const HolographicBodyScanner = ({ selected, onSelect }: { selected: string, onSe
                                 className="absolute w-10 h-10 -ml-5 -mt-5 flex items-center justify-center pointer-events-auto group/point z-40 outline-none"
                                 style={{ left: `${point.x}%`, top: `${point.y}%` }}
                             >
-                                <span className="absolute left-full ml-3 px-2.5 py-1.5 bg-slate-900/90 text-cyan-50 text-[11px] font-bold rounded-lg border border-cyan-500/30 whitespace-nowrap opacity-0 group-hover/point:opacity-100 transition-all transform group-hover/point:translate-x-1 pointer-events-none z-50 shadow-xl backdrop-blur-sm">
+                                <span className="absolute left-full ml-3 px-2.5 py-1.5 bg-black/90 text-white text-[11px] font-bold rounded-lg border border-white/30 whitespace-nowrap opacity-0 group-hover/point:opacity-100 transition-all transform group-hover/point:translate-x-1 pointer-events-none z-50 shadow-xl backdrop-blur-sm">
                                     {point.label}
                                 </span>
 
                                 {!isSelected && (
-                                    <span className="absolute w-full h-full rounded-full bg-cyan-400 opacity-10 animate-ping group-hover/point:opacity-30"></span>
+                                    <span className="absolute w-full h-full rounded-full bg-cyan-400 opacity-20 animate-ping group-hover/point:opacity-50"></span>
                                 )}
 
                                 <span className={`absolute rounded-full transition-all duration-300 border-2 ${
                                     isSelected 
-                                    ? 'w-6 h-6 border-cyan-400 bg-cyan-900/60 shadow-[0_0_15px_rgba(34,211,238,0.9)]' 
-                                    : 'w-3 h-3 border-cyan-500/40 bg-slate-900/80 group-hover/point:w-5 group-hover/point:h-5 group-hover/point:border-cyan-400 group-hover/point:shadow-[0_0_10px_rgba(34,211,238,0.5)]'
+                                    ? 'w-6 h-6 border-cyan-400 bg-white shadow-[0_0_15px_white]' 
+                                    : 'w-3 h-3 border-white bg-black/50 group-hover/point:w-5 group-hover/point:h-5 group-hover/point:border-cyan-400 group-hover/point:bg-white/10'
                                 }`}></span>
 
                                 <span className={`absolute rounded-full transition-all duration-300 ${
                                     isSelected 
-                                    ? 'w-2 h-2 bg-white shadow-[0_0_8px_white]' 
-                                    : 'w-1 h-1 bg-cyan-400'
+                                    ? 'w-2 h-2 bg-cyan-500' 
+                                    : 'w-1 h-1 bg-white'
                                 }`}></span>
                            </button> 
                         );
@@ -419,6 +486,8 @@ const Onboarding: React.FC<OnboardingProps> = ({ onSubmit, isLoading }) => {
     name: '', age: 30, injuryLocation: '', injuryType: InjuryType.ACUTE, symptoms: [], painLevel: 3, activityPainLevel: 5, goals: '', activityLevel: 'Måttlig',
     specificAnswers: {},
     redFlags: [],
+    painCharacter: 'molande',
+    functionalLimitations: [],
     lifestyle: { sleep: 'Okej', stress: 'Medel', fearAvoidance: false, workload: 'Stillasittande' },
     additionalInfo: ''
   });
@@ -452,6 +521,46 @@ const Onboarding: React.FC<OnboardingProps> = ({ onSubmit, isLoading }) => {
       });
   };
 
+  const toggleLimitation = (limit: string) => {
+      setData(prev => {
+          const current = prev.functionalLimitations || [];
+          if (current.includes(limit)) return { ...prev, functionalLimitations: current.filter(l => l !== limit) };
+          return { ...prev, functionalLimitations: [...current, limit] };
+      });
+  };
+
+  // --- NEW: Surgical Details Handler ---
+  const updateSurgicalDetails = (key: string, value: any) => {
+      setData(prev => ({
+          ...prev,
+          surgicalDetails: {
+              procedure: prev.surgicalDetails?.procedure || '',
+              date: prev.surgicalDetails?.date || '',
+              surgeonRestrictions: prev.surgicalDetails?.surgeonRestrictions || '',
+              weightBearing: (prev.surgicalDetails?.weightBearing || 'Fullt') as any,
+              riskFactors: prev.surgicalDetails?.riskFactors || [],
+              [key]: value
+          }
+      }));
+  };
+
+  const toggleRiskFactor = (factor: string) => {
+      setData(prev => {
+          const current = prev.surgicalDetails?.riskFactors || [];
+          const newFactors = current.includes(factor) 
+            ? current.filter(f => f !== factor) 
+            : [...current, factor];
+          
+          return {
+              ...prev,
+              surgicalDetails: {
+                  ...prev.surgicalDetails!,
+                  riskFactors: newFactors
+              }
+          };
+      });
+  };
+
   const getPainVisuals = (level: number) => {
     if (level <= 3) return { label: "Hanterbar", color: "text-green-600", bg: "bg-green-100", icon: Smile };
     if (level <= 6) return { label: "Besvärlig", color: "text-amber-600", bg: "bg-amber-100", icon: Meh };
@@ -464,6 +573,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onSubmit, isLoading }) => {
     return { label: "Ilsken", color: "text-red-600", bg: "bg-red-100", icon: Zap };
   };
 
+  // Step 1: Profile (Existing - Keep but ensure styles match)
   const renderStep1 = () => (
     <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-700">
       <div className="text-center md:text-left mb-8">
@@ -509,6 +619,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onSubmit, isLoading }) => {
     </div>
   );
 
+  // Step 2: Injury Selection & Post-Op Logic
   const renderStep2 = () => (
     <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-700">
       <div className="text-center md:text-left mb-4">
@@ -557,12 +668,63 @@ const Onboarding: React.FC<OnboardingProps> = ({ onSubmit, isLoading }) => {
                     ))}
                 </div>
             </div>
+
+            {/* CONDITIONAL POST-OP INPUTS */}
+            {data.injuryType === InjuryType.POST_OP && (
+                <div className="bg-blue-50 p-6 rounded-[2rem] border border-blue-100 space-y-4 animate-in fade-in slide-in-from-bottom-2">
+                    <h3 className="font-bold text-blue-900 flex items-center gap-2"><Stethoscope size={18} /> Kirurgiska Detaljer</h3>
+                    
+                    <div>
+                        <label className="text-xs font-bold text-blue-800 uppercase tracking-wide mb-1 block">Vilken operation?</label>
+                        <input type="text" className="w-full p-3 bg-white border border-blue-200 rounded-xl text-sm" placeholder="T.ex. Korsbandsrekonstruktion, Menisk..." value={data.surgicalDetails?.procedure || ''} onChange={(e) => updateSurgicalDetails('procedure', e.target.value)} />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-xs font-bold text-blue-800 uppercase tracking-wide mb-1 block">Datum</label>
+                            <input type="date" className="w-full p-3 bg-white border border-blue-200 rounded-xl text-sm" value={data.surgicalDetails?.date || ''} onChange={(e) => updateSurgicalDetails('date', e.target.value)} />
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-blue-800 uppercase tracking-wide mb-1 block">Belastning</label>
+                            <select className="w-full p-3 bg-white border border-blue-200 rounded-xl text-sm cursor-pointer" value={data.surgicalDetails?.weightBearing || 'Fullt'} onChange={(e) => updateSurgicalDetails('weightBearing', e.target.value)}>
+                                <option value="Fullt">Full belastning</option>
+                                <option value="Partiell">Partiell (Kryckor)</option>
+                                <option value="Avlastad">Ingen belastning</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label className="text-xs font-bold text-blue-800 uppercase tracking-wide mb-1 block">Läkarens Restriktioner</label>
+                        <input type="text" className="w-full p-3 bg-white border border-blue-200 rounded-xl text-sm" placeholder="T.ex. Ingen böjning över 90 grader..." value={data.surgicalDetails?.surgeonRestrictions || ''} onChange={(e) => updateSurgicalDetails('surgeonRestrictions', e.target.value)} />
+                    </div>
+
+                    {/* NEW: RISK FACTOR SCREENING */}
+                    <div>
+                        <label className="text-xs font-bold text-blue-800 uppercase tracking-wide mb-2 block">Riskfaktorer (påverkar läkning)</label>
+                        <div className="flex flex-wrap gap-2">
+                            {['Rökning', 'Diabetes', 'Blodförtunnande', 'Tidigare Infektion', 'Högt BMI'].map(factor => {
+                                const active = (data.surgicalDetails?.riskFactors || []).includes(factor);
+                                return (
+                                    <button 
+                                        key={factor}
+                                        onClick={() => toggleRiskFactor(factor)}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${active ? 'bg-red-100 text-red-700 border-red-200' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'}`}
+                                    >
+                                        {factor}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
       </div>
     </div>
   );
 
-  // --- NEW MEDICAL SAFETY CHECK STEP ---
+  // Step 3: Red Flags
   const renderStep3 = () => {
       const specificRedFlags = RED_FLAGS[data.injuryLocation] || [];
       const genericRedFlags = RED_FLAGS['Generic'];
@@ -616,41 +778,76 @@ const Onboarding: React.FC<OnboardingProps> = ({ onSubmit, isLoading }) => {
       );
   };
 
+  // Step 4: Deep Clinical Analysis
   const renderStep4 = () => {
     const questions = BODY_SPECIFIC_QUESTIONS[data.injuryLocation] || GENERIC_QUESTIONS;
+    const limits = FUNCTIONAL_LIMITS[data.injuryLocation] || FUNCTIONAL_LIMITS['General'];
     
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-700">
             <div className="text-center md:text-left">
-                <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight mb-2">Klinisk Analys</h2>
-                <p className="text-lg text-slate-500">Vi fördjupar oss i {data.injuryLocation ? `din ${data.injuryLocation.toLowerCase()}` : 'dina besvär'}.</p>
+                <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight mb-2">Klinisk Diagnostik</h2>
+                <p className="text-lg text-slate-500">Vi fördjupar oss för att skilja på olika vävnader och tillstånd.</p>
             </div>
 
+            {/* A. SPECIFIC ORTHOPEDIC QUESTIONS */}
             <div className="space-y-6">
                 {questions.map((q) => (
                     <div key={q.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-                        <h3 className="font-bold text-lg text-slate-800 mb-4 flex items-center gap-3">
-                            <div className="p-2 bg-primary-50 text-primary-600 rounded-xl"><Stethoscope size={20} /></div>
-                            {q.label}
-                        </h3>
+                        <div className="flex justify-between items-start mb-4">
+                            <h3 className="font-bold text-lg text-slate-800 flex items-center gap-3">
+                                <div className="p-2 bg-primary-50 text-primary-600 rounded-xl"><Stethoscope size={20} /></div>
+                                {q.label}
+                            </h3>
+                            {q.hint && <span className="text-xs font-semibold text-slate-400 bg-slate-50 px-2 py-1 rounded-md hidden sm:inline-block">Klinisk Ledtråd</span>}
+                        </div>
+                        
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             {q.options.map(opt => (
                                 <button
                                     key={opt}
                                     onClick={() => updateSpecificAnswer(q.id, opt)}
-                                    className={`px-5 py-4 rounded-xl text-sm font-medium text-left transition-all border ${
+                                    className={`px-5 py-4 rounded-xl text-sm font-medium text-left transition-all border relative overflow-hidden group ${
                                         data.specificAnswers[q.id] === opt
                                         ? 'bg-slate-900 text-white border-slate-900 shadow-md ring-2 ring-offset-2 ring-slate-900'
                                         : 'bg-slate-50 text-slate-600 border-slate-100 hover:bg-white hover:border-slate-300'
                                     }`}
                                 >
                                     {opt}
+                                    {data.specificAnswers[q.id] === opt && <div className="absolute right-3 top-1/2 -translate-y-1/2 w-2 h-2 bg-primary-500 rounded-full"></div>}
                                 </button>
                             ))}
                         </div>
                     </div>
                 ))}
 
+                {/* B. PAIN CHARACTERISTICS */}
+                <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
+                    <label className="block text-sm font-bold text-slate-700 mb-4 uppercase tracking-wide flex items-center gap-2">
+                        <Thermometer size={16} /> Hur känns smärtan?
+                    </label>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        {PAIN_CHARACTERS.map(char => (
+                            <button
+                                key={char.id}
+                                onClick={() => updateData('painCharacter', char.id)}
+                                className={`p-4 rounded-2xl border text-left transition-all flex flex-col gap-2 ${
+                                    data.painCharacter === char.id 
+                                    ? 'bg-primary-50 border-primary-500 text-primary-900 ring-1 ring-primary-500' 
+                                    : 'bg-slate-50 border-slate-100 text-slate-500 hover:bg-white hover:border-slate-300'
+                                }`}
+                            >
+                                {React.createElement(char.icon, { size: 24, className: data.painCharacter === char.id ? 'text-primary-600' : 'text-slate-400' })}
+                                <div>
+                                    <span className="block font-bold text-sm">{char.label}</span>
+                                    <span className="text-[10px] opacity-70 block leading-tight">{char.desc}</span>
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* C. PAIN LEVELS */}
                 <div className="grid md:grid-cols-2 gap-6">
                     {/* REST PAIN */}
                     <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm relative overflow-hidden">
@@ -687,6 +884,31 @@ const Onboarding: React.FC<OnboardingProps> = ({ onSubmit, isLoading }) => {
                     </div>
                 </div>
 
+                {/* D. FUNCTIONAL LIMITATIONS */}
+                <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
+                    <label className="block text-sm font-bold text-slate-700 mb-4 uppercase tracking-wide flex items-center gap-2">
+                        <Hammer size={16} /> Vad hindrar smärtan dig från att göra?
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                        {limits.map(limit => {
+                            const active = (data.functionalLimitations || []).includes(limit);
+                            return (
+                                <button
+                                    key={limit}
+                                    onClick={() => toggleLimitation(limit)}
+                                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all border ${
+                                        active 
+                                        ? 'bg-slate-800 text-white border-slate-800' 
+                                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
+                                    }`}
+                                >
+                                    {limit}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
                 {/* Free Text Input */}
                 <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
                      <label className="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-wide flex items-center gap-2">
@@ -704,6 +926,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onSubmit, isLoading }) => {
     );
   };
 
+  // Step 5: Lifestyle (Existing)
   const renderStep5 = () => (
     <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-700">
         <div className="text-center md:text-left">
