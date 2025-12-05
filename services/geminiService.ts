@@ -3586,8 +3586,83 @@ const mapBodyPartToSwedish = (bodyPart: string): string => {
 };
 
 /**
+ * Build a rich patient context description for AI to generate individualized questions
+ * Creates a narrative that helps AI understand the whole person, not just symptoms
+ */
+const buildPatientContext = (
+  assessment: Partial<UserAssessment>,
+  bodyPart: string,
+  age: string,
+  activityLevel: string,
+  workload: string,
+  injuryType: string
+): string => {
+  const parts: string[] = [];
+
+  // Grundläggande demografi
+  parts.push(`En ${age}-årig patient som är ${activityLevel.toLowerCase()} och arbetar ${workload.toLowerCase()}.`);
+
+  // Smärtlokalisation
+  parts.push(`Söker för besvär i ${bodyPart}.`);
+
+  // Skadetyp
+  if (injuryType === InjuryType.ACUTE) {
+    parts.push('Det är en AKUT skada (nyligen inträffad).');
+  } else if (injuryType === InjuryType.CHRONIC) {
+    parts.push('Besvären har pågått LÄNGE (kroniskt tillstånd).');
+  } else if (injuryType === InjuryType.POST_OP) {
+    const procedure = assessment.surgicalDetails?.procedure;
+    const date = assessment.surgicalDetails?.date;
+    const restrictions = assessment.surgicalDetails?.surgeonRestrictions;
+    parts.push(`Patienten är POSTOPERATIV efter ${procedure || 'operation'}${date ? ` (${date})` : ''}.`);
+    if (restrictions) {
+      parts.push(`Kirurgens restriktioner: ${restrictions}`);
+    }
+  } else if (injuryType === InjuryType.PREHAB) {
+    parts.push('Patienten vill FÖREBYGGA skada/förbereda sig.');
+  }
+
+  // Smärtnivå
+  if (assessment.painLevel !== undefined) {
+    if (assessment.painLevel >= 7) {
+      parts.push(`Smärtnivån är HÖG (${assessment.painLevel}/10) - var uppmärksam på röda flaggor.`);
+    } else if (assessment.painLevel >= 4) {
+      parts.push(`Smärtnivån är måttlig (${assessment.painLevel}/10).`);
+    } else {
+      parts.push(`Smärtnivån är relativt låg (${assessment.painLevel}/10).`);
+    }
+  }
+
+  // Livsstilsfaktorer
+  if (assessment.lifestyle) {
+    if (assessment.lifestyle.stressLevel === 'Hög' || assessment.lifestyle.stressLevel === 'Mycket hög') {
+      parts.push('Rapporterar HÖG STRESS - överväg psykosociala faktorer.');
+    }
+    if (assessment.lifestyle.sleepQuality === 'Dålig') {
+      parts.push('Sover DÅLIGT - kan påverka smärtupplevelse och läkning.');
+    }
+    if (assessment.lifestyle.fearAvoidance) {
+      parts.push('Visar tecken på RÖRELSERÄDSLA - var försiktig med hur du formulerar frågor.');
+    }
+  }
+
+  // Tidigare behandling
+  if (assessment.previousTreatment && assessment.previousTreatment.length > 0) {
+    parts.push(`Har provat: ${assessment.previousTreatment.join(', ')}.`);
+  }
+
+  // Mål
+  if (assessment.goals && assessment.goals.length > 0) {
+    parts.push(`Patientens mål: ${assessment.goals.join(', ')}.`);
+  }
+
+  return parts.join('\n');
+};
+
+/**
  * Generate body-part specific example questions for the AI prompt
  * This ensures clinically relevant questions for each body region
+ * @deprecated - Replaced by buildPatientContext for more individualized approach
  */
 const getBodyPartSpecificExamples = (bodyPart: string, activityLevel: string, workload: string): string => {
   const bp = bodyPart.toLowerCase();
@@ -3730,44 +3805,39 @@ ${isEarlyPostOp ? `🚫 TIDIG POSTOPERATIV FAS (< 6 veckor):
 `;
   }
 
-  // Bygg kroppsdel-specifika exempelfrågor
-  const bodyPartExamples = getBodyPartSpecificExamples(bodyPart, activityLevel, workload);
+  // Bygg patientkontext för anpassade frågor
+  const patientContext = buildPatientContext(assessment, bodyPart, age, activityLevel, workload, injuryType);
 
-  const prompt = `Du är en erfaren fysioterapeut (10+ år erfarenhet) som genomför en FOKUSERAD klinisk bedömning.
-${postOpSection}
-PATIENTPROFIL:
-- Ålder: ${age}
-- Aktivitetsnivå: ${activityLevel}
-- Arbete: ${workload}
-- Smärtlokalisation: ${bodyPart}
-- Skadtyp: ${injuryType}
-- Smärtnivå: ${assessment.painLevel ?? 'ej angiven'}/10
+  const prompt = `Du är en erfaren fysioterapeut som träffar en patient för FÖRSTA bedömningssamtalet.
 
-KLINISKT MÅL:
-Generera exakt 4 SPECIFIKA frågor som hjälper dig att:
-${isEarlyPostOp ? `1. Bedöma läkningsförlopp (svullnad, smärta, sår)
-2. Upptäcka komplikationstecken tidigt
-3. Förstå patientens oro och förväntningar
-4. Säkerställa följsamhet till restriktioner` : `1. DIFFERENTIALDIAGNOS - Utesluta allvarliga tillstånd
-2. SMÄRTMÖNSTER - När, var, hur ont (mekanisk vs inflammatorisk)
-3. FUNKTION - Vilka specifika rörelser/aktiviteter är begränsade
-4. BIDRAGANDE FAKTORER - Arbete, stress, sömn som påverkar`}
+DENNA UNIKA PATIENT:
+${patientContext}
 
-REGLER FÖR BRA FRÅGOR:
-✅ Ställ frågor som ÄNDRAR din kliniska bedömning
-✅ Var KONKRET för ${bodyPart} - inte generiska frågor
-✅ Anpassa till patientens ${activityLevel} aktivitetsnivå
-✅ Fråga om SPECIFIKA rörelser, inte "har du ont"
-✅ Inkludera minst 1 fråga om nattsömn/vilosmärta (rött flagga-screening)
-${isEarlyPostOp ? '🚫 INGA frågor om lyft, belastning eller styrka!' : ''}
+DIN UPPGIFT:
+Skapa 4 UNIKA frågor anpassade SPECIFIKT för denna patients situation.
+Tänk: "Vad skulle JAG fråga just denna person för att förstå deras problem?"
 
-${bodyPartExamples}
+${isEarlyPostOp ? `POSTOPERATIV PATIENT - anpassa frågorna till läkningsfasen:
+- Fråga om hur återhämtningen går
+- Eventuella komplikationer eller oro
+- Följsamhet till restriktioner
+🚫 INGA frågor om belastning, lyft eller styrka!` : `ANPASSA FRÅGORNA TILL:
+- Patientens ÅLDER (${age}) - en 25-åring och 65-åring har olika behov
+- Patientens ARBETE (${workload}) - vad gör de dagligen?
+- Patientens AKTIVITETSNIVÅ (${activityLevel}) - vad vill de tillbaka till?
+- SMÄRTANS LOKALISATION (${bodyPart}) - ställ anatomiskt relevanta frågor`}
 
-DÅLIGA FRÅGOR (undvik):
-❌ "Hur mår du?" - för generellt
-❌ "Har du ont?" - uppenbart ja
-❌ "Berätta om din smärta" - för öppet
-❌ "Är det något annat?" - leder ingenvart
+VIKTIGT - INDIVIDUALISERA:
+- KOPIERA INTE standardfrågor - skapa unika frågor för DENNA patient
+- Referera till patientens specifika situation i frågorna
+- Om patienten är ${activityLevel} - fråga om aktiviteter relevanta för den nivån
+- Om patienten jobbar ${workload} - fråga om hur arbetet påverkas
+${assessment.painLevel && assessment.painLevel >= 7 ? '- Hög smärtnivå - inkludera fråga om nattsömn/röda flaggor' : ''}
+
+UNDVIK:
+- Generiska frågor som passar alla
+- "Berätta om din smärta" (för öppet)
+- Frågor som inte ger kliniskt användbar information
 
 Returnera ENDAST JSON-array:
 [
