@@ -11,76 +11,139 @@ interface BodyPartDef {
   view: 'front' | 'back' | 'both';
 }
 
+// Offset for centering skeleton (all y-values offset by -0.88)
+const Y_OFFSET = -0.88;
+
 const BODY_PARTS_3D: BodyPartDef[] = [
   // Head & Neck
-  { id: 'Nacke', label: 'Nacke', position: [0, 1.55, 0], view: 'both' },
+  { id: 'Nacke', label: 'Nacke', position: [0, 1.55 + Y_OFFSET, 0], view: 'both' },
 
   // Upper body - Front
-  { id: 'Axlar', label: 'Höger Axel', position: [-0.22, 1.4, 0.02], view: 'front' },
-  { id: 'Axlar', label: 'Vänster Axel', position: [0.22, 1.4, 0.02], view: 'front' },
-  { id: 'Bröstrygg', label: 'Bröst', position: [0, 1.25, 0.05], view: 'front' },
-  { id: 'Armbåge', label: 'Höger Armbåge', position: [-0.35, 1.05, 0], view: 'front' },
-  { id: 'Armbåge', label: 'Vänster Armbåge', position: [0.35, 1.05, 0], view: 'front' },
-  { id: 'Handled', label: 'Höger Handled', position: [-0.42, 0.75, 0.02], view: 'front' },
-  { id: 'Handled', label: 'Vänster Handled', position: [0.42, 0.75, 0.02], view: 'front' },
+  { id: 'Axlar', label: 'Höger Axel', position: [-0.22, 1.4 + Y_OFFSET, 0.02], view: 'front' },
+  { id: 'Axlar', label: 'Vänster Axel', position: [0.22, 1.4 + Y_OFFSET, 0.02], view: 'front' },
+  { id: 'Bröstrygg', label: 'Bröst', position: [0, 1.25 + Y_OFFSET, 0.05], view: 'front' },
+  { id: 'Armbåge', label: 'Höger Armbåge', position: [-0.35, 1.05 + Y_OFFSET, 0], view: 'front' },
+  { id: 'Armbåge', label: 'Vänster Armbåge', position: [0.35, 1.05 + Y_OFFSET, 0], view: 'front' },
+  { id: 'Handled', label: 'Höger Handled', position: [-0.42, 0.75 + Y_OFFSET, 0.02], view: 'front' },
+  { id: 'Handled', label: 'Vänster Handled', position: [0.42, 0.75 + Y_OFFSET, 0.02], view: 'front' },
 
   // Lower body - Front
-  { id: 'Ljumskar', label: 'Höger Ljumske', position: [-0.1, 0.9, 0.03], view: 'front' },
-  { id: 'Ljumskar', label: 'Vänster Ljumske', position: [0.1, 0.9, 0.03], view: 'front' },
-  { id: 'Knä', label: 'Höger Knä', position: [-0.12, 0.5, 0.03], view: 'front' },
-  { id: 'Knä', label: 'Vänster Knä', position: [0.12, 0.5, 0.03], view: 'front' },
-  { id: 'Underben', label: 'Höger Smalben', position: [-0.11, 0.3, 0.02], view: 'front' },
-  { id: 'Underben', label: 'Vänster Smalben', position: [0.11, 0.3, 0.02], view: 'front' },
-  { id: 'Fot', label: 'Höger Fot', position: [-0.1, 0.05, 0.05], view: 'front' },
-  { id: 'Fot', label: 'Vänster Fot', position: [0.1, 0.05, 0.05], view: 'front' },
+  { id: 'Ljumskar', label: 'Höger Ljumske', position: [-0.1, 0.9 + Y_OFFSET, 0.03], view: 'front' },
+  { id: 'Ljumskar', label: 'Vänster Ljumske', position: [0.1, 0.9 + Y_OFFSET, 0.03], view: 'front' },
+  { id: 'Knä', label: 'Höger Knä', position: [-0.12, 0.5 + Y_OFFSET, 0.03], view: 'front' },
+  { id: 'Knä', label: 'Vänster Knä', position: [0.12, 0.5 + Y_OFFSET, 0.03], view: 'front' },
+  { id: 'Underben', label: 'Höger Smalben', position: [-0.11, 0.3 + Y_OFFSET, 0.02], view: 'front' },
+  { id: 'Underben', label: 'Vänster Smalben', position: [0.11, 0.3 + Y_OFFSET, 0.02], view: 'front' },
+  { id: 'Fot', label: 'Höger Fot', position: [-0.1, 0.05 + Y_OFFSET, 0.05], view: 'front' },
+  { id: 'Fot', label: 'Vänster Fot', position: [0.1, 0.05 + Y_OFFSET, 0.05], view: 'front' },
 
   // Back view
-  { id: 'Skulderblad', label: 'Höger Skulderblad', position: [-0.15, 1.3, -0.05], view: 'back' },
-  { id: 'Skulderblad', label: 'Vänster Skulderblad', position: [0.15, 1.3, -0.05], view: 'back' },
-  { id: 'Ländrygg', label: 'Ländrygg', position: [0, 1.05, -0.05], view: 'back' },
-  { id: 'Säte', label: 'Höger Säte', position: [-0.12, 0.88, -0.04], view: 'back' },
-  { id: 'Säte', label: 'Vänster Säte', position: [0.12, 0.88, -0.04], view: 'back' },
-  { id: 'Lår (Bak)', label: 'Höger Baksida Lår', position: [-0.12, 0.7, -0.03], view: 'back' },
-  { id: 'Lår (Bak)', label: 'Vänster Baksida Lår', position: [0.12, 0.7, -0.03], view: 'back' },
-  { id: 'Vad', label: 'Höger Vad', position: [-0.11, 0.35, -0.03], view: 'back' },
-  { id: 'Vad', label: 'Vänster Vad', position: [0.11, 0.35, -0.03], view: 'back' },
-  { id: 'Häl', label: 'Höger Häl', position: [-0.1, 0.08, -0.03], view: 'back' },
-  { id: 'Häl', label: 'Vänster Häl', position: [0.1, 0.08, -0.03], view: 'back' },
+  { id: 'Skulderblad', label: 'Höger Skulderblad', position: [-0.15, 1.3 + Y_OFFSET, -0.05], view: 'back' },
+  { id: 'Skulderblad', label: 'Vänster Skulderblad', position: [0.15, 1.3 + Y_OFFSET, -0.05], view: 'back' },
+  { id: 'Ländrygg', label: 'Ländrygg', position: [0, 1.05 + Y_OFFSET, -0.05], view: 'back' },
+  { id: 'Säte', label: 'Höger Säte', position: [-0.12, 0.88 + Y_OFFSET, -0.04], view: 'back' },
+  { id: 'Säte', label: 'Vänster Säte', position: [0.12, 0.88 + Y_OFFSET, -0.04], view: 'back' },
+  { id: 'Lår (Bak)', label: 'Höger Baksida Lår', position: [-0.12, 0.7 + Y_OFFSET, -0.03], view: 'back' },
+  { id: 'Lår (Bak)', label: 'Vänster Baksida Lår', position: [0.12, 0.7 + Y_OFFSET, -0.03], view: 'back' },
+  { id: 'Vad', label: 'Höger Vad', position: [-0.11, 0.35 + Y_OFFSET, -0.03], view: 'back' },
+  { id: 'Vad', label: 'Vänster Vad', position: [0.11, 0.35 + Y_OFFSET, -0.03], view: 'back' },
+  { id: 'Häl', label: 'Höger Häl', position: [-0.1, 0.08 + Y_OFFSET, -0.03], view: 'back' },
+  { id: 'Häl', label: 'Vänster Häl', position: [0.1, 0.08 + Y_OFFSET, -0.03], view: 'back' },
 ];
 
-// Realistic bone material
+// Realistic bone material - ivory/off-white with subtle warmth
 const createBoneMaterial = () => {
-  return new THREE.MeshStandardMaterial({
-    color: new THREE.Color('#e8dcc8'),
-    roughness: 0.6,
-    metalness: 0.1,
-    envMapIntensity: 0.5,
+  return new THREE.MeshPhysicalMaterial({
+    color: new THREE.Color('#f5f0e6'),
+    roughness: 0.45,
+    metalness: 0.0,
+    clearcoat: 0.1,
+    clearcoatRoughness: 0.8,
+    envMapIntensity: 0.8,
+    // Subtle subsurface scattering appearance
+    sheen: 0.2,
+    sheenColor: new THREE.Color('#fffaf0'),
   });
 };
 
-// Cartilage material (slightly blue tint)
+// Cartilage material (slightly translucent blue-white)
 const createCartilageMaterial = () => {
-  return new THREE.MeshStandardMaterial({
-    color: new THREE.Color('#c5d8e8'),
-    roughness: 0.4,
-    metalness: 0.05,
+  return new THREE.MeshPhysicalMaterial({
+    color: new THREE.Color('#e8f4f8'),
+    roughness: 0.3,
+    metalness: 0.0,
     transparent: true,
-    opacity: 0.85,
+    opacity: 0.9,
+    transmission: 0.2,
+    thickness: 0.5,
   });
 };
 
-// Human body silhouette
+// Human body silhouette - semi-transparent dark figure behind skeleton
 const BodySilhouette: React.FC = () => {
   return (
-    <mesh position={[0, 0.95, 0]} castShadow>
-      <capsuleGeometry args={[0.18, 1.1, 8, 16]} />
-      <meshStandardMaterial
-        color="#1a1a2e"
-        transparent
-        opacity={0.85}
-        roughness={0.9}
-      />
-    </mesh>
+    <group position={[0, 0, -0.05]}>
+      {/* Main torso */}
+      <mesh position={[0, 0.15, 0]} castShadow>
+        <capsuleGeometry args={[0.16, 0.7, 12, 24]} />
+        <meshStandardMaterial
+          color="#0f1419"
+          transparent
+          opacity={0.65}
+          roughness={1}
+        />
+      </mesh>
+      {/* Head */}
+      <mesh position={[0, 0.72, 0]} castShadow>
+        <sphereGeometry args={[0.12, 24, 24]} />
+        <meshStandardMaterial
+          color="#0f1419"
+          transparent
+          opacity={0.65}
+          roughness={1}
+        />
+      </mesh>
+      {/* Left leg */}
+      <mesh position={[-0.08, -0.55, 0]} castShadow>
+        <capsuleGeometry args={[0.06, 0.6, 8, 16]} />
+        <meshStandardMaterial
+          color="#0f1419"
+          transparent
+          opacity={0.6}
+          roughness={1}
+        />
+      </mesh>
+      {/* Right leg */}
+      <mesh position={[0.08, -0.55, 0]} castShadow>
+        <capsuleGeometry args={[0.06, 0.6, 8, 16]} />
+        <meshStandardMaterial
+          color="#0f1419"
+          transparent
+          opacity={0.6}
+          roughness={1}
+        />
+      </mesh>
+      {/* Left arm */}
+      <mesh position={[-0.28, 0.2, 0]} rotation={[0, 0, 0.15]} castShadow>
+        <capsuleGeometry args={[0.04, 0.5, 8, 16]} />
+        <meshStandardMaterial
+          color="#0f1419"
+          transparent
+          opacity={0.55}
+          roughness={1}
+        />
+      </mesh>
+      {/* Right arm */}
+      <mesh position={[0.28, 0.2, 0]} rotation={[0, 0, -0.15]} castShadow>
+        <capsuleGeometry args={[0.04, 0.5, 8, 16]} />
+        <meshStandardMaterial
+          color="#0f1419"
+          transparent
+          opacity={0.55}
+          roughness={1}
+        />
+      </mesh>
+    </group>
   );
 };
 
@@ -434,13 +497,15 @@ const Leg: React.FC<{ side: 'left' | 'right'; material: THREE.Material }> = ({ s
   );
 };
 
-// Complete Skeleton
+// Complete Skeleton - centered for proper view
 const Skeleton: React.FC = () => {
   const boneMaterial = useMemo(() => createBoneMaterial(), []);
   const cartilageMaterial = useMemo(() => createCartilageMaterial(), []);
 
+  // Center the skeleton: skeleton goes from y=0.04 (feet) to y=1.72 (head)
+  // Center point is around y=0.88, so offset by -0.88 to center at origin
   return (
-    <group position={[0, -0.95, 0]}>
+    <group position={[0, -0.88, 0]}>
       <Skull material={boneMaterial} />
       <CervicalSpine material={boneMaterial} />
       <ShoulderGirdle material={boneMaterial} />
@@ -536,7 +601,7 @@ const Hotspot: React.FC<HotspotProps> = ({ position, label, id, isSelected, onSe
   );
 };
 
-// Camera controller for view switching
+// Camera controller for view switching - centered on skeleton at y=0
 interface CameraControllerProps {
   view: 'front' | 'back' | 'side';
 }
@@ -545,14 +610,15 @@ const CameraController: React.FC<CameraControllerProps> = ({ view }) => {
   const { camera } = useThree();
 
   useFrame(() => {
+    // Camera positions for centered skeleton (looking at y=0)
     const targetPosition = view === 'front'
-      ? new THREE.Vector3(0, 0.8, 2)
+      ? new THREE.Vector3(0, 0, 2.2)
       : view === 'back'
-        ? new THREE.Vector3(0, 0.8, -2)
-        : new THREE.Vector3(2, 0.8, 0);
+        ? new THREE.Vector3(0, 0, -2.2)
+        : new THREE.Vector3(2.2, 0, 0);
 
     camera.position.lerp(targetPosition, 0.05);
-    camera.lookAt(0, 0.8, 0);
+    camera.lookAt(0, 0, 0);
   });
 
   return null;
@@ -598,7 +664,7 @@ const RealisticSkeleton3D: React.FC<RealisticSkeleton3DProps> = ({ selected, onS
   ) : null;
 
   return (
-    <div className="relative w-full h-[550px] bg-black rounded-[2rem] overflow-hidden shadow-2xl border border-slate-800 ring-4 ring-slate-100">
+    <div className="relative w-full h-[600px] bg-gradient-to-b from-slate-900 via-slate-950 to-black rounded-[2rem] overflow-hidden shadow-2xl border border-slate-700/50 ring-1 ring-slate-600/20">
       {/* View controls */}
       <div className="absolute top-6 left-6 z-30 flex flex-col gap-2">
         <button
@@ -669,21 +735,34 @@ const RealisticSkeleton3D: React.FC<RealisticSkeleton3DProps> = ({ selected, onS
 
       {/* 3D Canvas */}
       <Canvas
-        camera={{ position: [0, 0.8, 2], fov: 45 }}
+        camera={{ position: [0, 0, 2.2], fov: 50 }}
         shadows
         gl={{ antialias: true, alpha: true }}
+        onCreated={() => {
+          // Hide loading indicator when canvas is ready
+          const loader = document.getElementById('skeleton-loading');
+          if (loader) loader.style.display = 'none';
+        }}
       >
         <Suspense fallback={null}>
-          {/* Lighting */}
-          <ambientLight intensity={0.4} />
+          {/* Professional studio lighting setup */}
+          <ambientLight intensity={0.6} />
+          {/* Key light - main illumination from front-right */}
           <directionalLight
-            position={[5, 10, 5]}
-            intensity={1}
+            position={[3, 5, 4]}
+            intensity={1.2}
             castShadow
             shadow-mapSize={[2048, 2048]}
+            shadow-bias={-0.0001}
           />
-          <directionalLight position={[-5, 5, -5]} intensity={0.5} />
-          <pointLight position={[0, 2, 2]} intensity={0.3} color="#87ceeb" />
+          {/* Fill light - softer from left */}
+          <directionalLight position={[-4, 3, 2]} intensity={0.6} color="#f0f8ff" />
+          {/* Back light - rim lighting */}
+          <directionalLight position={[0, 4, -4]} intensity={0.4} color="#e8f4f8" />
+          {/* Top light for skull */}
+          <pointLight position={[0, 2.5, 1]} intensity={0.4} color="#fffff0" />
+          {/* Subtle blue accent from below */}
+          <pointLight position={[0, -1, 2]} intensity={0.15} color="#87ceeb" />
 
           {/* Environment for realistic reflections */}
           <Environment preset="studio" />
@@ -707,25 +786,26 @@ const RealisticSkeleton3D: React.FC<RealisticSkeleton3DProps> = ({ selected, onS
             />
           ))}
 
-          {/* Floor shadow */}
+          {/* Floor shadow - positioned at bottom of skeleton */}
           <ContactShadows
-            position={[0, -0.01, 0]}
+            position={[0, -0.85, 0]}
             opacity={0.4}
             scale={3}
             blur={2.5}
-            far={1}
+            far={2}
           />
 
-          {/* Controls */}
+          {/* Controls - target centered skeleton */}
           <OrbitControls
+            target={[0, 0, 0]}
             enablePan={false}
             enableZoom={true}
-            minDistance={1}
+            minDistance={1.2}
             maxDistance={4}
             autoRotate={autoRotate}
             autoRotateSpeed={1}
-            minPolarAngle={Math.PI / 4}
-            maxPolarAngle={Math.PI * 3/4}
+            minPolarAngle={Math.PI / 6}
+            maxPolarAngle={Math.PI * 5/6}
           />
 
           {/* Camera animation for view switching */}
@@ -734,8 +814,8 @@ const RealisticSkeleton3D: React.FC<RealisticSkeleton3DProps> = ({ selected, onS
       </Canvas>
 
       {/* Loading indicator */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="text-white/30 text-sm font-medium" id="loading-indicator">
+      <div id="skeleton-loading" className="absolute inset-0 flex items-center justify-center pointer-events-none bg-black/50">
+        <div className="text-cyan-400 text-sm font-medium animate-pulse">
           Laddar 3D-modell...
         </div>
       </div>

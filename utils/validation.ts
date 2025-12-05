@@ -39,8 +39,10 @@ export const validators = {
   },
 
   email: (value: string): ValidationResult => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const isValid = emailRegex.test(value);
+    // SECURITY FIX: More robust email validation (RFC 5322 compliant subset)
+    // Requires: valid local part, @ symbol, valid domain with 2+ char TLD
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/;
+    const isValid = value.length > 0 && value.length <= 254 && emailRegex.test(value);
     return {
       isValid,
       error: isValid ? undefined : ERROR_MESSAGES.INVALID_EMAIL

@@ -1,4 +1,4 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 
 interface Props {
@@ -31,10 +31,6 @@ class ErrorBoundary extends Component<Props, State> {
     // logErrorToService(error, errorInfo);
   }
 
-  private handleReset = () => {
-    this.setState({ hasError: false, error: null, errorInfo: null });
-  };
-
   private handleGoHome = () => {
     window.location.href = '/';
   };
@@ -50,13 +46,18 @@ class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div
+          className="min-h-screen bg-slate-50 flex items-center justify-center p-4"
+          role="alert"
+          aria-live="assertive"
+          aria-atomic="true"
+        >
           <div className="bg-white rounded-3xl shadow-xl max-w-md w-full p-8 text-center">
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <AlertTriangle className="w-8 h-8 text-red-600" />
+              <AlertTriangle className="w-8 h-8 text-red-600" aria-hidden="true" />
             </div>
 
-            <h1 className="text-2xl font-bold text-slate-900 mb-2">
+            <h1 className="text-2xl font-bold text-slate-900 mb-2" id="error-title">
               Något gick fel
             </h1>
 
@@ -83,16 +84,18 @@ class ErrorBoundary extends Component<Props, State> {
             <div className="flex gap-3 justify-center">
               <button
                 onClick={this.handleGoHome}
-                className="flex items-center gap-2 px-5 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold text-sm hover:bg-slate-200 transition-colors"
+                className="flex items-center gap-2 px-5 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold text-sm hover:bg-slate-200 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2"
+                aria-label="Gå till startsidan"
               >
-                <Home size={18} />
+                <Home size={18} aria-hidden="true" />
                 Startsidan
               </button>
               <button
                 onClick={this.handleRefresh}
-                className="flex items-center gap-2 px-5 py-3 bg-primary-600 text-white rounded-xl font-bold text-sm hover:bg-primary-700 transition-colors"
+                className="flex items-center gap-2 px-5 py-3 bg-primary-600 text-white rounded-xl font-bold text-sm hover:bg-primary-700 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-offset-2"
+                aria-label="Ladda om sidan"
               >
-                <RefreshCw size={18} />
+                <RefreshCw size={18} aria-hidden="true" />
                 Ladda om
               </button>
             </div>

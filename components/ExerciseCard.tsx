@@ -1,9 +1,61 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { Exercise, ExerciseAdjustmentType } from '../types';
-import { Play, Info, Clock, Repeat, Check, AlertTriangle, Lightbulb, Navigation, X, ChevronRight, ChevronLeft, MapPin, Activity, Flame, BarChart2, SlidersHorizontal, Loader2, TrendingUp, TrendingDown, PackageX, Volume2, VolumeX, Trophy, Timer, Zap, Youtube, ExternalLink, Search, Camera, Scan } from 'lucide-react';
+import React, { useState, useEffect, useMemo, Suspense, lazy, useRef, useCallback } from 'react';
+import { Exercise, ExerciseAdjustmentType, ExerciseLog } from '../types';
+import { Play, Clock, Repeat, Check, AlertTriangle, Lightbulb, X, Activity, SlidersHorizontal, Loader2, TrendingUp, TrendingDown, PackageX, Trophy, Timer, Zap, Scan, FileText, Minus, Plus, MessageSquare, Heart, BookOpen, GraduationCap, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import { generateAlternativeExercise } from '../services/geminiService';
-import AIMovementCoach from './AIMovementCoach';
+import { storageService } from '../services/storageService';
+import { User } from 'lucide-react';
+import PainSlider from './ui/PainSlider';
+
+// Focus trap hook for accessibility
+const useFocusTrap = (isActive: boolean, containerRef: React.RefObject<HTMLElement | null>) => {
+  useEffect(() => {
+    if (!isActive || !containerRef.current) return;
+
+    const container = containerRef.current;
+    const focusableElements = container.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+
+    // Auto-focus first element
+    firstElement?.focus();
+
+    const handleTabKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+
+      if (e.shiftKey) {
+        // Shift + Tab
+        if (document.activeElement === firstElement) {
+          e.preventDefault();
+          lastElement?.focus();
+        }
+      } else {
+        // Tab
+        if (document.activeElement === lastElement) {
+          e.preventDefault();
+          firstElement?.focus();
+        }
+      }
+    };
+
+    container.addEventListener('keydown', handleTabKey);
+    return () => container.removeEventListener('keydown', handleTabKey);
+  }, [isActive, containerRef]);
+};
+
+// Lazy load heavy components to improve initial load time
+const AIMovementCoach = lazy(() => import('./AIMovementCoach'));
+const Avatar3D = lazy(() => import('./Avatar3D'));
+
+// Loading fallback component
+const ComponentLoader = ({ text }: { text: string }) => (
+  <div className="flex flex-col items-center justify-center p-8 bg-slate-900 rounded-xl">
+    <Loader2 className="w-8 h-8 text-cyan-500 animate-spin mb-3" />
+    <p className="text-slate-400 text-sm">{text}</p>
+  </div>
+);
 
 interface ExerciseCardProps {
   exercise: Exercise;
@@ -11,6 +63,8 @@ interface ExerciseCardProps {
   onSwap?: (newExercise: Exercise) => void;
   completed?: boolean;
   readOnly?: boolean;
+  onFavoriteToggle?: () => void;
+  isFavorite?: boolean;
 }
 
 const categoryMap: Record<string, string> = {
@@ -27,15 +81,57 @@ const categoryColorMap: Record<string, string> = {
   endurance: 'bg-emerald-50 text-emerald-700 border-emerald-100'
 };
 
-const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, onComplete, onSwap, completed, readOnly = false }) => {
-  const [showVideo, setShowVideo] = useState(false);
-  
-  // Guide State
-  const [showGuide, setShowGuide] = useState(false);
-  const [currentStep, setCurrentStep] = useState(0);
+// Difficulty indicator with dots
+const getDifficultyIndicator = (difficulty: string): { dots: React.ReactNode; color: string; label: string } => {
+  const filledDot = '●';
+  const emptyDot = '○';
 
+  switch (difficulty?.toLowerCase()) {
+    case 'lätt':
+    case 'easy':
+      return {
+        dots: <>{filledDot}{emptyDot}{emptyDot}</>,
+        color: 'text-green-500',
+        label: 'Lätt'
+      };
+    case 'medel':
+    case 'medium':
+      return {
+        dots: <>{filledDot}{filledDot}{emptyDot}</>,
+        color: 'text-amber-500',
+        label: 'Medel'
+      };
+    case 'svår':
+    case 'hard':
+      return {
+        dots: <>{filledDot}{filledDot}{filledDot}</>,
+        color: 'text-red-500',
+        label: 'Svår'
+      };
+    default:
+      return {
+        dots: <>{filledDot}{emptyDot}{emptyDot}</>,
+        color: 'text-slate-400',
+        label: difficulty || 'Okänd'
+      };
+  }
+};
+
+// Evidence level labels and colors
+const evidenceLevelMap: Record<string, { label: string; description: string; color: string }> = {
+  'A': { label: 'Nivå A', description: 'Stark evidens (RCT, systematiska översikter)', color: 'bg-green-100 text-green-800 border-green-200' },
+  'B': { label: 'Nivå B', description: 'Måttlig evidens (kohortstudier)', color: 'bg-blue-100 text-blue-800 border-blue-200' },
+  'C': { label: 'Nivå C', description: 'Svag evidens (fallstudier)', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
+  'D': { label: 'Nivå D', description: 'Mycket begränsad evidens', color: 'bg-orange-100 text-orange-800 border-orange-200' },
+  'expert': { label: 'Expertråd', description: 'Klinisk expertis, etablerad praxis', color: 'bg-purple-100 text-purple-800 border-purple-200' }
+};
+
+const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, onComplete, onSwap, completed, readOnly = false, onFavoriteToggle, isFavorite = false }) => {
   // AI Camera State
   const [showAICoach, setShowAICoach] = useState(false);
+
+  // 3D Avatar State
+  const [showAvatar3D, setShowAvatar3D] = useState(false);
 
   // Swap State
   const [isSwapping, setIsSwapping] = useState(false);
@@ -44,10 +140,45 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, onComplete, onSwa
   // Feedback State
   const [completionFeedback, setCompletionFeedback] = useState<{ title: string; message: string; icon: any; color: string } | null>(null);
 
-  // Robust check for valid YouTube Embed URL
-  const hasValidEmbed = useMemo(() => {
-      return exercise.videoUrl && exercise.videoUrl.includes('youtube.com/embed');
-  }, [exercise.videoUrl]);
+  // Exercise Logging State
+  const [showLoggingModal, setShowLoggingModal] = useState(false);
+
+  // Sources State
+  const [showSources, setShowSources] = useState(false);
+
+  // Focus management refs
+  const lastFocusedElementRef = useRef<HTMLElement | null>(null);
+  const swapModalRef = useRef<HTMLDivElement>(null);
+  const loggingModalRef = useRef<HTMLDivElement>(null);
+
+  // Apply focus trap to modals
+  useFocusTrap(showSwapOptions, swapModalRef);
+  useFocusTrap(showLoggingModal, loggingModalRef);
+
+  // Helper to open modal with focus tracking
+  const openModalWithFocusTracking = useCallback((setter: React.Dispatch<React.SetStateAction<boolean>>) => {
+    lastFocusedElementRef.current = document.activeElement as HTMLElement;
+    setter(true);
+  }, []);
+
+  // Helper to close modal and return focus
+  const closeModalWithFocusReturn = useCallback((setter: React.Dispatch<React.SetStateAction<boolean>>) => {
+    setter(false);
+    // Return focus after animation completes
+    setTimeout(() => {
+      lastFocusedElementRef.current?.focus();
+      lastFocusedElementRef.current = null;
+    }, 100);
+  }, []);
+  const [logData, setLogData] = useState({
+    actualSets: exercise.sets,
+    actualReps: exercise.reps,
+    painDuring: 0,
+    painAfter: 0,
+    difficulty: 'lagom' as 'för_lätt' | 'lagom' | 'för_svår',
+    notes: '',
+    duration: 0
+  });
 
   useEffect(() => {
     if (completed) {
@@ -56,6 +187,32 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, onComplete, onSwa
         setCompletionFeedback(null);
     }
   }, [completed]);
+
+  // Keyboard navigation - Escape to close modals with focus return
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showAICoach) {
+          setShowAICoach(false);
+          setTimeout(() => lastFocusedElementRef.current?.focus(), 100);
+        }
+        if (showAvatar3D) {
+          setShowAvatar3D(false);
+          setTimeout(() => lastFocusedElementRef.current?.focus(), 100);
+        }
+        if (showSwapOptions) closeModalWithFocusReturn(setShowSwapOptions);
+        if (showLoggingModal) closeModalWithFocusReturn(setShowLoggingModal);
+        if (showSources) setShowSources(false);
+      }
+    };
+
+    // Only add listener if any modal is open
+    const anyModalOpen = showAICoach || showAvatar3D || showSwapOptions || showLoggingModal || showSources;
+    if (anyModalOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [showAICoach, showAvatar3D, showSwapOptions, showLoggingModal, showSources, closeModalWithFocusReturn]);
 
   const generateFeedback = () => {
       const isHard = exercise.difficulty === 'Svår';
@@ -104,12 +261,39 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, onComplete, onSwa
   };
 
   const handleToggleComplete = () => {
-      if (onComplete) onComplete();
+      if (completed) {
+        // If already completed, just toggle off
+        if (onComplete) onComplete();
+      } else {
+        // Show logging modal before marking complete (with focus tracking)
+        openModalWithFocusTracking(setShowLoggingModal);
+      }
   };
 
-  const handleVideoClick = async () => {
-    if (showGuide) setShowGuide(false);
-    setShowVideo(!showVideo);
+  const handleSaveLog = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const exerciseLog: ExerciseLog = {
+      exerciseId: `${exercise.name}-${today}`,
+      exerciseName: exercise.name,
+      date: today,
+      completed: true,
+      actualSets: logData.actualSets,
+      actualReps: logData.actualReps,
+      difficulty: logData.difficulty,
+      painDuring: logData.painDuring,
+      painAfter: logData.painAfter,
+      notes: logData.notes || undefined,
+      duration: logData.duration > 0 ? logData.duration : undefined
+    };
+
+    storageService.saveExerciseLog(exerciseLog);
+    closeModalWithFocusReturn(setShowLoggingModal);
+    if (onComplete) onComplete();
+  };
+
+  const handleSkipLogging = () => {
+    closeModalWithFocusReturn(setShowLoggingModal);
+    if (onComplete) onComplete();
   };
 
   const handleSwap = async (reason: string, type: ExerciseAdjustmentType) => {
@@ -119,7 +303,6 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, onComplete, onSwa
     try {
         const newExercise = await generateAlternativeExercise(exercise, reason, type);
         onSwap(newExercise);
-        setShowVideo(false);
     } catch (e) {
         alert("Kunde inte byta övning just nu.");
     } finally {
@@ -127,67 +310,21 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, onComplete, onSwa
     }
   };
 
-  const guideSteps = useMemo(() => {
+  // Simple steps for Avatar3D (from exercise data)
+  const avatarSteps = useMemo(() => {
     if (exercise.steps && exercise.steps.length > 0) {
-        return exercise.steps.map(step => ({
-            title: step.title,
-            content: step.instruction,
-            icon: step.type === 'start' ? MapPin : step.type === 'execution' ? Activity : Lightbulb,
-            color: step.type === 'start' ? "text-blue-600 bg-blue-50" : step.type === 'execution' ? "text-green-600 bg-green-50" : "text-amber-600 bg-amber-50",
-            videoUrl: step.videoUrl,
-            animationType: step.animationType
-        }));
+      return exercise.steps.map(step => ({
+        title: step.title,
+        instruction: step.instruction
+      }));
     }
-
-    const steps = [];
+    // Fallback: split description into steps
     const sentences = exercise.description.split('. ').filter(s => s.length > 0);
-    const startPos = sentences[0];
-    const movement = sentences.slice(1).join('. ');
-
-    steps.push({
-        title: "Startposition",
-        content: startPos + (startPos.endsWith('.') ? '' : '.'),
-        icon: MapPin,
-        color: "text-blue-600 bg-blue-50",
-        animationType: 'pulse'
-    });
-
-    if (movement) {
-        steps.push({
-            title: "Utförande",
-            content: movement + (movement.endsWith('.') ? '' : '.'),
-            icon: Activity,
-            color: "text-green-600 bg-green-50",
-            animationType: 'slide'
-        });
-    }
-
-    if (exercise.tips) {
-        steps.push({
-            title: "Tekniktips",
-            content: exercise.tips,
-            icon: Lightbulb,
-            color: "text-amber-600 bg-amber-50",
-            animationType: 'bounce'
-        });
-    }
-
-    return steps;
+    return [
+      { title: 'Utförande', instruction: sentences.join('. ') },
+      ...(exercise.tips ? [{ title: 'Tips', instruction: exercise.tips }] : [])
+    ];
   }, [exercise]);
-
-  const handleGuideClick = () => {
-    if (showVideo) setShowVideo(false);
-    setShowGuide(!showGuide);
-    setCurrentStep(0);
-  };
-
-  const nextStep = () => {
-    if (currentStep < guideSteps.length - 1) setCurrentStep(c => c + 1);
-  };
-
-  const prevStep = () => {
-    if (currentStep > 0) setCurrentStep(c => c - 1);
-  };
 
   if (isSwapping) {
       return (
@@ -201,130 +338,69 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, onComplete, onSwa
 
   return (
     <>
-    {/* AI MOVEMENT COACH MODAL */}
+    {/* AI MOVEMENT COACH MODAL - Lazy loaded */}
     {showAICoach && (
-        <AIMovementCoach 
-            exerciseName={exercise.name} 
-            videoUrl={exercise.videoUrl}
-            onClose={() => setShowAICoach(false)} 
-        />
+        <Suspense fallback={<ComponentLoader text="Startar AI Movement Coach..." />}>
+            <AIMovementCoach
+                exerciseName={exercise.name}
+                videoUrl={exercise.videoUrl}
+                onClose={() => setShowAICoach(false)}
+            />
+        </Suspense>
     )}
 
-    <div className={`border rounded-3xl p-6 transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] transform relative overflow-hidden group
-      ${completed 
-        ? 'bg-gradient-to-br from-green-50/80 to-emerald-50/80 border-green-200/50 shadow-inner scale-[0.98] opacity-90' 
-        : 'bg-white border-white/50 shadow-[0_4px_20px_-12px_rgba(0,0,0,0.1)] hover:shadow-[0_8px_30px_-12px_rgba(0,0,0,0.15)] hover:-translate-y-1 hover:border-slate-200 scale-100'
-      }`}>
-      
-      {/* Interactive Guide Overlay */}
-      {showGuide && (
-        <div className="absolute inset-0 z-20 bg-white/95 backdrop-blur-xl flex flex-col animate-in fade-in slide-in-from-bottom-10 duration-500 rounded-3xl overflow-hidden">
-            <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/30">
-                <div className="flex items-center gap-2">
-                    <div className="p-1.5 bg-slate-900 text-white rounded-lg">
-                        <Navigation size={16} />
-                    </div>
-                    <span className="font-bold text-slate-800 text-sm tracking-wide">Steg-för-steg</span>
-                </div>
-                <button 
-                    onClick={() => setShowGuide(false)}
-                    className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-600"
-                >
-                    <X size={20} />
-                </button>
-            </div>
+    {/* 3D Avatar Demo - Lazy loaded */}
+    {showAvatar3D && (
+        <Suspense fallback={<ComponentLoader text="Laddar 3D-avatar..." />}>
+            <Avatar3D
+                exerciseName={exercise.name}
+                steps={avatarSteps}
+                onClose={() => setShowAvatar3D(false)}
+            />
+        </Suspense>
+    )}
 
-            <div className="flex-grow flex flex-col p-0 bg-white relative">
-                <div className="flex justify-center gap-1.5 p-4 pb-2 z-10 relative">
-                    {guideSteps.map((_, idx) => (
-                        <div 
-                            key={idx} 
-                            className={`h-1 rounded-full transition-all duration-300 shadow-sm ${idx === currentStep ? 'w-10 bg-slate-800' : idx < currentStep ? 'w-2 bg-slate-300' : 'w-2 bg-slate-100'}`}
-                        />
-                    ))}
-                </div>
-
-                <div className="w-full bg-slate-50 aspect-video relative flex items-center justify-center overflow-hidden border-y border-slate-100 group/media">
-                    <div className="w-full h-full relative overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900"></div>
-                        <div className="absolute inset-0 flex items-center justify-center opacity-20">
-                            {guideSteps[currentStep].animationType === 'pulse' && <div className="w-32 h-32 rounded-full border-4 border-cyan-400 animate-ping"></div>}
-                            {guideSteps[currentStep].animationType === 'slide' && <div className="w-48 h-2 bg-gradient-to-r from-transparent via-cyan-400 to-transparent animate-[shimmer_2s_infinite]"></div>}
-                            {guideSteps[currentStep].animationType === 'bounce' && <div className="w-20 h-20 bg-amber-400/50 rounded-full animate-bounce"></div>}
-                        </div>
-                        
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            <div className={`w-24 h-24 rounded-3xl flex items-center justify-center bg-white/10 backdrop-blur-md border border-white/20 shadow-2xl ${guideSteps[currentStep].color.replace('bg-', 'text-').replace('100', '300')}`}>
-                                {React.createElement(guideSteps[currentStep].icon, { size: 40 })}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="p-8 text-center flex flex-col justify-center flex-grow transition-all duration-300 transform" key={currentStep}>
-                    <h4 className="text-2xl font-bold text-slate-800 mb-4 animate-in fade-in slide-in-from-bottom-2 tracking-tight">
-                        {guideSteps[currentStep].title}
-                    </h4>
-                    
-                    <p className="text-slate-600 leading-relaxed text-lg animate-in fade-in slide-in-from-bottom-3 delay-100 font-medium">
-                        {guideSteps[currentStep].content}
-                    </p>
-                </div>
-            </div>
-
-            <div className="p-5 border-t border-slate-100 flex justify-between items-center bg-slate-50/50">
-                <button 
-                    onClick={prevStep}
-                    disabled={currentStep === 0}
-                    className="flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-bold text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white hover:shadow-sm transition-all"
-                >
-                    <ChevronLeft size={18} />
-                </button>
-
-                <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                    Steg {currentStep + 1} / {guideSteps.length}
-                </div>
-
-                {currentStep === guideSteps.length - 1 ? (
-                    <button 
-                        onClick={() => {
-                            setShowGuide(false);
-                            if (onComplete && !completed) handleToggleComplete();
-                        }}
-                        className="flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold bg-green-500 text-white shadow-lg shadow-green-500/20 hover:bg-green-600 transition-all hover:scale-105 hover:-translate-y-0.5"
-                    >
-                        Klart <Check size={18} />
-                    </button>
-                ) : (
-                    <button 
-                        onClick={nextStep}
-                        className="flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold bg-slate-900 text-white shadow-lg hover:bg-slate-800 transition-all hover:translate-x-1"
-                    >
-                        Nästa <ChevronRight size={18} />
-                    </button>
-                )}
-            </div>
+    <article
+      className={`border-2 rounded-3xl p-6 transition-all duration-500 ease-out transform relative overflow-hidden group
+      ${completed
+        ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-400 shadow-sm ring-2 ring-green-100'
+        : 'bg-white border-slate-100 shadow-[0_4px_20px_-12px_rgba(0,0,0,0.1)] hover:shadow-[0_8px_30px_-12px_rgba(0,0,0,0.15)] hover:-translate-y-1 hover:border-slate-200'
+      }`}
+      aria-label={`Övning: ${exercise.name}${completed ? ' - Slutförd' : ''}`}
+      aria-describedby={`exercise-desc-${exercise.name.replace(/\s+/g, '-')}`}
+    >
+      {/* Completed Badge */}
+      {completed && (
+        <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5 px-3 py-1.5 bg-green-500 text-white text-xs font-bold rounded-full shadow-lg shadow-green-500/30 animate-in zoom-in duration-300">
+          <Check size={14} className="stroke-[3px]" />
+          Slutförd
         </div>
       )}
-
+      
       {/* SWAP / DIFFICULTY OVERLAY */}
       {showSwapOptions && (
-          <div className="absolute inset-0 z-30 bg-slate-900/95 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-300 rounded-3xl">
-              <h4 className="text-white font-bold text-xl mb-2">Justera svårighetsgrad</h4>
+          <div
+            ref={swapModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="swap-dialog-title"
+            className="absolute inset-0 z-30 bg-slate-900/95 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-300 rounded-3xl"
+          >
+              <h4 id="swap-dialog-title" className="text-white font-bold text-xl mb-2">Justera svårighetsgrad</h4>
               <p className="text-slate-400 text-sm mb-8">AI:n skapar en anpassad övning baserat på ditt val.</p>
-              
+
               <div className="grid grid-cols-1 w-full gap-3 max-w-sm">
                   {[
-                    { label: "Gör den lättare", sub: "Minska belastning/smärta", icon: TrendingDown, type: 'easier', color: "green" },
-                    { label: "Gör den svårare", sub: "Öka utmaningen", icon: TrendingUp, type: 'harder', color: "orange" },
-                    { label: "Annat alternativ", sub: "Lika tung, annan övning", icon: PackageX, type: 'equivalent', color: "blue" }
+                    { label: "Gör den lättare", sub: "Minska belastning/smärta", icon: TrendingDown, type: 'easier', iconClass: "bg-green-500/10 text-green-400 group-hover/btn:bg-green-500" },
+                    { label: "Gör den svårare", sub: "Öka utmaningen", icon: TrendingUp, type: 'harder', iconClass: "bg-orange-500/10 text-orange-400 group-hover/btn:bg-orange-500" },
+                    { label: "Annat alternativ", sub: "Lika tung, annan övning", icon: PackageX, type: 'equivalent', iconClass: "bg-blue-500/10 text-blue-400 group-hover/btn:bg-blue-500" }
                   ].map((opt) => (
-                    <button 
+                    <button
                         key={opt.type}
-                        onClick={() => handleSwap(opt.label, opt.type as ExerciseAdjustmentType)} 
+                        onClick={() => handleSwap(opt.label, opt.type as ExerciseAdjustmentType)}
                         className="flex items-center gap-4 p-4 bg-slate-800/50 hover:bg-slate-800 text-white rounded-2xl text-left transition-all border border-slate-700 hover:border-slate-600 hover:scale-[1.02] group/btn"
                     >
-                        <div className={`p-2.5 bg-${opt.color}-500/10 rounded-xl text-${opt.color}-400 group-hover/btn:bg-${opt.color}-500 group-hover/btn:text-white transition-colors`}>
+                        <div className={`p-2.5 rounded-xl group-hover/btn:text-white transition-colors ${opt.iconClass}`}>
                             <opt.icon size={20} />
                         </div>
                         <div className="flex-1">
@@ -334,15 +410,156 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, onComplete, onSwa
                     </button>
                   ))}
               </div>
-              <button onClick={() => setShowSwapOptions(false)} className="mt-8 text-slate-500 hover:text-white text-sm font-medium transition-colors">Avbryt</button>
+              <button onClick={() => closeModalWithFocusReturn(setShowSwapOptions)} className="mt-8 text-slate-500 hover:text-white text-sm font-medium transition-colors">Avbryt</button>
+          </div>
+      )}
+
+      {/* EXERCISE LOGGING MODAL */}
+      {showLoggingModal && (
+          <div
+            ref={loggingModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="logging-dialog-title"
+            className="absolute inset-0 z-40 bg-white/98 backdrop-blur-md flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-300 rounded-3xl overflow-hidden"
+          >
+              <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-green-50/50">
+                  <div className="flex items-center gap-2">
+                      <div className="p-1.5 bg-green-500 text-white rounded-lg">
+                          <FileText size={16} />
+                      </div>
+                      <span id="logging-dialog-title" className="font-bold text-slate-800 text-sm tracking-wide">Logga övning</span>
+                  </div>
+                  <button
+                      onClick={() => closeModalWithFocusReturn(setShowLoggingModal)}
+                      className="p-2.5 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-600 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                      aria-label="Stäng dialog"
+                  >
+                      <X size={20} />
+                  </button>
+              </div>
+
+              <div className="flex-grow overflow-y-auto p-6 space-y-6">
+                  {/* Sets/Reps Row */}
+                  <div className="grid grid-cols-2 gap-4">
+                      <div>
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 block">Antal set</label>
+                          <div className="flex items-center gap-2">
+                              <button
+                                  onClick={() => setLogData(d => ({ ...d, actualSets: Math.max(1, d.actualSets - 1) }))}
+                                  className="p-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                              >
+                                  <Minus size={18} />
+                              </button>
+                              <span className="flex-1 text-center text-2xl font-bold text-slate-800">{logData.actualSets}</span>
+                              <button
+                                  onClick={() => setLogData(d => ({ ...d, actualSets: d.actualSets + 1 }))}
+                                  className="p-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                              >
+                                  <Plus size={18} />
+                              </button>
+                          </div>
+                      </div>
+                      <div>
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 block">Reps/tid</label>
+                          <input
+                              type="text"
+                              value={logData.actualReps}
+                              onChange={(e) => setLogData(d => ({ ...d, actualReps: e.target.value }))}
+                              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-center font-bold text-slate-800 focus:outline-none focus:border-green-300 focus:ring-2 focus:ring-green-100"
+                          />
+                      </div>
+                  </div>
+
+                  {/* Pain During Exercise */}
+                  <PainSlider
+                    value={logData.painDuring}
+                    onChange={(val) => setLogData(d => ({ ...d, painDuring: val }))}
+                    label="Smärta under övning"
+                  />
+
+                  {/* Pain After Exercise */}
+                  <PainSlider
+                    value={logData.painAfter}
+                    onChange={(val) => setLogData(d => ({ ...d, painAfter: val }))}
+                    label="Smärta efter övning"
+                  />
+
+                  {/* Difficulty */}
+                  <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3 block">Hur kändes övningen?</label>
+                      <div className="grid grid-cols-3 gap-2">
+                          {[
+                              { value: 'för_lätt', label: 'För lätt', icon: TrendingDown, activeClass: 'border-green-500 bg-green-50 text-green-700' },
+                              { value: 'lagom', label: 'Lagom', icon: Check, activeClass: 'border-blue-500 bg-blue-50 text-blue-700' },
+                              { value: 'för_svår', label: 'För svår', icon: TrendingUp, activeClass: 'border-orange-500 bg-orange-50 text-orange-700' }
+                          ].map((opt) => (
+                              <button
+                                  key={opt.value}
+                                  onClick={() => setLogData(d => ({ ...d, difficulty: opt.value as any }))}
+                                  className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-1 ${
+                                      logData.difficulty === opt.value
+                                          ? opt.activeClass
+                                          : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+                                  }`}
+                              >
+                                  <opt.icon size={20} />
+                                  <span className="text-xs font-bold">{opt.label}</span>
+                              </button>
+                          ))}
+                      </div>
+                  </div>
+
+                  {/* Notes */}
+                  <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-2">
+                          <MessageSquare size={14} /> Anteckningar (valfritt)
+                      </label>
+                      <textarea
+                          value={logData.notes}
+                          onChange={(e) => setLogData(d => ({ ...d, notes: e.target.value }))}
+                          placeholder="T.ex. 'Kände pirrning i knäet', 'Bättre än förra gången'..."
+                          className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-700 focus:outline-none focus:border-green-300 focus:ring-2 focus:ring-green-100 resize-none"
+                          rows={2}
+                      />
+                  </div>
+              </div>
+
+              <div className="p-5 border-t border-slate-100 bg-slate-50/50 flex gap-3">
+                  <button
+                      onClick={handleSkipLogging}
+                      className="flex-1 px-4 py-3 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-100 transition-colors"
+                  >
+                      Hoppa över
+                  </button>
+                  <button
+                      onClick={handleSaveLog}
+                      className="flex-1 px-4 py-3 rounded-xl text-sm font-bold bg-green-500 text-white shadow-lg shadow-green-500/20 hover:bg-green-600 transition-all flex items-center justify-center gap-2"
+                  >
+                      <Check size={18} /> Spara & Klar
+                  </button>
+              </div>
           </div>
       )}
 
       <div className="flex justify-between items-start mb-4 relative z-10">
         <div>
-          <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider transition-opacity duration-500 border ${completed ? 'opacity-70 grayscale' : 'opacity-100'} ${categoryColorMap[exercise.category] || 'bg-slate-100 text-slate-700 border-slate-200'}`}>
-            {categoryMap[exercise.category] || exercise.category}
-          </span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider transition-opacity duration-500 border ${completed ? 'opacity-70 grayscale' : 'opacity-100'} ${categoryColorMap[exercise.category] || 'bg-slate-100 text-slate-700 border-slate-200'}`}>
+              {categoryMap[exercise.category] || exercise.category}
+            </span>
+            {/* Difficulty Indicator */}
+            {exercise.difficulty && (
+              <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-50 border border-slate-200 ${completed ? 'opacity-70' : 'opacity-100'}`}>
+                <span className={`tracking-wider ${getDifficultyIndicator(exercise.difficulty).color}`}>
+                  {getDifficultyIndicator(exercise.difficulty).dots}
+                </span>
+                <span className="text-slate-600 uppercase tracking-wider">
+                  {getDifficultyIndicator(exercise.difficulty).label}
+                </span>
+              </span>
+            )}
+          </div>
           <h3 className={`text-xl font-bold mt-3 transition-all duration-300 tracking-tight ${completed ? 'text-slate-400 line-through decoration-slate-300 decoration-2' : 'text-slate-900'}`}>
             {exercise.name}
           </h3>
@@ -381,98 +598,13 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, onComplete, onSwa
         {exercise.description}
       </p>
 
-      {/* Expanded Video/Search Section */}
-      {showVideo && !showGuide && (
-        <div className="space-y-4 mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
-            {hasValidEmbed ? (
-                /* 1. TRUSTED EMBED EXISTS (FROM DATABASE) */
-                <div className={`bg-black rounded-2xl overflow-hidden aspect-video relative shadow-lg shadow-slate-200/50 border border-slate-100 transition-all duration-500 ${completed ? 'opacity-80' : ''}`}>
-                    <iframe 
-                        src={exercise.videoUrl}
-                        title={exercise.name}
-                        className="w-full h-full"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                        allowFullScreen
-                    ></iframe>
-                </div>
-            ) : (
-                /* 2. FAILSAFE SEARCH CARD (Bypass 'Video Unavailable' by opening in new tab) */
-                <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl relative overflow-hidden text-white p-6 flex flex-col items-center justify-center text-center gap-4 shadow-xl border border-slate-700">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -mr-10 -mt-10"></div>
-                    
-                    <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center backdrop-blur-md mb-2 ring-1 ring-white/20">
-                        <Search size={32} className="text-white" />
-                    </div>
-                    
-                    <div className="relative z-10">
-                        <h4 className="font-bold text-lg mb-1">Hitta korrekt teknik</h4>
-                        <p className="text-slate-300 text-sm max-w-[280px] mx-auto leading-relaxed">
-                            Vi har ingen verifierad video för "{exercise.name}" än. Klicka nedan för att söka efter en fysioterapeutisk instruktion på YouTube.
-                        </p>
-                    </div>
-                    
-                    <a 
-                        href={`https://www.youtube.com/results?search_query=${encodeURIComponent(exercise.name + " physiotherapy exercise technique")}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center gap-2 px-8 py-3.5 bg-red-600 text-white rounded-xl font-bold text-sm hover:bg-red-700 transition-all shadow-lg hover:shadow-red-500/30 hover:-translate-y-0.5 group/link"
-                    >
-                        <Youtube size={20} className="group-hover/link:scale-110 transition-transform" /> 
-                        Öppna sökning <ExternalLink size={16} className="opacity-70" />
-                    </a>
-                </div>
-            )}
-
-            {/* Info Grid */}
-            <div className={`grid grid-cols-1 md:grid-cols-2 gap-3 text-sm transition-opacity duration-300 ${completed ? 'opacity-60' : 'opacity-100'}`}>
-                <div className="md:col-span-2 flex gap-2 mb-1">
-                     {exercise.difficulty && (
-                         <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 rounded-lg text-xs font-bold text-slate-600 border border-slate-200">
-                            <BarChart2 size={14} /> {exercise.difficulty}
-                         </div>
-                     )}
-                     {exercise.calories && (
-                         <div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 text-orange-700 rounded-lg text-xs font-bold border border-orange-100">
-                            <Flame size={14} /> {exercise.calories}
-                         </div>
-                     )}
-                </div>
-
-                {exercise.frequency && (
-                     <div className="bg-blue-50/50 border border-blue-100 p-4 rounded-xl text-blue-800 md:col-span-2">
-                         <div className="flex items-center gap-2 font-bold mb-1 text-blue-900 text-xs uppercase tracking-wide">
-                            <Play size={12} /> Rekommenderad Frekvens
-                         </div>
-                         <p className="text-sm opacity-90 font-medium">{exercise.frequency}</p>
-                     </div>
-                )}
-
-                {exercise.risks && (
-                    <div className="bg-red-50/50 border border-red-100 p-4 rounded-xl text-red-800 md:col-span-1">
-                        <div className="flex items-center gap-2 font-bold mb-1 text-red-900 text-xs uppercase tracking-wide">
-                            <AlertTriangle size={12} /> Tänk på
-                        </div>
-                        <p className="text-sm opacity-90 leading-snug">{exercise.risks}</p>
-                    </div>
-                )}
-                {exercise.advancedTips && (
-                    <div className="bg-indigo-50/50 border border-indigo-100 p-4 rounded-xl text-indigo-800 md:col-span-1">
-                        <div className="flex items-center gap-2 font-bold mb-1 text-indigo-900 text-xs uppercase tracking-wide">
-                            <Lightbulb size={12} /> Proffstips
-                        </div>
-                        <p className="text-sm opacity-90 leading-snug">{exercise.advancedTips}</p>
-                    </div>
-                )}
-            </div>
-        </div>
-      )}
-
-      {/* Metrics Row */}
-      <div className={`grid grid-cols-3 gap-3 mb-6 transition-all duration-300 ${completed ? 'opacity-40 grayscale' : 'opacity-100'}`}>
+      {/* Metrics Row - Responsive */}
+      <div className={`grid grid-cols-2 ${exercise.calories ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-3 mb-6 transition-all duration-300 ${completed ? 'opacity-40 grayscale' : 'opacity-100'}`}>
         {[
             { label: 'Set', val: exercise.sets, icon: Repeat },
             { label: 'Reps', val: exercise.reps, icon: Clock },
-            { label: 'Frekvens', val: exercise.frequency.split(' ')[0], icon: Play } // Shorten freq
+            { label: 'Frekvens', val: exercise.frequency.split(' ')[0], icon: Play },
+            ...(exercise.calories ? [{ label: 'Kalorier', val: `~${exercise.calories}`, icon: Zap }] : [])
         ].map((stat, i) => (
             <div key={i} className="flex flex-col items-center p-3 bg-slate-50 border border-slate-100 rounded-2xl group-hover:border-slate-200 transition-colors">
                 <stat.icon className="w-4 h-4 text-slate-400 mb-1.5" />
@@ -482,67 +614,187 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, onComplete, onSwa
         ))}
       </div>
 
-      {/* Actions Row */}
-      <div className="flex gap-3">
-         <div className={`flex-1 flex items-start gap-3 text-xs p-3 rounded-2xl border transition-colors duration-300 ${
-             completed 
-             ? 'bg-transparent text-slate-400 border-slate-100' 
-             : 'bg-amber-50/50 text-amber-700 border-amber-100'
-         }`}>
-            <Info className="w-4 h-4 flex-shrink-0 mt-0.5 opacity-70" />
-            <p className="font-medium leading-relaxed">{exercise.tips}</p>
-         </div>
-         
-         <div className={`flex gap-2 transition-opacity duration-300 ${completed ? 'opacity-40 hover:opacity-100' : 'opacity-100'}`}>
-             {!completed && onSwap && !readOnly && (
-                <button
-                    onClick={() => setShowSwapOptions(true)}
-                    className="flex items-center justify-center w-12 rounded-2xl border bg-white text-slate-400 border-slate-200 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition-all shadow-sm hover:shadow"
-                    title="Justera nivå / Byt övning"
-                >
-                    <SlidersHorizontal size={20} />
-                </button>
-             )}
+      {/* Tips Section - More prominent */}
+      {exercise.tips && (
+        <div className={`mb-5 p-4 rounded-2xl border transition-colors duration-300 ${
+            completed
+            ? 'bg-slate-50/50 text-slate-400 border-slate-100'
+            : 'bg-amber-50/80 text-amber-800 border-amber-200'
+        }`}>
+           <div className="flex items-start gap-3">
+              <Lightbulb className={`w-5 h-5 flex-shrink-0 mt-0.5 ${completed ? 'text-slate-300' : 'text-amber-500'}`} />
+              <div>
+                <span className={`text-xs font-bold uppercase tracking-wide block mb-1 ${completed ? 'text-slate-400' : 'text-amber-600'}`}>Tips</span>
+                <p className="text-sm font-medium leading-relaxed">{exercise.tips}</p>
+              </div>
+           </div>
+        </div>
+      )}
 
-             <button 
-                onClick={handleGuideClick}
-                className={`flex items-center justify-center w-12 rounded-2xl border transition-all hover:-translate-y-0.5 shadow-sm hover:shadow ${
-                    showGuide 
-                    ? 'bg-slate-800 text-white border-slate-800 shadow-slate-300' 
-                    : 'bg-white text-indigo-600 border-slate-200 hover:border-indigo-200 hover:bg-indigo-50'
-                }`}
-                title="Starta guide"
-             >
-                <Navigation size={20} />
-             </button>
+      {/* Risks / Safety Section */}
+      {exercise.risks && (
+        <div className={`mb-5 p-4 rounded-2xl border transition-colors duration-300 ${
+            completed
+            ? 'bg-slate-50/50 text-slate-400 border-slate-100'
+            : 'bg-red-50/80 text-red-800 border-red-200'
+        }`}>
+           <div className="flex items-start gap-3">
+              <AlertTriangle className={`w-5 h-5 flex-shrink-0 mt-0.5 ${completed ? 'text-slate-300' : 'text-red-500'}`} />
+              <div className="flex-1">
+                <span className={`text-xs font-bold uppercase tracking-wide block mb-2 ${completed ? 'text-slate-400' : 'text-red-600'}`}>Säkerhetsvarning</span>
+                <p className="text-sm font-medium leading-relaxed">{exercise.risks}</p>
+              </div>
+           </div>
+        </div>
+      )}
 
-             <button 
-                onClick={handleVideoClick}
-                className={`flex items-center justify-center w-12 rounded-2xl border transition-all hover:-translate-y-0.5 shadow-sm hover:shadow ${
-                    showVideo 
-                    ? 'bg-red-500 text-white border-red-500 shadow-red-200' 
+      {/* Advanced Tips / Progression Section */}
+      {exercise.advancedTips && (
+        <details className={`mb-5 rounded-2xl border overflow-hidden transition-colors duration-300 ${
+            completed
+            ? 'bg-slate-50/50 border-slate-100'
+            : 'bg-indigo-50/60 border-indigo-200'
+        }`}>
+           <summary className={`p-4 cursor-pointer flex items-center gap-3 hover:bg-indigo-100/50 transition-colors list-none ${completed ? 'text-slate-400' : 'text-indigo-800'}`}>
+              <TrendingUp className={`w-5 h-5 flex-shrink-0 ${completed ? 'text-slate-300' : 'text-indigo-500'}`} />
+              <span className="text-sm font-bold">Progression & avancerade tips</span>
+              <ChevronDown className={`w-4 h-4 ml-auto ${completed ? 'text-slate-300' : 'text-indigo-400'}`} />
+           </summary>
+           <div className={`px-4 pb-4 pt-2 border-t ${completed ? 'border-slate-100' : 'border-indigo-200'}`}>
+              <p className={`text-sm leading-relaxed ${completed ? 'text-slate-400' : 'text-indigo-700'}`}>
+                {exercise.advancedTips}
+              </p>
+           </div>
+        </details>
+      )}
+
+      {/* Evidence & Sources Section */}
+      {(exercise.sources?.length || exercise.evidenceLevel) && (
+        <div className="mb-5">
+          {/* Evidence Badge & Toggle */}
+          <button
+            onClick={() => setShowSources(!showSources)}
+            className="w-full flex items-center justify-between p-4 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors min-h-[48px]"
+          >
+            <div className="flex items-center gap-3">
+              <GraduationCap className="w-5 h-5 text-slate-500" />
+              <div className="flex items-center gap-2">
+                {exercise.evidenceLevel && (
+                  <span className={`px-2 py-0.5 text-xs font-bold rounded-md border ${evidenceLevelMap[exercise.evidenceLevel]?.color || 'bg-slate-100 text-slate-600'}`}>
+                    {evidenceLevelMap[exercise.evidenceLevel]?.label || exercise.evidenceLevel}
+                  </span>
+                )}
+                <span className="text-sm text-slate-600 font-medium">
+                  {exercise.sources?.length ? `${exercise.sources.length} vetenskaplig${exercise.sources.length > 1 ? 'a' : ''} käll${exercise.sources.length > 1 ? 'or' : 'a'}` : 'Vetenskaplig grund'}
+                </span>
+              </div>
+            </div>
+            {showSources ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+          </button>
+
+          {/* Expanded Sources */}
+          {showSources && (
+            <div className="mt-2 p-4 bg-white rounded-xl border border-slate-200 space-y-3 animate-in slide-in-from-top-2 fade-in duration-200">
+              {/* Evidence Level Description */}
+              {exercise.evidenceLevel && evidenceLevelMap[exercise.evidenceLevel] && (
+                <p className="text-xs text-slate-500 pb-2 border-b border-slate-100">
+                  {evidenceLevelMap[exercise.evidenceLevel].description}
+                </p>
+              )}
+
+              {/* Source List */}
+              {exercise.sources?.map((source, idx) => (
+                <div key={idx} className="text-sm">
+                  <div className="flex items-start gap-2">
+                    <BookOpen className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-slate-700 leading-snug">{source.title}</p>
+                      {source.authors && (
+                        <p className="text-slate-500 text-xs mt-0.5">{source.authors} {source.year && `(${source.year})`}</p>
+                      )}
+                      {source.journal && (
+                        <p className="text-slate-400 text-xs italic">{source.journal}</p>
+                      )}
+                      {source.doi && (
+                        <a
+                          href={`https://doi.org/${source.doi}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-cyan-600 hover:text-cyan-700 mt-1"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          DOI: {source.doi}
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Primary Actions - Large touch-friendly buttons - Responsive */}
+      <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 transition-opacity duration-300 ${completed ? 'opacity-60' : 'opacity-100'}`}>
+         {/* AI Coach Button */}
+         <button
+            onClick={() => {
+              lastFocusedElementRef.current = document.activeElement as HTMLElement;
+              setShowAICoach(true);
+            }}
+            className="flex items-center justify-center gap-3 px-4 py-4 rounded-2xl bg-gradient-to-r from-cyan-500 to-cyan-600 text-white font-bold shadow-lg shadow-cyan-500/25 hover:shadow-xl hover:shadow-cyan-500/30 hover:-translate-y-0.5 transition-all active:scale-[0.98]"
+            aria-label="Starta AI Rörelseanalys"
+         >
+            <Scan size={22} />
+            <span className="text-sm">AI Rörelseanalys</span>
+         </button>
+
+         {/* 3D Avatar Button */}
+         <button
+            onClick={() => {
+              lastFocusedElementRef.current = document.activeElement as HTMLElement;
+              setShowAvatar3D(true);
+            }}
+            className="flex items-center justify-center gap-3 px-4 py-4 rounded-2xl bg-gradient-to-r from-purple-500 to-purple-600 text-white font-bold shadow-lg shadow-purple-500/25 hover:shadow-xl hover:shadow-purple-500/30 hover:-translate-y-0.5 transition-all active:scale-[0.98]"
+            aria-label="Visa 3D Demo"
+         >
+            <User size={22} />
+            <span className="text-sm">3D Demo</span>
+         </button>
+      </div>
+
+      {/* Secondary Actions Row - Responsive wrap */}
+      <div className={`flex flex-wrap gap-2 transition-opacity duration-300 ${completed ? 'opacity-40 hover:opacity-100' : 'opacity-100'}`}>
+         {/* FAVORITE BUTTON */}
+         {onFavoriteToggle && (
+            <button
+                onClick={onFavoriteToggle}
+                className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl border text-sm font-medium transition-all min-h-[44px] ${
+                    isFavorite
+                    ? 'bg-red-500 text-white border-red-500'
                     : 'bg-white text-slate-500 border-slate-200 hover:bg-red-50 hover:text-red-500 hover:border-red-200'
                 }`}
-                title="Visa video"
-             >
-                <Youtube size={20} />
-             </button>
-             
-             {/* NEW VISIBLE CAMERA BUTTON */}
-             <button
-                onClick={() => setShowAICoach(true)}
-                className={`flex items-center justify-center w-12 rounded-2xl border transition-all hover:-translate-y-0.5 shadow-sm hover:shadow ${
-                    showAICoach
-                    ? 'bg-cyan-500 text-white border-cyan-500 shadow-cyan-200'
-                    : 'bg-white text-cyan-500 border-slate-200 hover:bg-cyan-50 hover:border-cyan-200'
-                }`}
-                title="AI Rörelseanalys"
-             >
-                <Scan size={20} />
-             </button>
-         </div>
+                aria-label={isFavorite ? 'Ta bort favorit' : 'Lägg till favorit'}
+            >
+                <Heart size={18} fill={isFavorite ? 'currentColor' : 'none'} />
+                {isFavorite ? 'Favorit' : 'Spara'}
+            </button>
+         )}
+
+         {/* SWAP BUTTON */}
+         {!completed && onSwap && !readOnly && (
+            <button
+                onClick={() => openModalWithFocusTracking(setShowSwapOptions)}
+                className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl border bg-white text-slate-500 border-slate-200 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition-all text-sm font-medium min-h-[44px]"
+                aria-label="Justera svårighetsgrad"
+            >
+                <SlidersHorizontal size={18} />
+                Justera
+            </button>
+         )}
       </div>
-    </div>
+    </article>
     </>
   );
 };

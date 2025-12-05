@@ -1,12 +1,15 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { GeneratedProgram, Exercise, WeeklyAnalysis } from '../types';
+import { GeneratedProgram, Exercise, WeeklyAnalysis, Milestone } from '../types';
 import ExerciseCard from './ExerciseCard';
 import PatientEducationModule from './PatientEducationModule';
+import DailyCheckIn from './DailyCheckIn';
 import { storageService } from '../services/storageService';
 import { generateWeeklyAnalysis } from '../services/geminiService';
 import { supabase, getUserId } from '../services/supabaseClient';
-import { Calendar, ChevronRight, Activity, Info, BarChart, Printer, Sparkles, ThumbsUp, ShieldAlert, ArrowUpCircle, Zap, BrainCircuit, Star, Target, Crown, ClipboardCheck, Loader2, X, Flame, TrendingUp, Lock, Unlock } from 'lucide-react';
+import { exportProgramToPDF } from '../services/pdfExport';
+import { Calendar, ChevronRight, Activity, Info, BarChart, Printer, Sparkles, ThumbsUp, ShieldAlert, ArrowUpCircle, Zap, BrainCircuit, Star, Target, Crown, ClipboardCheck, X, Flame, TrendingUp, Lock, Unlock, Heart, PartyPopper, Download, Loader2 } from 'lucide-react';
+import Spinner from './ui/Spinner';
 
 // Get Stripe Link from Environment Variable or fallback to a placeholder
 const STRIPE_CHECKOUT_URL = (import.meta as any).env?.VITE_STRIPE_LINK || "https://stripe.com"; 
@@ -31,7 +34,15 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
   const [showPremiumModal, setShowPremiumModal] = useState(false);
 
   // Premium State Check
-  const [isPremium, setIsPremium] = useState(false); 
+  const [isPremium, setIsPremium] = useState(false);
+
+  // Daily Check-In State (Fas 6)
+  const [showPreCheckIn, setShowPreCheckIn] = useState(false);
+  const [showPostCheckIn, setShowPostCheckIn] = useState(false);
+  const [hasCompletedPreCheckIn, setHasCompletedPreCheckIn] = useState(false);
+  const [hasCompletedPostCheckIn, setHasCompletedPostCheckIn] = useState(false);
+  const [newMilestones, setNewMilestones] = useState<Milestone[]>([]);
+  const [showMilestoneModal, setShowMilestoneModal] = useState(false); 
 
   const activePhase = program.phases[activePhaseIndex];
   // Calculate total exercises in the representative daily routine for the active phase
@@ -91,6 +102,17 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
         }
         setCurrentStreak(streak);
         setLoadingHistory(false);
+
+        // Check if pre-workout check-in has been done today (Fas 6)
+        const hasPreCheckIn = storageService.hasPreWorkoutCheckIn(today);
+        const hasPostCheckIn = storageService.hasPostWorkoutCheckIn(today);
+        setHasCompletedPreCheckIn(hasPreCheckIn);
+        setHasCompletedPostCheckIn(hasPostCheckIn);
+
+        // Show pre-workout modal if not done yet
+        if (!hasPreCheckIn) {
+          setTimeout(() => setShowPreCheckIn(true), 500); // Small delay for better UX
+        }
     };
 
     fetchHistory();
@@ -168,6 +190,22 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
      const completedCount = Object.values(completedExercises).filter(Boolean).length;
      return Math.round((completedCount / totalExercises) * 100);
   }, [completedExercises, totalExercises]);
+
+  // Check for new milestones after exercises are completed (Fas 6)
+  useEffect(() => {
+    const checkMilestones = async () => {
+      const achieved = await storageService.checkAndAwardMilestones();
+      if (achieved.length > 0) {
+        setNewMilestones(achieved);
+        setShowMilestoneModal(true);
+      }
+    };
+
+    // Only check when progress increases
+    if (progress > 0) {
+      checkMilestones();
+    }
+  }, [progress]);
 
   // --- COACH LEVEL LOGIC (GAMIFICATION) ---
   const coachLevel = useMemo(() => {
@@ -324,9 +362,85 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
     window.print();
   };
 
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportPDF = async () => {
+    setIsExporting(true);
+    try {
+      const assessment = storageService.getAssessmentDraft();
+      await exportProgramToPDF(program, assessment);
+    } catch (error) {
+      console.error('PDF export failed:', error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto py-8 pb-24 print:p-0 print:max-w-none overflow-hidden relative">
       
+      {/* PRE-WORKOUT CHECK-IN MODAL (Fas 6) */}
+      {showPreCheckIn && (
+        <DailyCheckIn
+          type="pre"
+          onComplete={() => {
+            setShowPreCheckIn(false);
+            setHasCompletedPreCheckIn(true);
+          }}
+          onSkip={() => setShowPreCheckIn(false)}
+        />
+      )}
+
+      {/* POST-WORKOUT CHECK-IN MODAL (Fas 6) */}
+      {showPostCheckIn && (
+        <DailyCheckIn
+          type="post"
+          onComplete={() => {
+            setShowPostCheckIn(false);
+            setHasCompletedPostCheckIn(true);
+          }}
+          onSkip={() => setShowPostCheckIn(false)}
+        />
+      )}
+
+      {/* MILESTONE CELEBRATION MODAL (Fas 6) */}
+      {showMilestoneModal && newMilestones.length > 0 && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-gradient-to-b from-slate-900 to-slate-950 w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-500">
+            {/* Confetti effect */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+              <div className="absolute top-10 left-10 text-4xl animate-bounce delay-100">🎉</div>
+              <div className="absolute top-20 right-10 text-3xl animate-bounce delay-200">⭐</div>
+              <div className="absolute top-5 right-20 text-2xl animate-bounce delay-300">🎊</div>
+            </div>
+
+            <div className="p-8 text-center relative">
+              <div className="text-6xl mb-4 animate-bounce">
+                {newMilestones[0].icon}
+              </div>
+              <h3 className="text-2xl font-extrabold text-white mb-2">
+                {newMilestones[0].title}
+              </h3>
+              <p className="text-slate-400 mb-6">
+                {newMilestones[0].description}
+              </p>
+
+              <button
+                onClick={() => {
+                  // Mark as celebrated
+                  newMilestones.forEach(m => storageService.markMilestoneCelebrated(m.id));
+                  setShowMilestoneModal(false);
+                  setNewMilestones([]);
+                }}
+                className="w-full py-4 bg-cyan-500 text-slate-900 rounded-2xl font-bold text-lg hover:bg-cyan-400 transition-all"
+              >
+                Tack! 🙌
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* PREMIUM UPSELL MODAL */}
       {showPremiumModal && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
@@ -385,9 +499,8 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
                   
                   <div className="p-8 overflow-y-auto">
                       {isAnalyzing ? (
-                          <div className="flex flex-col items-center justify-center py-10 space-y-4">
-                              <Loader2 className="w-12 h-12 text-primary-500 animate-spin" />
-                              <p className="text-slate-500 font-medium">Analyserar träningsdata...</p>
+                          <div className="flex flex-col items-center justify-center py-10">
+                              <Spinner size="xl" text="Analyserar träningsdata..." centered />
                           </div>
                       ) : analysis ? (
                           <div className="space-y-8 animate-in slide-in-from-bottom-4">
@@ -430,7 +543,7 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
       )}
 
       {/* Header */}
-      <div className="bg-white/80 backdrop-blur-md rounded-3xl p-8 lg:p-10 shadow-lg shadow-slate-200/50 border border-white mb-10 print:border-none print:shadow-none print:p-0 relative overflow-hidden group">
+      <div className="bg-white/80 backdrop-blur-md rounded-3xl p-6 md:p-8 lg:p-10 shadow-lg shadow-slate-200/50 border border-white mb-6 md:mb-8 lg:mb-10 print:border-none print:shadow-none print:p-0 relative overflow-hidden group">
         <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-primary-100 to-transparent opacity-50 rounded-bl-[100px] pointer-events-none transition-transform duration-1000 group-hover:scale-110"></div>
         
         <div className="flex flex-col md:flex-row justify-between items-start gap-6 relative z-10">
@@ -438,7 +551,7 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
                 <h1 className="text-4xl font-extrabold text-slate-900 mb-3 tracking-tight break-words">{program.title}</h1>
                 <p className="text-slate-600 text-lg max-w-2xl leading-relaxed break-words">{program.summary}</p>
             </div>
-            <div className="flex gap-3 print:hidden shrink-0">
+            <div className="flex flex-wrap gap-2 md:gap-3 print:hidden shrink-0">
                 <button 
                     onClick={runWeeklyAnalysis}
                     className="flex items-center gap-2 px-5 py-3 bg-white hover:bg-slate-50 text-slate-700 rounded-xl transition-all font-bold border border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 relative overflow-hidden group/btn"
@@ -446,9 +559,23 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
                     {!isPremium && <div className="absolute inset-0 bg-slate-100/10 backdrop-blur-[1px] flex items-center justify-center z-20 transition-opacity opacity-0 group-hover/btn:opacity-100"><Lock size={16} className="text-slate-800" /></div>}
                     <ClipboardCheck size={20} className="text-primary-600" /> AI-Analys
                 </button>
-                <button 
+                <button
+                    onClick={handleExportPDF}
+                    disabled={isExporting}
+                    className="flex items-center gap-2 px-5 py-3 bg-white hover:bg-slate-50 text-slate-700 rounded-xl transition-all font-bold border border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                    aria-label="Exportera program som PDF"
+                >
+                    {isExporting ? (
+                      <Loader2 size={20} className="text-primary-500 animate-spin" />
+                    ) : (
+                      <Download size={20} className="text-primary-500" />
+                    )}
+                    <span className="hidden sm:inline">PDF</span>
+                </button>
+                <button
                     onClick={handlePrint}
-                    className="flex items-center gap-2 px-5 py-3 bg-white hover:bg-slate-50 text-slate-700 rounded-xl transition-all font-bold border border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-0.5"
+                    className="flex items-center gap-2 px-3 py-3 bg-white hover:bg-slate-50 text-slate-700 rounded-xl transition-all font-bold border border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-0.5"
+                    aria-label="Skriv ut program"
                 >
                     <Printer size={20} className="text-slate-400" />
                 </button>
@@ -475,11 +602,11 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 print:block">
+      <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-12 gap-6 lg:gap-8 print:block">
         {/* Left: Phase Navigation & Status */}
-        <div className="lg:col-span-3 space-y-6 no-print min-w-0">
-            <div className="bg-white/90 backdrop-blur-sm p-6 rounded-2xl shadow-sm border border-slate-100">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+        <div className="md:col-span-1 lg:col-span-3 space-y-4 lg:space-y-6 no-print min-w-0">
+            <div className="bg-white/90 backdrop-blur-sm p-4 lg:p-6 rounded-2xl shadow-sm border border-slate-100">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 lg:mb-4 flex items-center gap-2">
                     <TrendingUp size={14} /> Faser
                 </h3>
                 <div className="space-y-2">
@@ -489,9 +616,9 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
                         <button
                             key={idx}
                             onClick={() => handlePhaseClick(idx)}
-                            className={`w-full text-left p-4 rounded-xl text-sm font-semibold transition-all duration-300 relative overflow-hidden group min-w-0 ${
-                                idx === activePhaseIndex 
-                                ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/20' 
+                            className={`w-full text-left p-2 md:p-3 lg:p-4 rounded-xl text-xs md:text-sm font-semibold transition-all duration-300 relative overflow-hidden group min-w-0 ${
+                                idx === activePhaseIndex
+                                ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/20'
                                 : 'text-slate-600 hover:bg-slate-50 border border-transparent hover:border-slate-200'
                             }`}
                         >
@@ -502,8 +629,8 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
                                 </span>
                                 {idx === activePhaseIndex && <ChevronRight size={16} className="shrink-0" />}
                             </div>
-                            <div className={`text-xs ${idx === activePhaseIndex ? 'text-slate-300' : 'text-slate-400'} relative z-10 truncate`}>
-                                {isLocked ? 'Premium' : phase.durationWeeks}
+                            <div className={`text-[10px] lg:text-xs ${idx === activePhaseIndex ? 'text-slate-300' : 'text-slate-400'} relative z-10 truncate hidden md:block`}>
+                                {isLocked ? 'Pro' : phase.durationWeeks}
                             </div>
                             {isLocked && (
                                 <div className="absolute inset-0 bg-slate-100/50 backdrop-blur-[2px] z-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -515,7 +642,7 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
                 </div>
             </div>
 
-            <div className={`p-8 rounded-2xl text-white shadow-xl shadow-primary-500/20 transition-all duration-700 relative overflow-hidden ${
+            <div className={`p-4 lg:p-8 rounded-2xl text-white shadow-xl shadow-primary-500/20 transition-all duration-700 relative overflow-hidden ${
                 progress === 100 ? 'bg-gradient-to-br from-green-500 to-emerald-600' : 'bg-gradient-to-br from-primary-500 to-indigo-600'
             }`}>
                 {/* Background Pattern */}
@@ -531,10 +658,28 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
                 <div className="w-full bg-black/20 h-2 rounded-full mt-6 overflow-hidden relative z-10">
                     <div className="bg-white h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(255,255,255,0.5)]" style={{ width: `${progress}%` }}></div>
                 </div>
+
+                {/* Post-workout check-in button (Fas 6) */}
+                {progress >= 50 && !hasCompletedPostCheckIn && hasCompletedPreCheckIn && (
+                  <button
+                    onClick={() => setShowPostCheckIn(true)}
+                    className="mt-4 w-full py-3 bg-white/20 hover:bg-white/30 text-white rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 relative z-10"
+                  >
+                    <Heart size={18} />
+                    Avsluta pass & logga smärta
+                  </button>
+                )}
+
+                {hasCompletedPostCheckIn && (
+                  <div className="mt-4 flex items-center justify-center gap-2 text-white/80 text-sm relative z-10">
+                    <PartyPopper size={16} />
+                    <span>Passet loggat!</span>
+                  </div>
+                )}
             </div>
 
             {/* Coach Level Badge with Progress Bar */}
-            <div className="bg-white/90 backdrop-blur-sm p-6 rounded-2xl shadow-sm border border-slate-100">
+            <div className="bg-white/90 backdrop-blur-sm p-4 lg:p-6 rounded-2xl shadow-sm border border-slate-100">
                 <div className="flex items-center gap-4 mb-4">
                     <div className={`p-3 rounded-2xl ${coachLevel.bg} ${coachLevel.color}`}>
                         {React.createElement(coachLevel.icon, { size: 24 })}
@@ -575,7 +720,7 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
         </div>
 
         {/* Right: Active Phase Content */}
-        <div className="lg:col-span-9 space-y-10 min-w-0">
+        <div className="md:col-span-3 lg:col-span-9 space-y-8 lg:space-y-10 min-w-0">
             <div className="flex flex-col md:flex-row justify-between items-end gap-6 border-b border-slate-200 pb-8 print:block print:pb-2">
                 <div className="max-w-full">
                     <div className="flex items-center gap-3">
