@@ -3595,7 +3595,8 @@ export const generateFollowUpQuestions = async (
   const cacheKey = generateCacheKey('followup-questions', {
     location: assessment.injuryLocation,
     type: assessment.injuryType,
-    age: assessment.age
+    age: assessment.age,
+    isPostOp: assessment.injuryType === InjuryType.POST_OP
   });
 
   const cached = getCached<FollowUpQuestion[]>(cacheKey);
@@ -3607,8 +3608,41 @@ export const generateFollowUpQuestions = async (
   const activityLevel = assessment.activityLevel || 'okänd aktivitetsnivå';
   const workload = assessment.lifestyle?.workload || 'okänd';
 
-  const prompt = `Du är en erfaren fysioterapeut som genomför en klinisk bedömning.
+  // ⚠️ POST-OP SÄKERHETSKONTEXT
+  const isPostOp = assessment.injuryType === InjuryType.POST_OP;
+  const surgeryDate = assessment.surgicalDetails?.date;
+  const surgeryType = assessment.surgicalDetails?.procedure;
+  const surgeonRestrictions = assessment.surgicalDetails?.surgeonRestrictions;
+  const weightBearing = assessment.surgicalDetails?.weightBearing;
 
+  let daysSinceSurgery: number | null = null;
+  if (surgeryDate) {
+    daysSinceSurgery = Math.floor((Date.now() - new Date(surgeryDate).getTime()) / (1000 * 60 * 60 * 24));
+  }
+  const isEarlyPostOp = isPostOp && daysSinceSurgery !== null && daysSinceSurgery < 42;
+
+  // Bygg post-op säkerhetssektion
+  let postOpSection = '';
+  if (isPostOp) {
+    postOpSection = `
+⚠️ POSTOPERATIV PATIENT - KRITISKA SÄKERHETSREGLER:
+- Operation: ${surgeryType || 'ej specificerat'}
+- Operationsdatum: ${surgeryDate || 'ej angivet'}
+- Dagar sedan operation: ${daysSinceSurgery !== null ? daysSinceSurgery : 'okänt'}
+- Belastning: ${weightBearing || 'ej angivet'}
+- Läkarrestriktioner: ${surgeonRestrictions || 'ej specificerat'}
+
+${isEarlyPostOp ? `🚫 TIDIG POSTOPERATIV FAS (< 6 veckor):
+- STÄLL INTE frågor om lyft, belastning eller styrketest
+- STÄLL INTE frågor som "kan du lyfta armen" eller "hur tungt kan du bära"
+- FOKUSERA på: Läkning, svullnad, smärtlindring, ROM (rörelseomfång)
+- FRÅGA istället om: Hur mår du efter operationen? Hur fungerar såret? Svullnad?` : ''}
+
+`;
+  }
+
+  const prompt = `Du är en erfaren fysioterapeut som genomför en klinisk bedömning.
+${postOpSection}
 PATIENTDATA:
 - Ålder: ${age}
 - Aktivitetsnivå: ${activityLevel}
@@ -3618,21 +3652,28 @@ PATIENTDATA:
 
 UPPGIFT:
 Generera 4-5 kliniskt relevanta följdfrågor för att:
-1. Förstå smärtans karaktär och beteende
+${isEarlyPostOp ? `1. Förstå hur läkningen går (svullnad, smärta, sårläkning)
+2. Identifiera eventuella komplikationer
+3. Förstå patientens oro och förväntningar
+4. Bedöma följsamhet till restriktioner` : `1. Förstå smärtans karaktär och beteende
 2. Identifiera funktionella begränsningar i vardagen
 3. Förstå vad som förvärrar/lindrar besvären
-4. Bedöma om rörelserädsla kan vara relevant
+4. Bedöma om rörelserädsla kan vara relevant`}
 
 VIKTIGT:
 - Frågorna ska vara INDIVIDANPASSADE för denna specifika patient
 - Undvik generiska frågor - var specifik för kroppsdelen och situationen
 - Använd vardagligt svenskt språk som patienten förstår
 - Varje fråga ska ge kliniskt användbar information
+${isEarlyPostOp ? '- ABSOLUT INGA FRÅGOR om lyft, belastning, styrka eller funktion som kräver belastning!' : ''}
 
 EXEMPEL PÅ BRA FRÅGOR:
-- För knäsmärta hos löpare: "Känner du mest ont när du springer uppför eller nedför?"
+${isEarlyPostOp ? `- "Hur ser såret ut - finns det rodnad eller svullnad?"
+- "Hur är smärtan jämfört med dagarna efter operationen?"
+- "Följer du de instruktioner du fick från kirurgen?"
+- "Hur mår du psykiskt - känner du dig orolig för läkningen?"` : `- För knäsmärta hos löpare: "Känner du mest ont när du springer uppför eller nedför?"
 - För ryggsmärta hos kontorsarbetare: "Hur påverkas smärtan av att sitta länge vid datorn?"
-- För axelsmärta: "Har du svårt att sträcka dig uppåt, t.ex. för att ta något från en hylla?"
+- För axelsmärta: "Har du svårt att sträcka dig uppåt, t.ex. för att ta något från en hylla?"`}
 
 Returnera ENDAST JSON-array:
 [
@@ -3702,8 +3743,56 @@ KATEGORIER:
 
 /**
  * Fallback questions if AI generation fails
+ * Anpassade för post-op patienter
  */
 const getDefaultFollowUpQuestions = (assessment: Partial<UserAssessment>): FollowUpQuestion[] => {
+  const isPostOp = assessment.injuryType === InjuryType.POST_OP;
+  const surgeryDate = assessment.surgicalDetails?.date;
+  let daysSinceSurgery: number | null = null;
+  if (surgeryDate) {
+    daysSinceSurgery = Math.floor((Date.now() - new Date(surgeryDate).getTime()) / (1000 * 60 * 60 * 24));
+  }
+  const isEarlyPostOp = isPostOp && daysSinceSurgery !== null && daysSinceSurgery < 42;
+
+  // Post-op säkra frågor för tidig fas
+  if (isEarlyPostOp) {
+    return [
+      {
+        id: 'postop_healing',
+        question: 'Hur upplever du att läkningen går?',
+        type: 'single_choice',
+        options: ['Bra, som förväntat', 'Lite långsammare än jag hoppades', 'Osäker, svårt att bedöma', 'Har oro för komplikationer'],
+        required: true,
+        category: 'history'
+      },
+      {
+        id: 'postop_wound',
+        question: 'Hur ser operationsområdet ut?',
+        type: 'single_choice',
+        options: ['Läker fint, ingen rodnad', 'Lite svullet men normalt', 'Rodnad eller värme', 'Vätska eller problem med såret'],
+        required: true,
+        category: 'pain_character'
+      },
+      {
+        id: 'postop_pain',
+        question: 'Hur är smärtan jämfört med direkt efter operationen?',
+        type: 'single_choice',
+        options: ['Mycket bättre', 'Lite bättre', 'Ungefär samma', 'Värre'],
+        required: true,
+        category: 'pain_character'
+      },
+      {
+        id: 'postop_compliance',
+        question: 'Följer du läkarens instruktioner och restriktioner?',
+        type: 'single_choice',
+        options: ['Ja, till punkt och pricka', 'Mestadels', 'Ibland svårt', 'Osäker på vad som gäller'],
+        required: true,
+        category: 'lifestyle'
+      }
+    ];
+  }
+
+  // Vanliga frågor för icke-postop eller sen postop
   return [
     {
       id: 'default_duration',
