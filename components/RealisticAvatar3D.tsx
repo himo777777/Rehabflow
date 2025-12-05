@@ -15,6 +15,7 @@ import { CAMERA_PRESETS, BodyPosition } from '../constants/cameraPresets';
 import { getAnimationMapping, ExerciseAnimationMapping } from '../data/exerciseAnimationMap';
 import { getExerciseAnimation } from '../data/exerciseAnimations';
 import { ExerciseAnimationData, PoseKeyframe } from '../services/avatarAnimationService';
+import { EXERCISE_DATABASE } from '../data/exerciseDatabase';
 import { logger } from '../utils/logger';
 
 /**
@@ -2901,6 +2902,24 @@ function getBodyPosition(exerciseName?: string, mode?: ExerciseMode, explicitPos
   return 'standing';
 }
 
+/**
+ * Find exercise from database by name (fuzzy matching)
+ */
+function findExerciseByName(exerciseName: string | undefined) {
+  if (!exerciseName) return null;
+
+  // Exact match first
+  const exactMatch = EXERCISE_DATABASE.find(e => e.name === exerciseName);
+  if (exactMatch) return exactMatch;
+
+  // Normalized match
+  const normalized = exerciseName.toLowerCase().replace(/[()]/g, '').trim();
+  return EXERCISE_DATABASE.find(e => {
+    const eName = e.name.toLowerCase().replace(/[()]/g, '').trim();
+    return eName.includes(normalized) || normalized.includes(eName);
+  }) || null;
+}
+
 // Phase display names in Swedish
 const PHASE_DISPLAY_NAMES: Record<string, string> = {
   'ECCENTRIC': 'Sänkning',
@@ -2939,6 +2958,10 @@ const RealisticAvatar3D: React.FC<RealisticAvatar3DProps> = ({
   const [modelExists, setModelExists] = useState<boolean | null>(null);
   const [currentPhase, setCurrentPhase] = useState<string>('IDLE');
   const [animationProgress, setAnimationProgress] = useState<number>(0);
+  const [showInstructions, setShowInstructions] = useState<boolean>(true);
+
+  // Find exercise data from database
+  const exerciseData = useMemo(() => findExerciseByName(exerciseName), [exerciseName]);
 
   // Determine body position from exercise name, mode, or explicit prop
   const bodyPosition = getBodyPosition(exerciseName, mode, explicitPosition);
@@ -3065,6 +3088,56 @@ const RealisticAvatar3D: React.FC<RealisticAvatar3DProps> = ({
         <div className="absolute bottom-2 left-2 right-2 bg-amber-500/90 text-amber-900 text-xs p-2 rounded">
           3D-modell saknas. Se /public/models/README.md för instruktioner.
         </div>
+      )}
+
+      {/* Exercise Instructions Overlay */}
+      {exerciseData && showInstructions && (
+        <div className="absolute bottom-4 left-2 right-2 bg-slate-900/90 backdrop-blur-sm rounded-lg p-3 shadow-lg border border-slate-700">
+          {/* Toggle button */}
+          <button
+            onClick={() => setShowInstructions(false)}
+            className="absolute top-1 right-1 text-slate-400 hover:text-white p-1"
+            aria-label="Dölj instruktioner"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+
+          {/* Exercise name */}
+          <h3 className="text-cyan-400 font-semibold text-sm mb-1 pr-6">{exerciseData.name}</h3>
+
+          {/* Description */}
+          <p className="text-slate-300 text-xs leading-relaxed mb-2">{exerciseData.description}</p>
+
+          {/* Steps (if available) */}
+          {exerciseData.steps && exerciseData.steps.length > 0 && (
+            <div className="mt-2 pt-2 border-t border-slate-700">
+              <p className="text-slate-400 text-xs font-medium mb-1">Steg:</p>
+              <ol className="text-slate-300 text-xs space-y-1">
+                {exerciseData.steps.slice(0, 3).map((step, idx) => (
+                  <li key={idx} className="flex gap-1">
+                    <span className="text-cyan-500">{idx + 1}.</span>
+                    <span>{step.title}: {step.instruction}</span>
+                  </li>
+                ))}
+                {exerciseData.steps.length > 3 && (
+                  <li className="text-slate-500">+{exerciseData.steps.length - 3} till...</li>
+                )}
+              </ol>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Show instructions button when hidden */}
+      {exerciseData && !showInstructions && (
+        <button
+          onClick={() => setShowInstructions(true)}
+          className="absolute bottom-4 right-4 bg-slate-800/80 hover:bg-slate-700 text-cyan-400 px-3 py-1 rounded text-xs"
+        >
+          Visa instruktioner
+        </button>
       )}
     </div>
   );

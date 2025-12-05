@@ -157,18 +157,41 @@ export const EXERCISE_ANIMATION_MAP: Record<string, ExerciseAnimationMapping> = 
 
 /**
  * Get animation mapping for an exercise
+ * Förbättrad matchning med loggning för felsökning
  */
 export function getAnimationMapping(exerciseName: string): ExerciseAnimationMapping | null {
-  // Direct match
+  // Direct match (exakt matchning)
   if (EXERCISE_ANIMATION_MAP[exerciseName]) {
+    console.log(`[AnimationMap] Exakt match: "${exerciseName}" -> ${EXERCISE_ANIMATION_MAP[exerciseName].animationKey}`);
     return EXERCISE_ANIMATION_MAP[exerciseName];
   }
 
-  // Fuzzy match - check if exercise name contains key
-  const normalizedName = exerciseName.toLowerCase();
+  // Normalisera namnet för fuzzy match
+  const normalizedName = exerciseName.toLowerCase()
+    .replace(/[()]/g, '') // Ta bort parenteser
+    .replace(/\s+/g, ' ') // Normalisera mellanslag
+    .trim();
+
+  // Fuzzy match - kontrollera om övningsnamnet innehåller nyckeln eller vice versa
   for (const [key, mapping] of Object.entries(EXERCISE_ANIMATION_MAP)) {
-    const normalizedKey = key.toLowerCase();
+    const normalizedKey = key.toLowerCase()
+      .replace(/[()]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // Delvis matchning i båda riktningarna
     if (normalizedName.includes(normalizedKey) || normalizedKey.includes(normalizedName)) {
+      console.log(`[AnimationMap] Fuzzy match: "${exerciseName}" -> ${mapping.animationKey} (via "${key}")`);
+      return mapping;
+    }
+
+    // Kolla om några betydande ord matchar
+    const nameWords = normalizedName.split(' ').filter(w => w.length > 3);
+    const keyWords = normalizedKey.split(' ').filter(w => w.length > 3);
+    const matchingWords = nameWords.filter(w => keyWords.some(kw => kw.includes(w) || w.includes(kw)));
+
+    if (matchingWords.length >= 2) {
+      console.log(`[AnimationMap] Word match: "${exerciseName}" -> ${mapping.animationKey} (via "${key}", matching: ${matchingWords.join(', ')})`);
       return mapping;
     }
   }
@@ -190,11 +213,13 @@ export function getAnimationMapping(exerciseName: string): ExerciseAnimationMapp
 
   for (const [keyword, mapping] of Object.entries(keywordMap)) {
     if (normalizedName.includes(keyword)) {
+      console.log(`[AnimationMap] Keyword match: "${exerciseName}" -> ${mapping.animationKey} (keyword: "${keyword}")`);
       return mapping;
     }
   }
 
-  // Default fallback
+  // Default fallback - ingen match hittades
+  console.warn(`[AnimationMap] ⚠️ Ingen animation hittad för: "${exerciseName}" -> fallback till 'idle'`);
   return { animationKey: 'idle', position: 'standing' };
 }
 
