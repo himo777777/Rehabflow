@@ -13,31 +13,32 @@ export interface CameraPreset {
 }
 
 // Camera presets for different body positions
+// UPPDATERAT: Kameran placerad för att visa hela avataren (1.8m hög)
 export const CAMERA_PRESETS: Record<BodyPosition, CameraPreset> = {
   standing: {
-    position: [0, 0.7, 4],
-    target: [0, 0.5, 0],
-    fov: 50,
+    position: [0, 1.0, 5],      // Höjd upp (1.0m) och längre bak (5m)
+    target: [0, 0.9, 0],        // Siktar på mitten av kroppen
+    fov: 60,                    // Bredare vy för att fånga hela kroppen
   },
   lying: {
-    position: [0, 3, 2],    // Ovanifrån-vinkel för liggande
-    target: [0, 0, 0],
-    fov: 55,
+    position: [2, 2.5, 3],      // Snedvinkel istället för rakt ovanifrån
+    target: [0, 0.2, 0],
+    fov: 60,
   },
   sitting: {
-    position: [0, 0.5, 3],
-    target: [0, 0.3, 0],
-    fov: 50,
+    position: [0, 0.8, 4],      // Längre bak
+    target: [0, 0.5, 0],
+    fov: 55,
   },
   kneeling: {
-    position: [0, 0.8, 3.5],  // Lite lägre för knäende
-    target: [0, 0.3, 0],
-    fov: 50,
+    position: [0, 1.0, 4],      // Anpassad för knäende position
+    target: [0, 0.5, 0],
+    fov: 55,
   },
   sidelying: {
-    position: [2, 1.5, 2.5],  // Från sidan för sidoläge
-    target: [0, 0.1, 0],
-    fov: 55,
+    position: [3, 1.5, 3],      // Från sidan för sidoläge
+    target: [0, 0.3, 0],
+    fov: 60,
   },
 };
 

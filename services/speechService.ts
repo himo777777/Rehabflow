@@ -28,22 +28,40 @@ const state: SpeechState = {
 };
 
 // Initialize voices when they become available
+// Prioriterar mer naturliga röster (Neural, Enhanced, Premium)
 const initVoices = (): Promise<SpeechSynthesisVoice[]> => {
   return new Promise((resolve) => {
     const loadVoices = () => {
       state.availableVoices = window.speechSynthesis.getVoices();
 
-      // Try to find a Swedish voice
-      const swedishVoice = state.availableVoices.find(
+      // Prioritera svenska röster, med neural/enhanced/premium först
+      const swedishVoices = state.availableVoices.filter(
         (v) => v.lang.startsWith('sv') || v.lang === 'sv-SE'
       );
+
+      // Leta efter premium/neural/enhanced röster (mer naturliga)
+      const premiumSwedish = swedishVoices.find((v) =>
+        v.name.toLowerCase().includes('neural') ||
+        v.name.toLowerCase().includes('enhanced') ||
+        v.name.toLowerCase().includes('premium') ||
+        v.name.toLowerCase().includes('natural') ||
+        v.name.toLowerCase().includes('wavenet')
+      );
+
+      // Fallback till vanlig svensk röst
+      const standardSwedish = swedishVoices[0];
 
       // Fallback to any Scandinavian or English voice
       const fallbackVoice = state.availableVoices.find(
         (v) => v.lang.startsWith('nb') || v.lang.startsWith('da') || v.lang.startsWith('en')
       );
 
-      state.selectedVoice = swedishVoice || fallbackVoice || state.availableVoices[0] || null;
+      state.selectedVoice = premiumSwedish || standardSwedish || fallbackVoice || state.availableVoices[0] || null;
+
+      // Logga vilken röst som valdes
+      if (state.selectedVoice) {
+        console.log(`[SpeechService] Vald röst: ${state.selectedVoice.name} (${state.selectedVoice.lang})`);
+      }
 
       resolve(state.availableVoices);
     };
@@ -77,9 +95,9 @@ const speak = (text: string, options: SpeechOptions = {}): Promise<void> => {
 
     const utterance = new SpeechSynthesisUtterance(text);
 
-    // Set options
-    utterance.rate = options.rate ?? 0.9; // Slightly slower for clarity
-    utterance.pitch = options.pitch ?? 1;
+    // Set options - optimerat för mer naturligt tal
+    utterance.rate = options.rate ?? 0.85;   // Långsammare för tydlighet och naturlighet
+    utterance.pitch = options.pitch ?? 0.95; // Lite lägre tonhöjd, mindre robotaktigt
     utterance.volume = options.volume ?? 1;
     utterance.lang = 'sv-SE';
 

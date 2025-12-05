@@ -128,9 +128,49 @@ export function evaluatePainResponse(
 }
 
 /**
+ * Post-op kontext för säker progressionsbedömning
+ */
+export interface PostOpContext {
+  isPostOp: boolean;
+  daysSinceSurgery: number;
+  phase: 1 | 2 | 3;
+  procedure?: string;
+}
+
+/**
  * Detaljerad progressionsbedömning
  */
-export function evaluateProgression(criteria: ProgressionCriteria): ProgressionDecision {
+export function evaluateProgression(
+  criteria: ProgressionCriteria,
+  postOpContext?: PostOpContext
+): ProgressionDecision {
+  // ============================================
+  // ⚠️ POST-OP FAS 1: ABSOLUT INGEN PROGRESSION
+  // ============================================
+  if (postOpContext?.isPostOp && postOpContext.phase === 1) {
+    const daysRemaining = 42 - postOpContext.daysSinceSurgery;
+    return {
+      action: 'maintain',
+      volumeMultiplier: 1.0,
+      intensityAdjustment: -2, // Håll belastning låg
+      recommendation: `⚠️ POSTOPERATIV FAS 1: Ingen progression tillåten. Endast smärtfri rörelseträning (ROM) utan belastning. ${daysRemaining > 0 ? `Återstår ca ${daysRemaining} dagar i skyddsfasen.` : ''}`,
+      evidence: 'Postoperativa protokoll: Fas 1 (0-6 veckor) är skyddsfas med fokus på läkning och ROM.',
+      warnings: [
+        '🚫 ABSOLUT: Ingen vikt eller motstånd',
+        '🚫 ABSOLUT: Ingen ökning av intensitet',
+        '✅ TILLÅTET: Smärtfri rörelseträning',
+        '✅ TILLÅTET: Gradvis ökad ROM inom smärtfritt intervall'
+      ],
+      nextEvaluation: 'Vid nästa fysioterapeutbesök eller efter 6 veckor'
+    };
+  }
+
+  // Post-op Fas 2: Försiktig progression tillåten
+  if (postOpContext?.isPostOp && postOpContext.phase === 2) {
+    // Fortsätt till normal utvärdering men med försiktighet
+    // Lägg till extra varning i slutet
+  }
+
   const {
     painDuringExercise,
     painAfterExercise,

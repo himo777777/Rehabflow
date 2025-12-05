@@ -1681,6 +1681,107 @@ export const generateRehabProgram = async (assessment: UserAssessment): Promise<
       });
     }
 
+    // ============================================
+    // ⚠️ POST-OP FAS 1 SÄKERHETSFILTER - KRITISKT
+    // ============================================
+    // Filtrerar AKTIVT bort osäkra övningar för post-op patienter i skyddsfasen
+    const isPostOpPhase1 = assessment.injuryType === InjuryType.POST_OP &&
+      daysSinceSurgery !== null &&
+      daysSinceSurgery < 42;
+
+    if (isPostOpPhase1 && program.phases) {
+      const procedure = assessment.surgicalDetails?.procedure?.toLowerCase() || '';
+      const isShoulderSurgery = procedure.includes('axel') ||
+        procedure.includes('protes') ||
+        procedure.includes('rotator');
+
+      // Förbjudna nyckelord för post-op Fas 1
+      const forbiddenKeywords = [
+        'vikt', 'vikter', 'tung', 'tungt', 'belastning', 'motstånd',
+        'press', 'lyft', 'styrketräning', 'max', 'explosion',
+        'hopp', 'språng', 'snabb', 'power'
+      ];
+
+      // Extra förbjudet för axeloperation
+      const shoulderForbidden = isShoulderSurgery ? [
+        'overhead', 'över huvudet', 'shoulder press', 'axelpress',
+        'lateral raise', 'sidolyft', 'pullup', 'pull-up', 'chin-up',
+        'rodd', 'rowing', 'extern rotation', 'intern rotation'
+      ] : [];
+
+      const allForbidden = [...forbiddenKeywords, ...shoulderForbidden];
+
+      let removedCount = 0;
+      let modifiedCount = 0;
+
+      for (const phase of program.phases) {
+        if (!phase.dailyRoutine) continue;
+
+        for (const day of phase.dailyRoutine) {
+          if (!day.exercises) continue;
+
+          // Filtrera bort osäkra övningar
+          const safeExercises = day.exercises.filter(exercise => {
+            const name = exercise.name?.toLowerCase() || '';
+            const desc = exercise.description?.toLowerCase() || '';
+            const tips = exercise.advancedTips?.toLowerCase() || '';
+            const combinedText = `${name} ${desc} ${tips}`;
+
+            // Kolla om övningen innehåller förbjudna ord
+            const hasForbidden = allForbidden.some(kw => combinedText.includes(kw));
+
+            if (hasForbidden) {
+              logger.warn(`⚠️ SÄKERHET: Tar bort osäker övning för post-op Fas 1: ${exercise.name}`);
+              removedCount++;
+              return false;
+            }
+            return true;
+          });
+
+          // Modifiera kvarvarande övningar till ROM-only
+          for (const exercise of safeExercises) {
+            // Ta bort alla vikter/sets som antyder belastning
+            if (exercise.sets && exercise.sets > 1) {
+              exercise.sets = 1;
+              modifiedCount++;
+            }
+
+            // Ändra reps till ROM-beskrivning
+            if (exercise.reps && !exercise.reps.toLowerCase().includes('rom')) {
+              exercise.reps = 'ROM: Smärtfri rörelse';
+              modifiedCount++;
+            }
+
+            // Lägg till varning i tips
+            const romWarning = '⚠️ POST-OP FAS 1: Endast smärtfri rörelseträning utan belastning.';
+            if (exercise.tips && !exercise.tips.includes('POST-OP')) {
+              exercise.tips = `${romWarning} ${exercise.tips}`;
+            } else if (!exercise.tips) {
+              exercise.tips = romWarning;
+            }
+
+            // Rensa advancedTips från farliga förslag
+            if (exercise.advancedTips) {
+              exercise.advancedTips = exercise.advancedTips
+                .replace(/lägg till.*vikt/gi, '')
+                .replace(/öka.*belastning/gi, '')
+                .replace(/använd.*motstånd/gi, '')
+                .trim();
+            }
+          }
+
+          day.exercises = safeExercises;
+        }
+      }
+
+      logger.info(`🔒 Post-op Fas 1 säkerhetsfilter tillämpat`, {
+        removedExercises: removedCount,
+        modifiedExercises: modifiedCount,
+        procedure: assessment.surgicalDetails?.procedure,
+        daysSinceSurgery
+      });
+    }
+
     // Cache the result for 10 minutes
     setCache(cacheKey, program, 10 * 60 * 1000);
 
@@ -2346,9 +2447,26 @@ export const generateOnboardingFollowUps = async (
     painLevel: number;
     symptomDuration?: string;
     functionalLimitations?: string[];
+    // Post-op context för säker frågehantering
+    surgeryDate?: string;
+    surgeryType?: string;
+    isPostOp?: boolean;
   }
 ): Promise<OnboardingFollowUp[]> => {
   const followUps: OnboardingFollowUp[] = [];
+
+  // Beräkna post-op fas för att avgöra vilka frågor som är säkra
+  const daysSinceSurgery = currentAnswers.surgeryDate
+    ? Math.floor((Date.now() - new Date(currentAnswers.surgeryDate).getTime()) / (1000 * 60 * 60 * 24))
+    : null;
+
+  // Tidig post-op = första 6 veckorna (42 dagar) - skyddsfas
+  const isEarlyPostOp = currentAnswers.isPostOp && daysSinceSurgery !== null && daysSinceSurgery < 42;
+
+  // Axelprotes eller annan axeloperation kräver extra försiktighet
+  const isShoulderSurgery = currentAnswers.surgeryType?.toLowerCase().includes('axel') ||
+    currentAnswers.surgeryType?.toLowerCase().includes('protes') ||
+    currentAnswers.surgeryType?.toLowerCase().includes('rotator');
 
   // Location-specific follow-ups
   const location = currentAnswers.injuryLocation.toLowerCase();
@@ -2388,20 +2506,47 @@ export const generateOnboardingFollowUps = async (
   }
 
   if (location.includes('axel')) {
-    followUps.push({
-      question: "Kan du lyfta armen över huvudet utan smärta?",
-      type: 'choice',
-      options: ['Ja, utan problem', 'Med viss smärta', 'Mycket smärtsamt', 'Kan inte'],
-      importance: 'required',
-      clinicalReason: "Testar rotatorkuffens funktion"
-    });
-    followUps.push({
-      question: "Vaknar du på natten av smärta om du ligger på axeln?",
-      type: 'choice',
-      options: ['Ja, ofta', 'Ibland', 'Sällan', 'Nej'],
-      importance: 'recommended',
-      clinicalReason: "Nattlig smärta indikerar ofta rotatorkuffpatologi"
-    });
+    // ⚠️ SÄKERHET: Fråga INTE om ROM för post-op axelpatienter i skyddsfasen
+    if (isEarlyPostOp && isShoulderSurgery) {
+      // Post-op axelpatienter (Fas 1): Fråga om protokollföljsamhet istället
+      followUps.push({
+        question: "Följer du de rörelseövningar din fysioterapeut/kirurg har ordinerat?",
+        type: 'choice',
+        options: ['Ja, helt enligt schema', 'Mest, men missar ibland', 'Har svårt att komma ihåg', 'Har inte fått instruktioner'],
+        importance: 'required',
+        clinicalReason: "Post-op protokollföljsamhet är kritisk för läkning"
+      });
+      followUps.push({
+        question: "Har du upplevt ökad smärta eller svullnad sedan operationen?",
+        type: 'choice',
+        options: ['Nej, det går bra', 'Lite svullnad', 'Ökad smärta', 'Både smärta och svullnad'],
+        importance: 'required',
+        clinicalReason: "Varningssignaler för komplikationer efter operation"
+      });
+      followUps.push({
+        question: "Använder du din mitella/slynga som ordinerat?",
+        type: 'choice',
+        options: ['Ja, hela tiden förutom övningar', 'Mest', 'Ibland', 'Har ingen mitella'],
+        importance: 'recommended',
+        clinicalReason: "Immobilisering är viktig i skyddsfasen"
+      });
+    } else {
+      // Icke-opererade axelpatienter: Standardfrågor om ROM
+      followUps.push({
+        question: "Kan du lyfta armen över huvudet utan smärta?",
+        type: 'choice',
+        options: ['Ja, utan problem', 'Med viss smärta', 'Mycket smärtsamt', 'Kan inte'],
+        importance: 'required',
+        clinicalReason: "Testar rotatorkuffens funktion"
+      });
+      followUps.push({
+        question: "Vaknar du på natten av smärta om du ligger på axeln?",
+        type: 'choice',
+        options: ['Ja, ofta', 'Ibland', 'Sällan', 'Nej'],
+        importance: 'recommended',
+        clinicalReason: "Nattlig smärta indikerar ofta rotatorkuffpatologi"
+      });
+    }
   }
 
   // Pain level specific
