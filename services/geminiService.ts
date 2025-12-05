@@ -3586,6 +3586,95 @@ const mapBodyPartToSwedish = (bodyPart: string): string => {
 };
 
 /**
+ * Generate body-part specific example questions for the AI prompt
+ * This ensures clinically relevant questions for each body region
+ */
+const getBodyPartSpecificExamples = (bodyPart: string, activityLevel: string, workload: string): string => {
+  const bp = bodyPart.toLowerCase();
+
+  // Kroppsdel-specifika frågeexempel baserat på klinisk praxis
+  const examples: Record<string, string[]> = {
+    'nacke': [
+      '"Strålar smärtan ut i armen eller fingrarna?" (nervrotspåverkan)',
+      '"Känner du stelhet på morgonen som släpper efter en stund?" (inflammatorisk vs mekanisk)',
+      '"Blir det värre av att titta uppåt eller nedåt?" (specifika rörelser)',
+      '"Har du huvudvärk som börjar i nacken?" (cervikal huvudvärk)',
+    ],
+    'axel': [
+      '"Kan du sova på den sidan utan att vakna av smärta?" (nattlig smärta)',
+      '"Gör det ont när du sträcker dig bakåt, som att ta på ett skärp?" (inåtrotation)',
+      '"Har du svårt att lyfta armen utåt/uppåt?" (abduktion/impingement)',
+      '"Känns det svagt eller ostabilt i axeln?" (rotatorkuffproblem)',
+    ],
+    'rygg': [
+      '"Strålar smärtan ner i benet, under knät?" (ischias vs lokal ryggsmärta)',
+      '"Är det värre att sitta länge eller stå länge?" (mekaniskt mönster)',
+      '"Lindrar det att böja sig framåt eller bakåt?" (flexion vs extension)',
+      '"Har du domningar eller stickningar i benen?" (nervpåverkan)',
+    ],
+    'ländryggen': [
+      '"Strålar smärtan ner i benet, under knät?" (ischias)',
+      '"Blir det bättre av att gå en stund eller värre?" (spinal stenos)',
+      '"Känner du svaghet i benet eller svårt att gå på tå/häl?" (neurologisk screening)',
+      '"Påverkas blåsa eller tarm?" (cauda equina - rött flagga)',
+    ],
+    'knä': [
+      '"Har knät låst sig eller gett vika?" (menisk/ligamentskada)',
+      '"Svullnar det upp efter aktivitet?" (inflammation)',
+      '"Är det värre i trappor - uppför eller nedför?" (patellofemoral)',
+      '"Knakar eller knäpper det i knät?" (broskproblem)',
+    ],
+    'höft': [
+      '"Har du svårt att ta på strumpor eller skor?" (rörlighet)',
+      '"Gör det ont i ljumsken eller på utsidan av höften?" (lokalisation)',
+      '"Känns det stelt efter att ha suttit länge?" (artros-tecken)',
+      '"Haltar du när du går?" (funktionspåverkan)',
+    ],
+    'fotled': [
+      '"Vrickade du foten nyligen?" (akut skada)',
+      '"Känns det ostabilt när du går på ojämnt underlag?" (instabilitet)',
+      '"Är det värre på morgonen och blir bättre av att gå?" (hälsporre/fasciit)',
+      '"Svullnar det upp mot kvällen?" (inflammation)',
+    ],
+    'handled': [
+      '"Domnar fingrarna, speciellt på natten?" (karpaltunnel)',
+      '"Är det värre av att vrida handleden?" (TFCC-skada)',
+      '"Gör det ont att greppa saker hårt?" (tendinopati)',
+      '"Har du arbetat mycket med händerna nyligen?" (överbelastning)',
+    ],
+  };
+
+  // Hitta matchande kroppsdel eller använd generiska
+  let relevantExamples: string[] = [];
+  for (const [key, ex] of Object.entries(examples)) {
+    if (bp.includes(key) || key.includes(bp)) {
+      relevantExamples = ex;
+      break;
+    }
+  }
+
+  // Fallback till generiska frågor
+  if (relevantExamples.length === 0) {
+    relevantExamples = [
+      '"Vaknar du av smärtan på natten?" (inflammatorisk/allvarlig)',
+      '"Är smärtan konstant eller kommer och går?" (mönster)',
+      '"Vad gör smärtan värre respektive bättre?" (provokerande/lindrande)',
+      '"Påverkar det din sömn eller ditt humör?" (psykosocialt)',
+    ];
+  }
+
+  // Lägg till arbetsrelaterad fråga baserat på arbetsbelastning
+  if (workload === 'Fysiskt tungt') {
+    relevantExamples.push('"Blir det värre under eller efter arbetet?" (arbetsrelaterat)');
+  } else if (workload === 'Stillasittande') {
+    relevantExamples.push('"Blir det värre av att sitta länge vid datorn?" (stillasittande)');
+  }
+
+  return `SPECIFIKA EXEMPELFRÅGOR FÖR ${bodyPart.toUpperCase()}:
+${relevantExamples.map(ex => `- ${ex}`).join('\n')}`;
+};
+
+/**
  * Generate individualized follow-up questions based on patient data
  * This replaces standardized questionnaires with AI-tailored questions
  */
@@ -3641,39 +3730,44 @@ ${isEarlyPostOp ? `🚫 TIDIG POSTOPERATIV FAS (< 6 veckor):
 `;
   }
 
-  const prompt = `Du är en erfaren fysioterapeut som genomför en klinisk bedömning.
+  // Bygg kroppsdel-specifika exempelfrågor
+  const bodyPartExamples = getBodyPartSpecificExamples(bodyPart, activityLevel, workload);
+
+  const prompt = `Du är en erfaren fysioterapeut (10+ år erfarenhet) som genomför en FOKUSERAD klinisk bedömning.
 ${postOpSection}
-PATIENTDATA:
+PATIENTPROFIL:
 - Ålder: ${age}
 - Aktivitetsnivå: ${activityLevel}
 - Arbete: ${workload}
 - Smärtlokalisation: ${bodyPart}
 - Skadtyp: ${injuryType}
+- Smärtnivå: ${assessment.painLevel ?? 'ej angiven'}/10
 
-UPPGIFT:
-Generera 4-5 kliniskt relevanta följdfrågor för att:
-${isEarlyPostOp ? `1. Förstå hur läkningen går (svullnad, smärta, sårläkning)
-2. Identifiera eventuella komplikationer
+KLINISKT MÅL:
+Generera exakt 4 SPECIFIKA frågor som hjälper dig att:
+${isEarlyPostOp ? `1. Bedöma läkningsförlopp (svullnad, smärta, sår)
+2. Upptäcka komplikationstecken tidigt
 3. Förstå patientens oro och förväntningar
-4. Bedöma följsamhet till restriktioner` : `1. Förstå smärtans karaktär och beteende
-2. Identifiera funktionella begränsningar i vardagen
-3. Förstå vad som förvärrar/lindrar besvären
-4. Bedöma om rörelserädsla kan vara relevant`}
+4. Säkerställa följsamhet till restriktioner` : `1. DIFFERENTIALDIAGNOS - Utesluta allvarliga tillstånd
+2. SMÄRTMÖNSTER - När, var, hur ont (mekanisk vs inflammatorisk)
+3. FUNKTION - Vilka specifika rörelser/aktiviteter är begränsade
+4. BIDRAGANDE FAKTORER - Arbete, stress, sömn som påverkar`}
 
-VIKTIGT:
-- Frågorna ska vara INDIVIDANPASSADE för denna specifika patient
-- Undvik generiska frågor - var specifik för kroppsdelen och situationen
-- Använd vardagligt svenskt språk som patienten förstår
-- Varje fråga ska ge kliniskt användbar information
-${isEarlyPostOp ? '- ABSOLUT INGA FRÅGOR om lyft, belastning, styrka eller funktion som kräver belastning!' : ''}
+REGLER FÖR BRA FRÅGOR:
+✅ Ställ frågor som ÄNDRAR din kliniska bedömning
+✅ Var KONKRET för ${bodyPart} - inte generiska frågor
+✅ Anpassa till patientens ${activityLevel} aktivitetsnivå
+✅ Fråga om SPECIFIKA rörelser, inte "har du ont"
+✅ Inkludera minst 1 fråga om nattsömn/vilosmärta (rött flagga-screening)
+${isEarlyPostOp ? '🚫 INGA frågor om lyft, belastning eller styrka!' : ''}
 
-EXEMPEL PÅ BRA FRÅGOR:
-${isEarlyPostOp ? `- "Hur ser såret ut - finns det rodnad eller svullnad?"
-- "Hur är smärtan jämfört med dagarna efter operationen?"
-- "Följer du de instruktioner du fick från kirurgen?"
-- "Hur mår du psykiskt - känner du dig orolig för läkningen?"` : `- För knäsmärta hos löpare: "Känner du mest ont när du springer uppför eller nedför?"
-- För ryggsmärta hos kontorsarbetare: "Hur påverkas smärtan av att sitta länge vid datorn?"
-- För axelsmärta: "Har du svårt att sträcka dig uppåt, t.ex. för att ta något från en hylla?"`}
+${bodyPartExamples}
+
+DÅLIGA FRÅGOR (undvik):
+❌ "Hur mår du?" - för generellt
+❌ "Har du ont?" - uppenbart ja
+❌ "Berätta om din smärta" - för öppet
+❌ "Är det något annat?" - leder ingenvart
 
 Returnera ENDAST JSON-array:
 [
