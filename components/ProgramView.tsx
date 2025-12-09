@@ -13,7 +13,8 @@ import { storageService } from '../services/storageService';
 import { generateWeeklyAnalysis } from '../services/geminiService';
 import { supabase, getUserId } from '../services/supabaseClient';
 import { exportProgramToPDF } from '../services/pdfExport';
-import { Calendar, ChevronRight, Activity, Info, BarChart, Printer, Sparkles, ThumbsUp, ShieldAlert, ArrowUpCircle, Zap, BrainCircuit, Star, Target, Crown, ClipboardCheck, X, Flame, TrendingUp, Lock, Unlock, Heart, PartyPopper, Download, Loader2 } from 'lucide-react';
+import { useNotifications } from '../services/notificationService';
+import { Calendar, ChevronRight, Activity, Info, BarChart, Printer, Sparkles, ThumbsUp, ShieldAlert, ArrowUpCircle, Zap, BrainCircuit, Star, Target, Crown, ClipboardCheck, X, Flame, TrendingUp, Lock, Unlock, Heart, PartyPopper, Download, Loader2, Bell, BellOff, Clock } from 'lucide-react';
 import { logger } from '../utils/logger';
 import Spinner from './ui/Spinner';
 
@@ -60,6 +61,27 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
 
   // Toast notifications
   const { toasts, removeToast, warning } = useToast();
+
+  // Notification service for exercise reminders
+  const {
+    isSupported: notificationsSupported,
+    permission: notificationPermission,
+    preferences: notificationPreferences,
+    requestPermission: requestNotificationPermission,
+    scheduleExerciseReminder,
+    getScheduled,
+    cancelAll: cancelAllNotifications,
+  } = useNotifications();
+  const [showNotificationSetup, setShowNotificationSetup] = useState(false);
+  const [reminderTime, setReminderTime] = useState<{ hour: number; minute: number }>({ hour: 9, minute: 0 });
+  const [hasScheduledReminder, setHasScheduledReminder] = useState(false);
+
+  // Check if reminder is already scheduled
+  useEffect(() => {
+    const scheduled = getScheduled();
+    const hasExerciseReminder = scheduled.some(n => n.type === 'exercise_reminder');
+    setHasScheduledReminder(hasExerciseReminder);
+  }, [getScheduled]);
 
   // Load user assessment for ROM tracking
   useEffect(() => {
@@ -535,6 +557,112 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
           </div>
       )}
 
+      {/* NOTIFICATION SETUP MODAL */}
+      {showNotificationSetup && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="h-24 bg-gradient-to-br from-blue-500 to-cyan-600 relative flex items-center justify-center overflow-hidden">
+              <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.1)_1px,transparent_1px)] bg-[size:20px_20px] opacity-30"></div>
+              <Bell size={48} className="text-white drop-shadow-lg relative z-10" />
+            </div>
+            <div className="p-8">
+              <h3 className="text-2xl font-extrabold text-slate-900 mb-2">Träningspåminnelser</h3>
+              <p className="text-slate-500 mb-6">Få dagliga påminnelser så att du aldrig missar ett träningspass.</p>
+
+              {notificationPermission === 'denied' ? (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+                  <p className="text-red-700 text-sm font-medium">
+                    Notifikationer är blockerade. Aktivera dem i webbläsarens inställningar för att använda påminnelser.
+                  </p>
+                </div>
+              ) : notificationPermission !== 'granted' ? (
+                <button
+                  onClick={async () => {
+                    const result = await requestNotificationPermission();
+                    if (result === 'granted') {
+                      logger.info('[ProgramView] Notification permission granted');
+                    }
+                  }}
+                  className="w-full py-4 bg-blue-500 text-white rounded-2xl font-bold text-lg shadow-lg hover:bg-blue-600 transition-all mb-6 flex items-center justify-center gap-2"
+                >
+                  <Bell size={20} />
+                  Aktivera notifikationer
+                </button>
+              ) : (
+                <div className="space-y-4 mb-6">
+                  <div className="flex items-center gap-2 text-green-600 mb-4">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    <span className="text-sm font-medium">Notifikationer aktiverade</span>
+                  </div>
+
+                  <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                    <label className="block text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                      <Clock size={16} />
+                      Välj tid för daglig påminnelse
+                    </label>
+                    <div className="flex gap-2">
+                      <select
+                        value={reminderTime.hour}
+                        onChange={(e) => setReminderTime(prev => ({ ...prev, hour: parseInt(e.target.value) }))}
+                        className="flex-1 px-4 py-3 border border-slate-300 rounded-xl font-medium text-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        {[...Array(24)].map((_, i) => (
+                          <option key={i} value={i}>
+                            {i.toString().padStart(2, '0')}:00
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={reminderTime.minute}
+                        onChange={(e) => setReminderTime(prev => ({ ...prev, minute: parseInt(e.target.value) }))}
+                        className="flex-1 px-4 py-3 border border-slate-300 rounded-xl font-medium text-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value={0}>:00</option>
+                        <option value={15}>:15</option>
+                        <option value={30}>:30</option>
+                        <option value={45}>:45</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {hasScheduledReminder ? (
+                    <button
+                      onClick={() => {
+                        cancelAllNotifications();
+                        setHasScheduledReminder(false);
+                      }}
+                      className="w-full py-4 bg-red-50 text-red-600 border border-red-200 rounded-2xl font-bold text-lg hover:bg-red-100 transition-all flex items-center justify-center gap-2"
+                    >
+                      <BellOff size={20} />
+                      Ta bort påminnelse
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        scheduleExerciseReminder(reminderTime.hour, reminderTime.minute);
+                        setHasScheduledReminder(true);
+                        setShowNotificationSetup(false);
+                      }}
+                      className="w-full py-4 bg-blue-500 text-white rounded-2xl font-bold text-lg shadow-lg hover:bg-blue-600 transition-all flex items-center justify-center gap-2"
+                    >
+                      <Bell size={20} />
+                      Schemalägg daglig påminnelse
+                    </button>
+                  )}
+                </div>
+              )}
+
+              <button
+                onClick={() => setShowNotificationSetup(false)}
+                className="w-full text-sm font-bold text-slate-400 hover:text-slate-600 py-2"
+              >
+                Stäng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ANALYSIS MODAL */}
       {showAnalysisModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
@@ -624,6 +752,19 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
                     )}
                     <span className="hidden sm:inline">PDF</span>
                 </button>
+                {notificationsSupported && (
+                    <button
+                        onClick={() => setShowNotificationSetup(true)}
+                        className={`flex items-center gap-2 px-3 py-3 rounded-xl transition-all font-bold border shadow-sm hover:shadow-md hover:-translate-y-0.5 ${
+                          hasScheduledReminder
+                            ? 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200'
+                            : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                        }`}
+                        aria-label="Hantera påminnelser"
+                    >
+                        {hasScheduledReminder ? <Bell size={20} className="text-blue-500" /> : <BellOff size={20} className="text-slate-400" />}
+                    </button>
+                )}
                 <button
                     onClick={handlePrint}
                     className="flex items-center gap-2 px-3 py-3 bg-white hover:bg-slate-50 text-slate-700 rounded-xl transition-all font-bold border border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-0.5"
