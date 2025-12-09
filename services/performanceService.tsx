@@ -11,6 +11,7 @@
  * - Performance budgets and alerts
  */
 
+import React from 'react';
 import { logger } from '../utils/logger';
 
 // ============================================================================
@@ -894,7 +895,5 @@ export function ProfilerWrapper({
     </React.Profiler>
   );
 }
-
-import React from 'react';
 
 export default performanceService;

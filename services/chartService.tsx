@@ -12,6 +12,7 @@
  * - Export to image
  */
 
+import React, { useRef, useEffect } from 'react';
 import { logger } from '../utils/logger';
 
 // ============================================================================
@@ -695,8 +696,6 @@ export const chartService = new ChartService();
 // ============================================================================
 // REACT COMPONENTS
 // ============================================================================
-
-import React, { useRef, useEffect } from 'react';
 
 interface ChartProps {
   type: ChartType;

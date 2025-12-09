@@ -13,6 +13,7 @@
  * - Error reporting API
  */
 
+import React from 'react';
 import { logger } from '../utils/logger';
 
 // ============================================================================
@@ -990,7 +991,5 @@ export function withErrorBoundary<P extends object>(
     }
   };
 }
-
-import React from 'react';
 
 export default errorTrackingService;
