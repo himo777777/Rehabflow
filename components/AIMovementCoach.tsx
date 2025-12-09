@@ -1,6 +1,6 @@
 
 import React, { useEffect, useRef, useState, useMemo, useCallback, lazy, Suspense } from 'react';
-import { X, RefreshCw, AlertTriangle, Activity, BrainCircuit, Layers, Zap, Trophy, Timer, ScanLine, Target, Loader2, Pause, Play, FlipHorizontal } from 'lucide-react';
+import { X, RefreshCw, AlertTriangle, Activity, BrainCircuit, Layers, Zap, Trophy, Timer, ScanLine, Target, Loader2, Pause, Play, FlipHorizontal, Mic, MicOff } from 'lucide-react';
 // Lazy load MediaPipe modules for better initial bundle size
 import { loadMediaPipeModules, MediaPipeModules } from '../services/lazyMediaPipe';
 
@@ -15,6 +15,8 @@ import { RepScore, FormIssue, RepPhase, MovementSession } from '../types';
 import { getAnimationMapping } from '../data/exerciseAnimationMap';
 import { logger } from '../utils/logger';
 import { speechService } from '../services/speechService';
+import { voiceCommandService, ListeningState } from '../services/voiceCommandService';
+import { hapticService } from '../services/hapticService';
 import SectionErrorBoundary from './SectionErrorBoundary';
 import { getDeviceCapability, getCameraConstraints, getMediaPipeConfig, PerformanceMonitor } from '../services/adaptiveCameraService';
 import { FrameThrottler, getExerciseSpeed } from '../services/frameThrottler';
@@ -897,6 +899,10 @@ const AIMovementCoach: React.FC<AIMovementCoachProps> = ({ exerciseName, videoUr
   const [motionState, setMotionState] = useState<'START' | 'ECCENTRIC' | 'TURN' | 'CONCENTRIC'>('START');
   const [isMuted, setIsMuted] = useState(false);
 
+  // Voice Command State
+  const [voiceListening, setVoiceListening] = useState<ListeningState>('idle');
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+
   // Avatar Gender Selection (persisted to localStorage)
   const [avatarGender, setAvatarGender] = useState<'male' | 'female'>(() => {
     if (typeof window !== 'undefined') {
@@ -911,6 +917,68 @@ const AIMovementCoach: React.FC<AIMovementCoachProps> = ({ exerciseName, videoUr
       localStorage.setItem('avatarGender', avatarGender);
     }
   }, [avatarGender]);
+
+  // Voice Command Setup
+  useEffect(() => {
+    if (!voiceCommandService.isSupported()) return;
+
+    // Register exercise-specific voice commands
+    voiceCommandService.registerCommand({
+      id: 'pause-exercise',
+      phrases: ['pausa', 'paus', 'stopp', 'vänta'],
+      callback: () => {
+        setIsPaused(true);
+        hapticService.tap();
+        speechService.speak('Pausad');
+      },
+      description: 'Pausa övningen',
+      category: 'exercise',
+    });
+
+    voiceCommandService.registerCommand({
+      id: 'resume-exercise',
+      phrases: ['fortsätt', 'kör', 'starta', 'börja'],
+      callback: () => {
+        setIsPaused(false);
+        hapticService.success();
+        speechService.speak('Fortsätter');
+      },
+      description: 'Fortsätt övningen',
+      category: 'exercise',
+    });
+
+    voiceCommandService.registerCommand({
+      id: 'close-exercise',
+      phrases: ['avsluta', 'stäng', 'klar'],
+      callback: () => {
+        onClose();
+      },
+      description: 'Avsluta övningen',
+      category: 'exercise',
+    });
+
+    // Set up state change listener
+    voiceCommandService.setOnStateChange(setVoiceListening);
+
+    return () => {
+      voiceCommandService.unregisterCommand('pause-exercise');
+      voiceCommandService.unregisterCommand('resume-exercise');
+      voiceCommandService.unregisterCommand('close-exercise');
+      voiceCommandService.stop();
+    };
+  }, [onClose]);
+
+  // Toggle voice commands
+  const toggleVoiceCommands = useCallback(() => {
+    if (voiceEnabled) {
+      voiceCommandService.stop();
+      setVoiceEnabled(false);
+    } else {
+      voiceCommandService.start();
+      setVoiceEnabled(true);
+      hapticService.tap();
+    }
+  }, [voiceEnabled]);
 
   // NEW: Integrated Services State
   const [showSummary, setShowSummary] = useState(false);
@@ -1504,6 +1572,15 @@ const AIMovementCoach: React.FC<AIMovementCoachProps> = ({ exerciseName, videoUr
           setSessionScores([...completedReps]);
           setCurrentRepScore(newScore);
           setReps(completedReps.length);
+
+          // Haptic feedback for rep completion
+          if (newScore.overall >= 90) {
+            hapticService.onAchievement(); // Strong celebration
+          } else if (newScore.overall >= 70) {
+            hapticService.onRepComplete(); // Standard rep feedback
+          } else {
+            hapticService.tap(); // Light feedback for lower scores
+          }
 
           // FAS 10: Record rep completion for emotional tracking
           const repSuccess = newScore.overall >= 60;
@@ -2929,6 +3006,24 @@ const AIMovementCoach: React.FC<AIMovementCoachProps> = ({ exerciseName, videoUr
                        aria-label={isPaused ? 'Fortsätt träning' : 'Pausa träning'}
                      >
                        {isPaused ? <Play size={18} /> : <Pause size={18} />}
+                     </button>
+                   )}
+
+                   {/* Voice Control Button */}
+                   {voiceCommandService.isSupported() && (
+                     <button
+                       onClick={toggleVoiceCommands}
+                       className={`p-2.5 rounded-xl font-semibold transition-all ${
+                         voiceEnabled
+                           ? voiceListening === 'listening'
+                             ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 animate-pulse'
+                             : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                           : 'bg-slate-700/50 text-slate-400 border border-slate-600/30'
+                       }`}
+                       title={voiceEnabled ? 'Röststyrning aktiv' : 'Aktivera röststyrning'}
+                       aria-label={voiceEnabled ? 'Stäng av röststyrning' : 'Aktivera röststyrning'}
+                     >
+                       {voiceEnabled ? <Mic size={18} /> : <MicOff size={18} />}
                      </button>
                    )}
                  </div>
