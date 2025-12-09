@@ -9,8 +9,10 @@
  */
 
 import React, { Suspense, useRef, useState, useEffect } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, useGLTF, Environment, ContactShadows } from '@react-three/drei';
+import { Canvas, useFrame, useThree, useLoader } from '@react-three/fiber';
+import { OrbitControls, Environment, ContactShadows } from '@react-three/drei';
+import { MeshoptDecoder } from 'meshoptimizer';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as THREE from 'three';
 import { GLTF } from 'three-stdlib';
 import { logger } from '../../utils/logger';
@@ -149,7 +151,13 @@ function SkeletonModel({
   painLevels = {}
 }: Skeleton3DProps) {
   const group = useRef<THREE.Group>(null);
-  const { scene } = useGLTF('/models/skeleton.glb');
+  // Load with MeshoptDecoder for compressed models
+  const gltf = useLoader(
+    GLTFLoader,
+    '/models/skeleton.glb',
+    (loader) => loader.setMeshoptDecoder(MeshoptDecoder)
+  );
+  const scene = gltf.scene;
   const [hovered, setHovered] = useState<string | null>(null);
   const { gl } = useThree();
 
@@ -379,7 +387,11 @@ const Skeleton3D: React.FC<Skeleton3DProps> = ({
   );
 };
 
-// Preload the model
-useGLTF.preload('/models/skeleton.glb');
+// Preload the model with MeshoptDecoder
+useLoader.preload(
+  GLTFLoader,
+  '/models/skeleton.glb',
+  (loader) => loader.setMeshoptDecoder(MeshoptDecoder)
+);
 
 export default Skeleton3D;

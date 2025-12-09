@@ -25,9 +25,15 @@ export default defineConfig(({ mode }) => ({
               id.includes('node_modules/jspdf')) {
             return 'pdf-vendor';
           }
-          // Google AI SDK
-          if (id.includes('node_modules/@google/generative-ai')) {
+          // AI SDKs (Groq, Google, OpenAI)
+          if (id.includes('node_modules/@google/generative-ai') ||
+              id.includes('node_modules/groq-sdk') ||
+              id.includes('node_modules/openai')) {
             return 'ai-vendor';
+          }
+          // Validation (Zod)
+          if (id.includes('node_modules/zod')) {
+            return 'validation-vendor';
           }
           // UI libraries
           if (id.includes('node_modules/framer-motion') ||
@@ -43,6 +49,19 @@ export default defineConfig(({ mode }) => ({
               id.includes('node_modules/marked')) {
             return 'markdown-vendor';
           }
+          // MediaPipe and pose detection (ML libraries)
+          if (id.includes('node_modules/@mediapipe/') ||
+              id.includes('node_modules/@tensorflow/')) {
+            return 'ml-vendor';
+          }
+          // Router
+          if (id.includes('node_modules/react-router')) {
+            return 'router-vendor';
+          }
+          // Upstash Redis (rate limiting)
+          if (id.includes('node_modules/@upstash/')) {
+            return 'rate-limit-vendor';
+          }
         },
       },
     },
@@ -50,6 +69,8 @@ export default defineConfig(({ mode }) => ({
     minify: mode === 'production' ? 'esbuild' : false,
     // Increase chunk size warning limit (Three.js is inherently large)
     chunkSizeWarningLimit: 600,
+    // Target modern browsers for smaller bundle
+    target: 'es2020',
   },
   // Only expose specific environment variables, not all of process.env
   define: {
@@ -57,6 +78,24 @@ export default defineConfig(({ mode }) => ({
   },
   // Optimizations
   optimizeDeps: {
-    include: ['react', 'react-dom'],
+    include: [
+      'react',
+      'react-dom',
+      'react-router-dom',
+      'lucide-react',
+      'framer-motion',
+      'zod',
+    ],
+    // Exclude large libraries that are lazy loaded
+    exclude: [
+      '@mediapipe/pose',
+      '@mediapipe/camera_utils',
+    ],
+  },
+  // Faster HMR in development
+  server: {
+    hmr: {
+      overlay: true,
+    },
   },
 }));

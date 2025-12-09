@@ -4,6 +4,7 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { Navigate } from 'react-router-dom';
 import {
   AuthUser,
   AuthState,
@@ -157,9 +158,8 @@ export const withAuth = <P extends object>(
     }
 
     if (!isAuthenticated) {
-      // Redirect to login
-      window.location.href = '/login';
-      return null;
+      // Redirect to home (which shows login modal if needed)
+      return <Navigate to="/" replace />;
     }
 
     if (requiredRole && !hasRole(requiredRole)) {

@@ -6,8 +6,10 @@
  */
 
 import React, { useRef, Suspense, useMemo, useEffect, useState, useCallback } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useLoader } from '@react-three/fiber';
 import { OrbitControls, Environment, ContactShadows, useGLTF } from '@react-three/drei';
+import { MeshoptDecoder } from 'meshoptimizer';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as THREE from 'three';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { createBoneMap, applyPose, BoneMap, validateSkeleton, listAllBones } from '../utils/boneMapping';
@@ -17,6 +19,7 @@ import { getExerciseAnimation } from '../data/exerciseAnimations';
 import { ExerciseAnimationData, PoseKeyframe } from '../services/avatarAnimationService';
 import { EXERCISE_DATABASE } from '../data/exerciseDatabase';
 import { logger } from '../utils/logger';
+import SectionErrorBoundary from './SectionErrorBoundary';
 
 /**
  * Map animation joint names to bone names used in the skeleton
@@ -53,7 +56,7 @@ const JOINT_TO_BONE_MAP: Record<string, string> = {
   'rightLowerLeg': 'rightLowerLeg',
 };
 
-type ExerciseMode = 'LEGS' | 'PRESS' | 'PULL' | 'LUNGE' | 'CORE' | 'STRETCH' | 'BALANCE' | 'PUSH' | 'GENERAL';
+type ExerciseMode = 'LEGS' | 'PRESS' | 'PULL' | 'LUNGE' | 'CORE' | 'STRETCH' | 'BALANCE' | 'PUSH' | 'SHOULDER' | 'GENERAL';
 
 interface RealisticAvatar3DProps {
   mode: ExerciseMode;
@@ -154,6 +157,25 @@ const BASE_POSES: Record<BodyPosition, {
     rootPosition: { x: 0, y: 0.1, z: 0 },
     rootRotation: { x: -Math.PI / 2, y: Math.PI / 2, z: 0 },
   },
+  quadruped: {
+    pose: {
+      // Fyrfotaposition (cat-cow, bird dog) - händer och knän i golvet
+      spine: { x: Math.PI / 12, y: 0, z: 0 },
+      chest: { x: 0, y: 0, z: 0 },
+      // Armar rakt ner mot golvet
+      leftUpperArm: { x: -Math.PI / 2.5, y: 0, z: 0.1 },
+      rightUpperArm: { x: -Math.PI / 2.5, y: 0, z: -0.1 },
+      leftLowerArm: { x: -Math.PI / 6, y: 0, z: 0 },
+      rightLowerArm: { x: -Math.PI / 6, y: 0, z: 0 },
+      // Lår vertikala, underben horisontella på golvet
+      leftUpperLeg: { x: Math.PI / 2, y: 0, z: 0 },
+      rightUpperLeg: { x: Math.PI / 2, y: 0, z: 0 },
+      leftLowerLeg: { x: -Math.PI / 2, y: 0, z: 0 },
+      rightLowerLeg: { x: -Math.PI / 2, y: 0, z: 0 },
+    },
+    rootPosition: { x: 0, y: -0.5, z: 0 },
+    rootRotation: { x: 0, y: 0, z: 0 },
+  },
 };
 
 // Animation keyframes for different exercise modes
@@ -216,37 +238,41 @@ const EXERCISE_ANIMATIONS: Record<ExerciseMode, {
       {
         time: 0,
         pose: {
-          leftUpperArm: { x: 0, y: 0, z: Math.PI / 2 },
-          rightUpperArm: { x: 0, y: 0, z: -Math.PI / 2 },
-          leftLowerArm: { x: 0, y: Math.PI / 2, z: 0 },
-          rightLowerArm: { x: 0, y: -Math.PI / 2, z: 0 },
+          // Start position: arms slightly out, elbows bent (like holding weights at shoulder level)
+          leftUpperArm: { x: -0.3, y: 0, z: 0.4 },
+          rightUpperArm: { x: -0.3, y: 0, z: -0.4 },
+          leftLowerArm: { x: -0.5, y: 0, z: 0 },
+          rightLowerArm: { x: -0.5, y: 0, z: 0 },
         },
       },
       {
         time: 0.6,
         pose: {
-          leftUpperArm: { x: -Math.PI / 6, y: 0, z: Math.PI / 1.5 },
-          rightUpperArm: { x: -Math.PI / 6, y: 0, z: -Math.PI / 1.5 },
-          leftLowerArm: { x: 0, y: 0, z: 0 },
-          rightLowerArm: { x: 0, y: 0, z: 0 },
+          // Press up: arms raised overhead
+          leftUpperArm: { x: -0.8, y: 0, z: 0.2 },
+          rightUpperArm: { x: -0.8, y: 0, z: -0.2 },
+          leftLowerArm: { x: -0.1, y: 0, z: 0 },
+          rightLowerArm: { x: -0.1, y: 0, z: 0 },
         },
       },
       {
         time: 0.8,
         pose: {
-          leftUpperArm: { x: -Math.PI / 6, y: 0, z: Math.PI / 1.5 },
-          rightUpperArm: { x: -Math.PI / 6, y: 0, z: -Math.PI / 1.5 },
-          leftLowerArm: { x: 0, y: 0, z: 0 },
-          rightLowerArm: { x: 0, y: 0, z: 0 },
+          // Hold at top
+          leftUpperArm: { x: -0.8, y: 0, z: 0.2 },
+          rightUpperArm: { x: -0.8, y: 0, z: -0.2 },
+          leftLowerArm: { x: -0.1, y: 0, z: 0 },
+          rightLowerArm: { x: -0.1, y: 0, z: 0 },
         },
       },
       {
         time: 1,
         pose: {
-          leftUpperArm: { x: 0, y: 0, z: Math.PI / 2 },
-          rightUpperArm: { x: 0, y: 0, z: -Math.PI / 2 },
-          leftLowerArm: { x: 0, y: Math.PI / 2, z: 0 },
-          rightLowerArm: { x: 0, y: -Math.PI / 2, z: 0 },
+          // Return to start
+          leftUpperArm: { x: -0.3, y: 0, z: 0.4 },
+          rightUpperArm: { x: -0.3, y: 0, z: -0.4 },
+          leftLowerArm: { x: -0.5, y: 0, z: 0 },
+          rightLowerArm: { x: -0.5, y: 0, z: 0 },
         },
       },
     ],
@@ -257,37 +283,41 @@ const EXERCISE_ANIMATIONS: Record<ExerciseMode, {
       {
         time: 0,
         pose: {
-          leftUpperArm: { x: -Math.PI / 3, y: 0, z: 0.2 },
-          rightUpperArm: { x: -Math.PI / 3, y: 0, z: -0.2 },
-          leftLowerArm: { x: 0, y: 0, z: 0 },
-          rightLowerArm: { x: 0, y: 0, z: 0 },
+          // Start: arms extended forward
+          leftUpperArm: { x: -0.6, y: 0, z: 0.2 },
+          rightUpperArm: { x: -0.6, y: 0, z: -0.2 },
+          leftLowerArm: { x: -0.1, y: 0, z: 0 },
+          rightLowerArm: { x: -0.1, y: 0, z: 0 },
         },
       },
       {
         time: 0.6,
         pose: {
-          leftUpperArm: { x: 0, y: 0, z: 0.5 },
-          rightUpperArm: { x: 0, y: 0, z: -0.5 },
-          leftLowerArm: { x: -Math.PI / 2, y: 0, z: 0 },
-          rightLowerArm: { x: -Math.PI / 2, y: 0, z: 0 },
+          // Pull: elbows back, hands toward chest
+          leftUpperArm: { x: 0.1, y: 0, z: 0.3 },
+          rightUpperArm: { x: 0.1, y: 0, z: -0.3 },
+          leftLowerArm: { x: -0.8, y: 0, z: 0 },
+          rightLowerArm: { x: -0.8, y: 0, z: 0 },
         },
       },
       {
         time: 0.8,
         pose: {
-          leftUpperArm: { x: 0, y: 0, z: 0.5 },
-          rightUpperArm: { x: 0, y: 0, z: -0.5 },
-          leftLowerArm: { x: -Math.PI / 2, y: 0, z: 0 },
-          rightLowerArm: { x: -Math.PI / 2, y: 0, z: 0 },
+          // Hold
+          leftUpperArm: { x: 0.1, y: 0, z: 0.3 },
+          rightUpperArm: { x: 0.1, y: 0, z: -0.3 },
+          leftLowerArm: { x: -0.8, y: 0, z: 0 },
+          rightLowerArm: { x: -0.8, y: 0, z: 0 },
         },
       },
       {
         time: 1,
         pose: {
-          leftUpperArm: { x: -Math.PI / 3, y: 0, z: 0.2 },
-          rightUpperArm: { x: -Math.PI / 3, y: 0, z: -0.2 },
-          leftLowerArm: { x: 0, y: 0, z: 0 },
-          rightLowerArm: { x: 0, y: 0, z: 0 },
+          // Return to start
+          leftUpperArm: { x: -0.6, y: 0, z: 0.2 },
+          rightUpperArm: { x: -0.6, y: 0, z: -0.2 },
+          leftLowerArm: { x: -0.1, y: 0, z: 0 },
+          rightLowerArm: { x: -0.1, y: 0, z: 0 },
         },
       },
     ],
@@ -376,24 +406,27 @@ const EXERCISE_ANIMATIONS: Record<ExerciseMode, {
       {
         time: 0,
         pose: {
-          leftUpperArm: { x: 0, y: 0, z: 0 },
-          rightUpperArm: { x: 0, y: 0, z: 0 },
+          // Start: arms at sides
+          leftUpperArm: { x: 0, y: 0, z: 0.15 },
+          rightUpperArm: { x: 0, y: 0, z: -0.15 },
           spine: { x: 0, y: 0, z: 0 },
         },
       },
       {
         time: 0.5,
         pose: {
-          leftUpperArm: { x: -Math.PI, y: 0, z: 0.3 },
-          rightUpperArm: { x: 0, y: 0, z: -0.3 },
-          spine: { x: 0, y: 0, z: -0.2 },
+          // Stretch: raise one arm overhead, slight side bend
+          leftUpperArm: { x: -0.9, y: 0, z: 0.3 },
+          rightUpperArm: { x: 0, y: 0, z: -0.2 },
+          spine: { x: 0, y: 0, z: -0.15 },
         },
       },
       {
         time: 1,
         pose: {
-          leftUpperArm: { x: 0, y: 0, z: 0 },
-          rightUpperArm: { x: 0, y: 0, z: 0 },
+          // Return to neutral
+          leftUpperArm: { x: 0, y: 0, z: 0.15 },
+          rightUpperArm: { x: 0, y: 0, z: -0.15 },
           spine: { x: 0, y: 0, z: 0 },
         },
       },
@@ -405,37 +438,41 @@ const EXERCISE_ANIMATIONS: Record<ExerciseMode, {
       {
         time: 0,
         pose: {
+          // Start: standing neutral
           leftUpperLeg: { x: 0, y: 0, z: 0 },
           rightUpperLeg: { x: 0, y: 0, z: 0 },
-          leftUpperArm: { x: 0, y: 0, z: 0.5 },
-          rightUpperArm: { x: 0, y: 0, z: -0.5 },
+          leftUpperArm: { x: 0, y: 0, z: 0.3 },
+          rightUpperArm: { x: 0, y: 0, z: -0.3 },
         },
       },
       {
         time: 0.5,
         pose: {
+          // Balance: lift one leg, arms out for balance
           leftUpperLeg: { x: 0, y: 0, z: 0 },
-          rightUpperLeg: { x: Math.PI / 4, y: 0, z: 0.2 },
-          leftUpperArm: { x: -Math.PI / 4, y: 0, z: Math.PI / 3 },
-          rightUpperArm: { x: -Math.PI / 4, y: 0, z: -Math.PI / 3 },
+          rightUpperLeg: { x: 0.5, y: 0, z: 0.1 },
+          leftUpperArm: { x: -0.4, y: 0, z: 0.6 },
+          rightUpperArm: { x: -0.4, y: 0, z: -0.6 },
         },
       },
       {
         time: 0.75,
         pose: {
+          // Hold balance
           leftUpperLeg: { x: 0, y: 0, z: 0 },
-          rightUpperLeg: { x: Math.PI / 4, y: 0, z: 0.2 },
-          leftUpperArm: { x: -Math.PI / 4, y: 0, z: Math.PI / 3 },
-          rightUpperArm: { x: -Math.PI / 4, y: 0, z: -Math.PI / 3 },
+          rightUpperLeg: { x: 0.5, y: 0, z: 0.1 },
+          leftUpperArm: { x: -0.4, y: 0, z: 0.6 },
+          rightUpperArm: { x: -0.4, y: 0, z: -0.6 },
         },
       },
       {
         time: 1,
         pose: {
+          // Return to start
           leftUpperLeg: { x: 0, y: 0, z: 0 },
           rightUpperLeg: { x: 0, y: 0, z: 0 },
-          leftUpperArm: { x: 0, y: 0, z: 0.5 },
-          rightUpperArm: { x: 0, y: 0, z: -0.5 },
+          leftUpperArm: { x: 0, y: 0, z: 0.3 },
+          rightUpperArm: { x: 0, y: 0, z: -0.3 },
         },
       },
     ],
@@ -446,26 +483,74 @@ const EXERCISE_ANIMATIONS: Record<ExerciseMode, {
       {
         time: 0,
         pose: {
-          leftUpperArm: { x: -Math.PI / 4, y: 0, z: 0.3 },
-          rightUpperArm: { x: -Math.PI / 4, y: 0, z: -0.3 },
-          leftLowerArm: { x: -Math.PI / 4, y: 0, z: 0 },
-          rightLowerArm: { x: -Math.PI / 4, y: 0, z: 0 },
+          // Start: arms bent at chest level (like push-up down position)
+          leftUpperArm: { x: -0.4, y: 0, z: 0.3 },
+          rightUpperArm: { x: -0.4, y: 0, z: -0.3 },
+          leftLowerArm: { x: -0.6, y: 0, z: 0 },
+          rightLowerArm: { x: -0.6, y: 0, z: 0 },
         },
       },
       {
         time: 0.6,
         pose: {
-          leftUpperArm: { x: -Math.PI / 2, y: 0, z: 0.3 },
-          rightUpperArm: { x: -Math.PI / 2, y: 0, z: -0.3 },
-          leftLowerArm: { x: 0, y: 0, z: 0 },
-          rightLowerArm: { x: 0, y: 0, z: 0 },
+          // Push up: arms extended forward
+          leftUpperArm: { x: -0.7, y: 0, z: 0.2 },
+          rightUpperArm: { x: -0.7, y: 0, z: -0.2 },
+          leftLowerArm: { x: -0.1, y: 0, z: 0 },
+          rightLowerArm: { x: -0.1, y: 0, z: 0 },
         },
       },
       {
         time: 0.8,
         pose: {
-          leftUpperArm: { x: -Math.PI / 2, y: 0, z: 0.3 },
-          rightUpperArm: { x: -Math.PI / 2, y: 0, z: -0.3 },
+          // Hold at top
+          leftUpperArm: { x: -0.7, y: 0, z: 0.2 },
+          rightUpperArm: { x: -0.7, y: 0, z: -0.2 },
+          leftLowerArm: { x: -0.1, y: 0, z: 0 },
+          rightLowerArm: { x: -0.1, y: 0, z: 0 },
+        },
+      },
+      {
+        time: 1,
+        pose: {
+          // Return to start
+          leftUpperArm: { x: -0.4, y: 0, z: 0.3 },
+          rightUpperArm: { x: -0.4, y: 0, z: -0.3 },
+          leftLowerArm: { x: -0.6, y: 0, z: 0 },
+          rightLowerArm: { x: -0.6, y: 0, z: 0 },
+        },
+      },
+    ],
+  },
+  SHOULDER: {
+    duration: 5,
+    keyframes: [
+      {
+        time: 0,
+        pose: {
+          // Start: arms at sides
+          leftUpperArm: { x: 0, y: 0, z: 0.2 },
+          rightUpperArm: { x: 0, y: 0, z: -0.2 },
+          leftLowerArm: { x: 0, y: 0, z: 0 },
+          rightLowerArm: { x: 0, y: 0, z: 0 },
+        },
+      },
+      {
+        time: 0.5,
+        pose: {
+          // Raise arms forward to shoulder level
+          leftUpperArm: { x: -0.8, y: 0, z: 0.15 },
+          rightUpperArm: { x: -0.8, y: 0, z: -0.15 },
+          leftLowerArm: { x: 0, y: 0, z: 0 },
+          rightLowerArm: { x: 0, y: 0, z: 0 },
+        },
+      },
+      {
+        time: 0.7,
+        pose: {
+          // Hold at shoulder level
+          leftUpperArm: { x: -0.9, y: 0, z: 0.1 },
+          rightUpperArm: { x: -0.9, y: 0, z: -0.1 },
           leftLowerArm: { x: 0, y: 0, z: 0 },
           rightLowerArm: { x: 0, y: 0, z: 0 },
         },
@@ -473,10 +558,11 @@ const EXERCISE_ANIMATIONS: Record<ExerciseMode, {
       {
         time: 1,
         pose: {
-          leftUpperArm: { x: -Math.PI / 4, y: 0, z: 0.3 },
-          rightUpperArm: { x: -Math.PI / 4, y: 0, z: -0.3 },
-          leftLowerArm: { x: -Math.PI / 4, y: 0, z: 0 },
-          rightLowerArm: { x: -Math.PI / 4, y: 0, z: 0 },
+          // Return to start
+          leftUpperArm: { x: 0, y: 0, z: 0.2 },
+          rightUpperArm: { x: 0, y: 0, z: -0.2 },
+          leftLowerArm: { x: 0, y: 0, z: 0 },
+          rightLowerArm: { x: 0, y: 0, z: 0 },
         },
       },
     ],
@@ -696,6 +782,16 @@ const EXERCISE_BIOMECHANICS: Record<ExerciseMode, {
       'Controlled movement',
     ],
   },
+  SHOULDER: {
+    primaryJoints: ['leftUpperArm', 'rightUpperArm'],
+    secondaryJoints: ['leftLowerArm', 'rightLowerArm', 'chest'],
+    formChecks: [
+      'Shoulders down',
+      'Controlled lift',
+      'Full range',
+      'Even movement',
+    ],
+  },
   GENERAL: {
     primaryJoints: ['spine', 'chest'],
     secondaryJoints: ['leftUpperArm', 'rightUpperArm'],
@@ -788,6 +884,9 @@ class SpringPhysics {
   }
 
   update(state: SpringState, deltaTime: number): SpringState {
+    // Clamp deltaTime to prevent instability
+    const clampedDelta = Math.min(Math.max(deltaTime, 0), 0.1);
+
     // Spring force: F = -k * (x - target)
     const springForce = -this.stiffness * (state.position - state.target);
 
@@ -798,8 +897,17 @@ class SpringPhysics {
     const acceleration = (springForce + dampingForce) / this.mass;
 
     // Update velocity and position (Euler integration)
-    const newVelocity = state.velocity + acceleration * deltaTime;
-    const newPosition = state.position + newVelocity * deltaTime;
+    const newVelocity = state.velocity + acceleration * clampedDelta;
+    const newPosition = state.position + newVelocity * clampedDelta;
+
+    // Guard against NaN/Infinity - return safe fallback
+    if (!Number.isFinite(newPosition) || !Number.isFinite(newVelocity)) {
+      return {
+        position: state.target,
+        velocity: 0,
+        target: state.target,
+      };
+    }
 
     return {
       position: newPosition,
@@ -879,16 +987,33 @@ class Vector3SpringPhysics {
     const ay = (fy_spring + fy_damp) * this.invMass;
     const az = (fz_spring + fz_damp) * this.invMass;
 
+    // Clamp deltaTime to prevent instability
+    const clampedDelta = Math.min(Math.max(deltaTime, 0), 0.1);
+
     // Semi-implicit Euler (better stability, GPU-friendly)
-    const newVx = vx + ax * deltaTime;
-    const newVy = vy + ay * deltaTime;
-    const newVz = vz + az * deltaTime;
+    const newVx = vx + ax * clampedDelta;
+    const newVy = vy + ay * clampedDelta;
+    const newVz = vz + az * clampedDelta;
+
+    const newPosX = state.position.x + newVx * clampedDelta;
+    const newPosY = state.position.y + newVy * clampedDelta;
+    const newPosZ = state.position.z + newVz * clampedDelta;
+
+    // Guard against NaN/Infinity - return safe fallback
+    if (!Number.isFinite(newPosX) || !Number.isFinite(newPosY) || !Number.isFinite(newPosZ) ||
+        !Number.isFinite(newVx) || !Number.isFinite(newVy) || !Number.isFinite(newVz)) {
+      return {
+        position: { ...state.target },
+        velocity: { x: 0, y: 0, z: 0 },
+        target: state.target,
+      };
+    }
 
     return {
       position: {
-        x: state.position.x + newVx * deltaTime,
-        y: state.position.y + newVy * deltaTime,
-        z: state.position.z + newVz * deltaTime,
+        x: newPosX,
+        y: newPosY,
+        z: newPosZ,
       },
       velocity: {
         x: newVx,
@@ -1164,6 +1289,11 @@ const MUSCLE_ACTIVATION_PATTERNS: Record<ExerciseMode, {
     eccentric: { quadriceps: 0.5, hamstrings: 0.5, glutes: 0.5, calves: 0.7, core: 0.7, pectorals: 0.2, deltoids: 0.3, latissimus: 0.3, biceps: 0.2, triceps: 0.2 },
     hold: { quadriceps: 0.6, hamstrings: 0.6, glutes: 0.6, calves: 0.8, core: 0.8, pectorals: 0.2, deltoids: 0.3, latissimus: 0.3, biceps: 0.2, triceps: 0.2 },
     concentric: { quadriceps: 0.5, hamstrings: 0.5, glutes: 0.5, calves: 0.7, core: 0.7, pectorals: 0.2, deltoids: 0.3, latissimus: 0.3, biceps: 0.2, triceps: 0.2 },
+  },
+  SHOULDER: {
+    eccentric: { quadriceps: 0.2, hamstrings: 0.2, glutes: 0.2, calves: 0.2, core: 0.5, pectorals: 0.4, deltoids: 0.85, latissimus: 0.4, biceps: 0.4, triceps: 0.3 },
+    hold: { quadriceps: 0.2, hamstrings: 0.2, glutes: 0.2, calves: 0.2, core: 0.6, pectorals: 0.4, deltoids: 0.95, latissimus: 0.4, biceps: 0.4, triceps: 0.3 },
+    concentric: { quadriceps: 0.2, hamstrings: 0.2, glutes: 0.2, calves: 0.2, core: 0.55, pectorals: 0.4, deltoids: 0.9, latissimus: 0.4, biceps: 0.5, triceps: 0.3 },
   },
   GENERAL: {
     eccentric: { quadriceps: 0.3, hamstrings: 0.3, glutes: 0.3, calves: 0.2, core: 0.4, pectorals: 0.2, deltoids: 0.3, latissimus: 0.2, biceps: 0.2, triceps: 0.2 },
@@ -2191,6 +2321,8 @@ const AvatarModel: React.FC<AvatarModelProps> = ({ mode, modelPath, bodyPosition
   const [skeleton, setSkeleton] = useState<THREE.Skeleton | null>(null);
   const [defaultHipsY, setDefaultHipsY] = useState(0);
   const [isInitialized, setIsInitialized] = useState(false);
+  // Avatar is always visible - we apply initial pose immediately to prevent T-pose
+  const isAnimationReady = true;
 
   // State for muscle heat map visualization
   const [currentMuscleActivation, setCurrentMuscleActivation] = useState<MuscleActivation>({
@@ -2263,6 +2395,17 @@ const AvatarModel: React.FC<AvatarModelProps> = ({ mode, modelPath, bodyPosition
   const swayPhase = useRef<number>(0);
   const weightShiftPhase = useRef<number>(0);
 
+  // Sprint 4: Dynamic breathing config
+  const breathingConfig = useRef({
+    baseRate: 0.8,              // ~12 breaths/min at rest
+    currentRate: 0.8,           // Dynamically adjusted
+    phaseSync: true,            // Sync with exercise phase
+    lastPhase: 'REST' as string,
+    chestExpansion: 0.025,      // Base chest expansion
+    bellyExpansion: 0.03,       // Base belly expansion
+    shoulderRaise: 0.3,         // Shoulder movement during breathing
+  });
+
   // Initialize per-joint spring physics
   useEffect(() => {
     for (const [joint, props] of Object.entries(JOINT_PHYSICS_PROPERTIES)) {
@@ -2278,8 +2421,15 @@ const AvatarModel: React.FC<AvatarModelProps> = ({ mode, modelPath, bodyPosition
     }
   }, []);
 
-  // Load the GLTF model
-  const { scene } = useGLTF(modelPath);
+  // Load the GLTF model with MeshoptDecoder for compressed models
+  const gltf = useLoader(
+    GLTFLoader,
+    modelPath,
+    (loader) => {
+      loader.setMeshoptDecoder(MeshoptDecoder);
+    }
+  );
+  const scene = gltf.scene;
 
   // Clone and setup the model
   const clonedScene = useMemo(() => {
@@ -2325,6 +2475,15 @@ const AvatarModel: React.FC<AvatarModelProps> = ({ mode, modelPath, bodyPosition
   // Get base pose for current body position
   const basePose = BASE_POSES[bodyPosition];
 
+  // Apply initial pose immediately when boneMap becomes available (prevents T-pose flash)
+  useEffect(() => {
+    if (Object.keys(boneMap).length > 0 && basePose) {
+      // Apply the starting pose from the base pose
+      applyPose(boneMap, basePose.pose, 1.0);
+      logger.debug('[RealisticAvatar3D] Applied initial pose to prevent T-pose');
+    }
+  }, [boneMap, basePose]);
+
   // Get exercise-specific animation (memoized)
   const specificAnimation = useMemo(() => {
     if (exerciseName) {
@@ -2348,11 +2507,14 @@ const AvatarModel: React.FC<AvatarModelProps> = ({ mode, modelPath, bodyPosition
   useFrame((state) => {
     if (!groupRef.current || Object.keys(boneMap).length === 0) return;
 
-    const time = state.clock.getElapsedTime();
-    const deltaTime = lastFrameTime.current > 0 ? time - lastFrameTime.current : 0.016;
-    lastFrameTime.current = time;
+    try {
+      const time = state.clock.getElapsedTime();
+      const rawDelta = lastFrameTime.current > 0 ? time - lastFrameTime.current : 0.016;
+      // Clamp deltaTime to prevent physics instability
+      const deltaTime = Math.min(Math.max(rawDelta, 0.001), 0.1);
+      lastFrameTime.current = time;
 
-    // === LOD (Level of Detail) OPTIMIZATION ===
+      // === LOD (Level of Detail) OPTIMIZATION ===
     // Calculate camera distance to avatar
     const cameraPos = state.camera.position;
     const avatarPos = groupRef.current.position;
@@ -2427,13 +2589,56 @@ const AvatarModel: React.FC<AvatarModelProps> = ({ mode, modelPath, bodyPosition
 
     // === SECONDARY MOTION: MICRO-MOVEMENTS FOR ULTRA-REALISM ===
 
-    // 1. Enhanced Breathing Animation - realistic respiratory pattern
-    breathingPhase.current += deltaTime * 0.8; // ~12 breaths per minute
+    // 1. SPRINT 4: Dynamic Breathing Animation - phase-synchronized
+    // Adjust breathing rate based on exercise phase
+    const cfg = breathingConfig.current;
+
+    // Dynamic rate: faster during effort (concentric), slower during rest
+    if (currentPhase !== cfg.lastPhase) {
+      cfg.lastPhase = currentPhase;
+      switch (currentPhase) {
+        case 'CONCENTRIC':
+          // Exhale during effort - faster breathing
+          cfg.currentRate = cfg.baseRate * 1.5;
+          cfg.chestExpansion = 0.015; // Less expansion (exhaling)
+          cfg.bellyExpansion = 0.01;
+          break;
+        case 'ECCENTRIC':
+          // Inhale during lowering - controlled breathing
+          cfg.currentRate = cfg.baseRate * 0.8;
+          cfg.chestExpansion = 0.035; // More expansion (inhaling)
+          cfg.bellyExpansion = 0.04;
+          break;
+        case 'TURN':
+        case 'HOLD':
+          // Brief hold/transition - pause breathing slightly
+          cfg.currentRate = cfg.baseRate * 0.5;
+          cfg.chestExpansion = 0.02;
+          cfg.bellyExpansion = 0.025;
+          break;
+        default:
+          // REST - normal relaxed breathing
+          cfg.currentRate = cfg.baseRate;
+          cfg.chestExpansion = 0.025;
+          cfg.bellyExpansion = 0.03;
+      }
+    }
+
+    // Update breathing phase with dynamic rate
+    breathingPhase.current += deltaTime * cfg.currentRate;
     const breathCycle = Math.sin(breathingPhase.current);
-    // Inhale faster, exhale slower (realistic breathing)
+
+    // Realistic breathing pattern: inhale faster, exhale slower
+    // Also sync with exercise phase for natural coordination
+    const phaseMultiplier = currentPhase === 'CONCENTRIC' ? -1 : 1; // Exhale on effort
     const breathingStrength = breathCycle > 0
-      ? Math.pow(breathCycle, 0.7) * 0.025  // Inhale
-      : Math.pow(-breathCycle, 1.3) * 0.02; // Exhale
+      ? Math.pow(breathCycle, 0.7) * cfg.chestExpansion * phaseMultiplier
+      : Math.pow(-breathCycle, 1.3) * cfg.chestExpansion * 0.8 * phaseMultiplier;
+
+    // Belly breathing component (diaphragmatic breathing)
+    const bellyStrength = breathCycle > 0
+      ? Math.pow(breathCycle, 0.8) * cfg.bellyExpansion
+      : Math.pow(-breathCycle, 1.2) * cfg.bellyExpansion * 0.7;
 
     // 2. Subtle Weight Shift - natural micro-balance adjustments
     weightShiftPhase.current += deltaTime * 0.4;
@@ -2475,18 +2680,39 @@ const AvatarModel: React.FC<AvatarModelProps> = ({ mode, modelPath, bodyPosition
 
     // === ADD SECONDARY MOTION TO JOINTS ===
 
-    // Breathing affects spine, chest, and shoulders
+    // SPRINT 4: Enhanced breathing affects spine, chest, shoulders, and hips (belly)
+    // Chest breathing - primary respiratory movement
     if (combinedPose.spine) {
       combinedPose.spine.x += breathingStrength * 0.5;
+      // Subtle lateral expansion during deep breaths
+      combinedPose.spine.y += Math.abs(breathingStrength) * 0.1;
     }
     if (combinedPose.chest) {
       combinedPose.chest.x += breathingStrength * 0.8;
+      // Chest lifts during inhalation
+      combinedPose.chest.y += breathingStrength > 0 ? breathingStrength * 0.2 : 0;
     }
+
+    // Diaphragmatic (belly) breathing - affects hips and lower spine
+    if (combinedPose.hips) {
+      // Belly expands forward during inhalation
+      combinedPose.hips.x += bellyStrength * 0.3;
+    }
+
+    // Shoulders rise slightly during inhalation
     if (combinedPose.leftUpperArm) {
-      combinedPose.leftUpperArm.z += breathingStrength * 0.3;
+      combinedPose.leftUpperArm.z += breathingStrength * cfg.shoulderRaise;
+      // Slight abduction during deep breaths
+      combinedPose.leftUpperArm.x -= breathingStrength > 0 ? breathingStrength * 0.15 : 0;
     }
     if (combinedPose.rightUpperArm) {
-      combinedPose.rightUpperArm.z -= breathingStrength * 0.3;
+      combinedPose.rightUpperArm.z -= breathingStrength * cfg.shoulderRaise;
+      combinedPose.rightUpperArm.x -= breathingStrength > 0 ? breathingStrength * 0.15 : 0;
+    }
+
+    // Neck extends slightly during inhalation (natural posture)
+    if (combinedPose.neck) {
+      combinedPose.neck.x -= breathingStrength * 0.1;
     }
 
     // Weight shift affects hips and legs
@@ -2774,25 +3000,45 @@ const AvatarModel: React.FC<AvatarModelProps> = ({ mode, modelPath, bodyPosition
       groupRef.current.rotation.z = lateralSway * 0.4 + balanceAdjustment.z;
     }
 
-    // Enhanced breathing animation on chest/spine with realistic expansion
+    // SPRINT 4: Enhanced breathing animation on chest/spine/hips with realistic expansion
     if (boneMap.chest) {
-      const chestExpansion = 1 + breathingStrength * 1.5;
+      // Chest expansion varies with phase (more during inhale/eccentric)
+      const chestExpansionBase = 1 + Math.abs(breathingStrength) * 1.5;
+      const phaseBoost = currentPhase === 'ECCENTRIC' ? 1.1 : 1.0;
+      const chestExpansion = chestExpansionBase * phaseBoost;
       boneMap.chest.scale.set(
-        chestExpansion * 0.8, // Lateral expansion
-        chestExpansion * 1.2, // Vertical expansion (primary)
-        chestExpansion        // Anterior expansion
+        chestExpansion * 0.85, // Lateral expansion
+        chestExpansion * 1.15, // Vertical expansion (primary)
+        chestExpansion         // Anterior expansion
       );
     }
 
-    // Add subtle spine breathing effect
+    // Spine breathing effect with phase awareness
     if (boneMap.spine) {
-      const spineExpansion = 1 + breathingStrength * 0.8;
+      const spineExpansion = 1 + Math.abs(breathingStrength) * 0.8;
       boneMap.spine.scale.setScalar(spineExpansion);
+    }
+
+    // SPRINT 4: Belly/diaphragm expansion (hips bone approximation)
+    if (boneMap.hips) {
+      // Belly expands during inhalation (eccentric phase)
+      const bellyScale = 1 + Math.abs(bellyStrength) * 0.6;
+      const currentHipsScale = boneMap.hips.scale.clone();
+      // Only affect Z (anterior) direction for belly expansion
+      boneMap.hips.scale.set(
+        currentHipsScale.x,
+        currentHipsScale.y,
+        Math.max(currentHipsScale.z, bellyScale)
+      );
+    }
+    } catch (error) {
+      // Prevent animation errors from crashing the component
+      logger.error('[RealisticAvatar3D] Animation error:', error);
     }
   });
 
   return (
-    <group ref={groupRef} position={[0, -0.5, 0]} scale={1}>
+    <group ref={groupRef} position={[0, -0.5, 0]} scale={1} visible={isAnimationReady}>
       <primitive object={clonedScene} />
       {/* Muscle Heat Map Overlay - Hidden in low LOD */}
       <MuscleHeatMap
@@ -2912,12 +3158,84 @@ function findExerciseByName(exerciseName: string | undefined) {
   const exactMatch = EXERCISE_DATABASE.find(e => e.name === exerciseName);
   if (exactMatch) return exactMatch;
 
-  // Normalized match
-  const normalized = exerciseName.toLowerCase().replace(/[()]/g, '').trim();
-  return EXERCISE_DATABASE.find(e => {
-    const eName = e.name.toLowerCase().replace(/[()]/g, '').trim();
-    return eName.includes(normalized) || normalized.includes(eName);
-  }) || null;
+  // Normalize names for comparison
+  const normalizeString = (str: string) => str
+    .toLowerCase()
+    .replace(/[()]/g, '')
+    .replace(/[-_]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const normalized = normalizeString(exerciseName);
+
+  // Direct normalized match
+  const normalizedMatch = EXERCISE_DATABASE.find(e => {
+    const eName = normalizeString(e.name);
+    return eName === normalized;
+  });
+  if (normalizedMatch) return normalizedMatch;
+
+  // Partial match with scoring - find best match
+  let bestMatch: (typeof EXERCISE_DATABASE)[number] | null = null;
+  let bestScore = 0;
+
+  for (const exercise of EXERCISE_DATABASE) {
+    const eName = normalizeString(exercise.name);
+    let score = 0;
+
+    // Check if one contains the other
+    if (eName.includes(normalized) || normalized.includes(eName)) {
+      score = 50;
+
+      // Bonus for longer match
+      const matchLength = Math.min(eName.length, normalized.length);
+      const maxLength = Math.max(eName.length, normalized.length);
+      score += (matchLength / maxLength) * 30;
+    }
+
+    // Check for common word matches
+    const normalizedWords = normalized.split(' ');
+    const eNameWords = eName.split(' ');
+    const commonWords = normalizedWords.filter(w => w.length > 2 && eNameWords.some(ew => ew.includes(w) || w.includes(ew)));
+    score += commonWords.length * 10;
+
+    // Swedish-English keyword mapping
+    const keywordMap: Record<string, string[]> = {
+      'knäböj': ['squat', 'knä'],
+      'squat': ['knäböj', 'knä'],
+      'utfall': ['lunge', 'utfall'],
+      'lunge': ['utfall'],
+      'axel': ['shoulder', 'axel', 'skulder'],
+      'shoulder': ['axel', 'skulder'],
+      'höft': ['hip', 'höft'],
+      'hip': ['höft'],
+      'rygg': ['back', 'rygg', 'lumbar'],
+      'back': ['rygg'],
+      'arm': ['arm', 'biceps', 'triceps'],
+      'planka': ['plank', 'core'],
+      'plank': ['planka', 'core'],
+      'stretch': ['töjning', 'stretch', 'rörlighet'],
+      'töjning': ['stretch', 'rörlighet'],
+    };
+
+    // Check for keyword matches
+    for (const [keyword, synonyms] of Object.entries(keywordMap)) {
+      if (normalized.includes(keyword) || synonyms.some(s => normalized.includes(s))) {
+        if (eName.includes(keyword) || synonyms.some(s => eName.includes(s))) {
+          score += 20;
+          break;
+        }
+      }
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestMatch = exercise;
+    }
+  }
+
+  // Only return if we have a reasonable match
+  return bestScore >= 40 ? bestMatch : null;
 }
 
 // Phase display names in Swedish
@@ -2945,7 +3263,7 @@ const PHASE_COLORS: Record<string, string> = {
 };
 
 // Main component
-const RealisticAvatar3D: React.FC<RealisticAvatar3DProps> = ({
+const RealisticAvatar3DComponent: React.FC<RealisticAvatar3DProps> = ({
   mode,
   gender = 'male',
   className = '',
@@ -3002,14 +3320,15 @@ const RealisticAvatar3D: React.FC<RealisticAvatar3DProps> = ({
 
   return (
     <div className={`w-full h-full ${className}`}>
-      <Canvas
-        camera={{
-          position: cameraPreset.position,
-          fov: cameraPreset.fov,
-        }}
-        gl={{ antialias: true, alpha: true }}
-        dpr={[1, 2]}
-      >
+      <SectionErrorBoundary sectionName="3D Avatar" fallbackHeight="h-full">
+        <Canvas
+          camera={{
+            position: cameraPreset.position,
+            fov: cameraPreset.fov,
+          }}
+          gl={{ antialias: true, alpha: true }}
+          dpr={[1, 2]}
+        >
         {/* Lighting */}
         <ambientLight intensity={0.5} />
         <directionalLight position={[5, 10, 5]} intensity={1} castShadow />
@@ -3056,7 +3375,8 @@ const RealisticAvatar3D: React.FC<RealisticAvatar3DProps> = ({
           autoRotate
           autoRotateSpeed={0.3}
         />
-      </Canvas>
+        </Canvas>
+      </SectionErrorBoundary>
 
       {/* Phase indicator overlay */}
       {showPhaseIndicator && (
@@ -3143,17 +3463,36 @@ const RealisticAvatar3D: React.FC<RealisticAvatar3DProps> = ({
   );
 };
 
+// React.memo optimization to prevent unnecessary re-renders
+// Compare mode, exercise, and visual settings
+const RealisticAvatar3D = React.memo(RealisticAvatar3DComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.mode === nextProps.mode &&
+    prevProps.gender === nextProps.gender &&
+    prevProps.exerciseName === nextProps.exerciseName &&
+    prevProps.bodyPosition === nextProps.bodyPosition &&
+    prevProps.animationKey === nextProps.animationKey &&
+    prevProps.showPhaseIndicator === nextProps.showPhaseIndicator &&
+    prevProps.className === nextProps.className
+  );
+});
+
 export default RealisticAvatar3D;
+
+// Configure loader with MeshoptDecoder for preloading
+const configureGltfLoader = (loader: GLTFLoader) => {
+  loader.setMeshoptDecoder(MeshoptDecoder);
+};
 
 // Preload hook for both models
 export const preloadRealisticAvatar = (gender?: 'male' | 'female') => {
   if (gender === 'female') {
-    useGLTF.preload('/models/avatar-female.glb');
+    useLoader.preload(GLTFLoader, '/models/avatar-female.glb', configureGltfLoader);
   } else if (gender === 'male') {
-    useGLTF.preload('/models/avatar-male.glb');
+    useLoader.preload(GLTFLoader, '/models/avatar-male.glb', configureGltfLoader);
   } else {
     // Preload both models
-    useGLTF.preload('/models/avatar-male.glb');
-    useGLTF.preload('/models/avatar-female.glb');
+    useLoader.preload(GLTFLoader, '/models/avatar-male.glb', configureGltfLoader);
+    useLoader.preload(GLTFLoader, '/models/avatar-female.glb', configureGltfLoader);
   }
 };

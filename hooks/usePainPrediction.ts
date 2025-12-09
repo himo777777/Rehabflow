@@ -14,6 +14,7 @@ import {
   PainTrendAnalysis
 } from '../services/painPredictionService';
 import { supabase } from '../services/supabaseClient';
+import { logger } from '../utils/logger';
 
 // ============================================================================
 // TYPES
@@ -89,7 +90,7 @@ export const usePainPrediction = (): UsePainPredictionReturn => {
           accuracyMetrics: metrics
         }));
       } catch (error) {
-        console.error('❌ Failed to initialize pain prediction:', error);
+        logger.error('❌ Failed to initialize pain prediction:', error);
         setState(prev => ({
           ...prev,
           isLoading: false,
@@ -165,7 +166,7 @@ export const usePainPrediction = (): UsePainPredictionReturn => {
         }));
       }
     } catch (error) {
-      console.error('Failed to load last prediction:', error);
+      logger.error('Failed to load last prediction:', error);
     }
   };
 
@@ -203,7 +204,7 @@ export const usePainPrediction = (): UsePainPredictionReturn => {
         totalPredictions: result.total_predictions
       };
     } catch (error) {
-      console.error('Failed to fetch accuracy metrics:', error);
+      logger.error('Failed to fetch accuracy metrics:', error);
       return null;
     }
   };
@@ -253,7 +254,7 @@ export const usePainPrediction = (): UsePainPredictionReturn => {
 
       return true;
     } catch (error) {
-      console.error('❌ Prediction generation failed:', error);
+      logger.error('❌ Prediction generation failed:', error);
       setState(prev => ({
         ...prev,
         isLoading: false,
@@ -305,7 +306,7 @@ export const usePainPrediction = (): UsePainPredictionReturn => {
 
       return !error && data && data.length >= 7;
     } catch (error) {
-      console.error('Failed to check data sufficiency:', error);
+      logger.error('Failed to check data sufficiency:', error);
       return false;
     }
   };

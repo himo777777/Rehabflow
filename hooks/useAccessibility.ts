@@ -345,6 +345,187 @@ function getRelativeLuminance({ r, g, b }: { r: number; g: number; b: number }):
 }
 
 // ============================================
+// HIGH CONTRAST MODE DETECTION (Sprint 5.5)
+// ============================================
+
+/**
+ * Hook to detect user's high contrast preference
+ * @returns true if user prefers high contrast
+ */
+export function usePrefersHighContrast(): boolean {
+  const [prefersHighContrast, setPrefersHighContrast] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-contrast: more)');
+    setPrefersHighContrast(mediaQuery.matches);
+
+    const handleChange = (e: MediaQueryListEvent) => {
+      setPrefersHighContrast(e.matches);
+    };
+
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
+  return prefersHighContrast;
+}
+
+// ============================================
+// FOCUS VISIBLE DETECTION (Sprint 5.5)
+// ============================================
+
+/**
+ * Hook to detect if focus indicators should be visible
+ * (keyboard navigation vs mouse)
+ */
+export function useFocusVisible(): boolean {
+  const [focusVisible, setFocusVisible] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Tab') {
+        setFocusVisible(true);
+      }
+    };
+
+    const handleMouseDown = () => {
+      setFocusVisible(false);
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('mousedown', handleMouseDown);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handleMouseDown);
+    };
+  }, []);
+
+  return focusVisible;
+}
+
+// ============================================
+// ROVING TABINDEX HOOK (Sprint 5.5)
+// ============================================
+
+/**
+ * Implements roving tabindex pattern for composite widgets
+ */
+export function useRovingTabIndex(itemCount: number, initialIndex: number = 0) {
+  const [activeIndex, setActiveIndex] = useState(initialIndex);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent, currentIndex: number) => {
+    let newIndex = currentIndex;
+
+    switch (e.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        e.preventDefault();
+        newIndex = (currentIndex + 1) % itemCount;
+        break;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        e.preventDefault();
+        newIndex = (currentIndex - 1 + itemCount) % itemCount;
+        break;
+      case 'Home':
+        e.preventDefault();
+        newIndex = 0;
+        break;
+      case 'End':
+        e.preventDefault();
+        newIndex = itemCount - 1;
+        break;
+    }
+
+    setActiveIndex(newIndex);
+    return newIndex;
+  }, [itemCount]);
+
+  const getTabIndex = useCallback((index: number) => {
+    return index === activeIndex ? 0 : -1;
+  }, [activeIndex]);
+
+  return {
+    activeIndex,
+    setActiveIndex,
+    handleKeyDown,
+    getTabIndex,
+  };
+}
+
+// ============================================
+// SKIP LINK HOOK (Sprint 5.5)
+// ============================================
+
+/**
+ * Hook for creating accessible skip links
+ */
+export function useSkipLink(targetId: string = 'main-content') {
+  const skipLinkRef = useRef<HTMLAnchorElement>(null);
+
+  const handleClick = useCallback((e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    const target = document.getElementById(targetId);
+    if (target) {
+      target.setAttribute('tabindex', '-1');
+      target.focus();
+      target.scrollIntoView({ behavior: 'smooth' });
+      // Remove tabindex after blur
+      target.addEventListener('blur', () => {
+        target.removeAttribute('tabindex');
+      }, { once: true });
+    }
+  }, [targetId]);
+
+  return {
+    skipLinkRef,
+    skipLinkProps: {
+      href: `#${targetId}`,
+      onClick: handleClick,
+      className: 'sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary-600 focus:text-white focus:rounded-lg focus:shadow-lg',
+    },
+  };
+}
+
+// ============================================
+// LIVE REGION PROPS HELPER (Sprint 5.5)
+// ============================================
+
+/**
+ * Get ARIA props for different live region types
+ */
+export function getLiveRegionProps(
+  type: 'status' | 'alert' | 'log' | 'timer' = 'status'
+): {
+  role: string;
+  'aria-live': 'polite' | 'assertive' | 'off';
+  'aria-atomic': boolean;
+} {
+  const config = {
+    status: { role: 'status', 'aria-live': 'polite' as const, 'aria-atomic': true },
+    alert: { role: 'alert', 'aria-live': 'assertive' as const, 'aria-atomic': true },
+    log: { role: 'log', 'aria-live': 'polite' as const, 'aria-atomic': false },
+    timer: { role: 'timer', 'aria-live': 'off' as const, 'aria-atomic': false },
+  };
+  return config[type];
+}
+
+// ============================================
+// DESCRIPTION ID GENERATOR (Sprint 5.5)
+// ============================================
+
+let descriptionIdCounter = 0;
+
+/**
+ * Generate unique IDs for aria-describedby
+ */
+export function useDescriptionId(prefix: string = 'desc'): string {
+  const [id] = useState(() => `${prefix}-${++descriptionIdCounter}`);
+  return id;
+}
+
+// ============================================
 // EXPORTS
 // ============================================
 
@@ -354,7 +535,8 @@ export const a11y = {
   announceLoadingState,
   getErrorSummary,
   skipToMain,
-  meetsContrastRequirement
+  meetsContrastRequirement,
+  getLiveRegionProps,
 };
 
 export default a11y;

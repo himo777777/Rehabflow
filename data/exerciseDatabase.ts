@@ -188,7 +188,42 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Rörelse", instruction: "Dra hakan rakt bakåt. Föreställ dig att nacken blir lång.", type: "execution", animationType: "slide" },
       { title: "Håll", instruction: "Håll positionen i 3-5 sekunder.", type: "execution", animationType: "pulse" },
       { title: "Släpp", instruction: "Återgå mjukt till startläget.", type: "execution", animationType: "slide" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER
+    contraindications: [
+      "Akut nacktrauma eller whiplash < 2 veckor",
+      "Misstänkt cervikal fraktur",
+      "Vertebrobasilar insufficiens",
+      "Akut diskbråck med neurologiska symtom"
+    ],
+    precautions: [
+      "Tidigare nackskada - börja försiktigt",
+      "Huvudvärk - minska intensitet",
+      "Yrsel - utför sittande"
+    ],
+    redFlags: [
+      "Plötslig stark huvudvärk",
+      "Synstörningar eller dubbelseende",
+      "Domningar i armar eller ben",
+      "Balansproblem eller yrsel"
+    ],
+    maxPainDuring: 3,
+    maxPainAfter24h: 2,
+    targetStructure: "Djupa nackflexorer (longus colli, longus capitis)",
+    healingTissue: "muscle",
+    progressionCriteria: {
+      minPainFreeReps: 10,
+      minConsecutiveDays: 3,
+      maxPainDuring: 2,
+      maxPainAfter: 1
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: false,
+      formBreakdown: true,
+      compensationPatterns: ["Axelspänning", "Käkspänning", "Andningshållning"]
+    },
+    progressionExercise: "Isometrisk Nackflexion"
   },
   {
     name: "Isometrisk Nackextension",
@@ -216,7 +251,41 @@ export const EXERCISE_DATABASE: Exercise[] = [
     steps: [
       { title: "Start", instruction: "Händerna knäppta bakom bakhuvudet.", type: "start", animationType: "pulse" },
       { title: "Pressa", instruction: "Tryck huvudet bakåt mot händerna. Håll statiskt.", type: "execution", animationType: "bounce" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER
+    contraindications: [
+      "Akut nacktrauma eller whiplash < 2 veckor",
+      "Misstänkt cervikal fraktur",
+      "Cervikal spinal stenos med myelopati",
+      "Akut diskbråck med neurologiska symtom"
+    ],
+    precautions: [
+      "Artros i nacken - minska motståndet",
+      "Huvudvärk - börja med låg intensitet",
+      "Tidigare nackkontusion"
+    ],
+    redFlags: [
+      "Smärta som strålar ut i armarna",
+      "Yrsel eller balansproblem",
+      "Svaghet i armar eller händer",
+      "Förändrad känsel i fingrar"
+    ],
+    maxPainDuring: 3,
+    maxPainAfter24h: 2,
+    targetStructure: "Nackextensorer (splenius, semispinalis)",
+    healingTissue: "muscle",
+    progressionCriteria: {
+      minPainFreeReps: 10,
+      minConsecutiveDays: 3,
+      maxPainDuring: 2,
+      maxPainAfter: 1
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: false,
+      formBreakdown: true,
+      compensationPatterns: ["Rycker huvudet", "Håller andan", "Spänner käken"]
+    }
   },
   {
     name: "Levator Scapulae Stretch",
@@ -244,7 +313,39 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Fixera", instruction: "Greppa stolkanten för att sänka axeln.", type: "start", animationType: "pulse" },
       { title: "Vinkla", instruction: "Vrid näsan mot motsatt armhåla.", type: "execution", animationType: "slide" },
       { title: "Dra", instruction: "Lägg på ett lätt tryck med handen på bakhuvudet.", type: "execution", animationType: "slide" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER
+    contraindications: [
+      "Akut nacktrauma < 2 veckor",
+      "Vertebral artärdissektion",
+      "Akut torticollis"
+    ],
+    precautions: [
+      "Cervikal artros - stretcha försiktigare",
+      "Spända axlar - stretcha kortare tid",
+      "Tidigare nervinklämning"
+    ],
+    redFlags: [
+      "Domningar eller stickningar ner i armen",
+      "Yrsel vid rotation",
+      "Kraftig huvudvärk"
+    ],
+    maxPainDuring: 4,
+    maxPainAfter24h: 2,
+    targetStructure: "Levator scapulae, övre trapezius",
+    healingTissue: "muscle",
+    progressionCriteria: {
+      minPainFreeReps: 3,
+      minConsecutiveDays: 3,
+      maxPainDuring: 3,
+      maxPainAfter: 1
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: false,
+      formBreakdown: true,
+      compensationPatterns: ["Höjer axeln", "Vrider hela överkroppen"]
+    }
   },
   {
     name: "Isometrisk Nackflexion",
@@ -262,7 +363,39 @@ export const EXERCISE_DATABASE: Exercise[] = [
     steps: [
       { title: "Start", instruction: "Hand mot pannan, blick framåt.", type: "start", animationType: "pulse" },
       { title: "Pressa", instruction: "Pressa huvudet framåt mot handen. Håll i 5 sekunder.", type: "execution", animationType: "bounce" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER
+    contraindications: [
+      "Akut nacktrauma eller whiplash < 2 veckor",
+      "Misstänkt cervikal fraktur",
+      "Cervikal diskbråck med akuta symtom"
+    ],
+    precautions: [
+      "Huvudvärk - börja med låg intensitet",
+      "Nackstelhet - varm upp först",
+      "Äldre patienter - reducera tryck"
+    ],
+    redFlags: [
+      "Smärta som strålar ut i armarna",
+      "Domningar i ansikte eller käke",
+      "Svårighet att svälja"
+    ],
+    maxPainDuring: 3,
+    maxPainAfter24h: 2,
+    targetStructure: "Djupa nackflexorer (longus colli, longus capitis)",
+    healingTissue: "muscle",
+    progressionCriteria: {
+      minPainFreeReps: 10,
+      minConsecutiveDays: 3,
+      maxPainDuring: 2,
+      maxPainAfter: 1
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: false,
+      formBreakdown: true,
+      compensationPatterns: ["Spänner käken", "Håller andan", "Höjer axlarna"]
+    }
   },
   {
     name: "Övre Trapezius Stretch",
@@ -289,7 +422,39 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Start", instruction: "Sitt upprätt, axlarna avslappnade.", type: "start", animationType: "pulse" },
       { title: "Luta", instruction: "Luta huvudet åt sidan, örat mot axeln.", type: "execution", animationType: "slide" },
       { title: "Tryck", instruction: "Lägg lätt tryck med handen för att öka stretchen.", type: "execution", animationType: "slide" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER
+    contraindications: [
+      "Akut nacktrauma < 2 veckor",
+      "Misstänkt cervikalfraktur",
+      "Akut torticollis"
+    ],
+    precautions: [
+      "Cervikal artros - stretcha försiktigare",
+      "Spänningshuvudvärk - kortare duration",
+      "Tidigare nervinklämning i nacke"
+    ],
+    redFlags: [
+      "Domningar eller stickningar ner i armen",
+      "Yrsel eller svimningskänsla",
+      "Kraftig huvudvärk som förvärras"
+    ],
+    maxPainDuring: 4,
+    maxPainAfter24h: 2,
+    targetStructure: "Övre trapezius",
+    healingTissue: "muscle",
+    progressionCriteria: {
+      minPainFreeReps: 3,
+      minConsecutiveDays: 3,
+      maxPainDuring: 3,
+      maxPainAfter: 1
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: false,
+      formBreakdown: true,
+      compensationPatterns: ["Höjer axeln", "Vrider nacken fel riktning"]
+    }
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -322,7 +487,54 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Position", instruction: "Luta framåt med stöd. Låt armen hänga.", type: "start", animationType: "pulse" },
       { title: "Svinga", instruction: "Små cirklar medurs, sedan moturs.", type: "execution", animationType: "bounce" },
       { title: "Fram-tillbaka", instruction: "Svinga fram och tillbaka i linje med kroppen.", type: "execution", animationType: "slide" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER - KRITISK FÖR POST-OP
+    contraindications: [
+      "Axelfraktur < 6 veckor",
+      "Akut axelluxation",
+      "Obehandlad rotatorkuffruptur med stor kraft",
+      "Akut bursit med svår inflammation"
+    ],
+    precautions: [
+      "Post-op rotatorkuff - endast passiv rörelse vecka 0-6",
+      "Frozen shoulder - undvik forcerad rörelse",
+      "Osteoporos - var försiktig med belastning"
+    ],
+    redFlags: [
+      "Plötslig, svår smärta under övningen",
+      "Känsla av att axeln 'hoppar ur led'",
+      "Svullnad eller rodnad som ökar snabbt",
+      "Domningar eller stickningar i arm/hand"
+    ],
+    appropriateForSurgeries: [
+      "Rotatorkuffrekonstruktion",
+      "Axelprotes",
+      "Labrumreparation",
+      "Subacromiell dekompression",
+      "AC-ledsplastik"
+    ],
+    postOpRestrictions: [
+      { phase: 1, weeksPostOp: { min: 0, max: 6 }, allowed: true, modifications: ["Endast passiv rörelse", "Inga aktiva muskelkontraktioner"], maxLoad: "none", maxROM: 50 },
+      { phase: 2, weeksPostOp: { min: 6, max: 12 }, allowed: true, modifications: ["Assisterad aktiv rörelse"], maxLoad: "none", maxROM: 80 },
+      { phase: 3, weeksPostOp: { min: 12, max: 20 }, allowed: true, maxLoad: "bodyweight", maxROM: 100 }
+    ],
+    maxPainDuring: 3,
+    maxPainAfter24h: 2,
+    targetStructure: "Glenohumeral led, subakromiellt utrymme",
+    healingTissue: "tendon",
+    progressionCriteria: {
+      minPainFreeReps: 20,
+      minConsecutiveDays: 5,
+      maxPainDuring: 2,
+      maxPainAfter: 1
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: true,
+      formBreakdown: true,
+      compensationPatterns: ["Höjer axeln", "Lutar kroppen för mycket"]
+    },
+    progressionExercise: "Utåtrotation med gummiband"
   },
   {
     name: "Utåtrotation med gummiband",
@@ -350,7 +562,54 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Start", instruction: "Armbåge 90°, intill kroppen, gummiband i handen.", type: "start", animationType: "pulse" },
       { title: "Rotera", instruction: "Rotera underarmen utåt utan att armbågen lämnar sidan.", type: "execution", animationType: "slide" },
       { title: "Kontrollerat tillbaka", instruction: "Långsamt tillbaka till start.", type: "execution", animationType: "slide" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER - POST-OP KRITISK
+    contraindications: [
+      "Akut rotatorkuffruptur < 6 veckor post-op",
+      "Axelfraktur < 8 veckor",
+      "Instabil axelluxation"
+    ],
+    precautions: [
+      "Post-op axel - vänta minst 6 veckor innan belastning",
+      "Impingement - undvik smärtsamt rörelseomfång",
+      "Labrumskada - börja utan motstånd"
+    ],
+    redFlags: [
+      "Skarp smärta vid rotation",
+      "Klickande eller låsningskänsla",
+      "Smärta som strålar ner i armen",
+      "Plötslig svaghet"
+    ],
+    appropriateForSurgeries: [
+      "Rotatorkuffrekonstruktion (efter 6 veckor)",
+      "Subacromiell dekompression",
+      "AC-ledsplastik"
+    ],
+    contraindicatedSurgeries: [
+      "Omvänd axelprotes (första 3 månaderna)"
+    ],
+    postOpRestrictions: [
+      { phase: 1, weeksPostOp: { min: 0, max: 6 }, allowed: false, modifications: ["Ej tillåten"], maxLoad: "none" },
+      { phase: 2, weeksPostOp: { min: 6, max: 12 }, allowed: true, modifications: ["Mycket lätt gummiband", "Begränsat ROM"], maxLoad: "light", maxROM: 45 },
+      { phase: 3, weeksPostOp: { min: 12, max: 20 }, allowed: true, modifications: ["Normalt gummiband"], maxLoad: "moderate", maxROM: 90 }
+    ],
+    maxPainDuring: 3,
+    maxPainAfter24h: 2,
+    targetStructure: "Infraspinatus, teres minor",
+    healingTissue: "tendon",
+    progressionCriteria: {
+      minPainFreeReps: 15,
+      minConsecutiveDays: 5,
+      maxPainDuring: 2,
+      maxPainAfter: 1
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: true,
+      formBreakdown: true,
+      compensationPatterns: ["Armbåge lämnar sidan", "Vrider kroppen", "Höjer axeln"]
+    },
+    progressionExercise: "Utåtrotation med vikt"
   },
   {
     name: "Inåtrotation med gummiband",
@@ -377,7 +636,52 @@ export const EXERCISE_DATABASE: Exercise[] = [
     steps: [
       { title: "Start", instruction: "Armbåge 90°, gummiband fäst utåt.", type: "start", animationType: "pulse" },
       { title: "Rotera", instruction: "Dra handen in mot magen.", type: "execution", animationType: "slide" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER - POST-OP KRITISK
+    contraindications: [
+      "Akut subscapularis-ruptur < 8 veckor post-op",
+      "Axelfraktur < 8 veckor",
+      "Instabil anterior axelluxation"
+    ],
+    precautions: [
+      "Post-op subscapularis-reparation - extra försiktighet",
+      "Impingement - undvik smärtsamt område",
+      "Instabilitet - begränsa motståndet"
+    ],
+    redFlags: [
+      "Skarp smärta vid rotation",
+      "Känsla av att axeln glider framåt",
+      "Domningar i hand eller fingrar"
+    ],
+    appropriateForSurgeries: [
+      "Rotatorkuffrekonstruktion (ej subscapularis)",
+      "Subacromiell dekompression",
+      "Stabiliseringsoperation (efter 8 veckor)"
+    ],
+    contraindicatedSurgeries: [
+      "Subscapularis-reparation (första 8 veckorna)"
+    ],
+    postOpRestrictions: [
+      { phase: 1, weeksPostOp: { min: 0, max: 6 }, allowed: false, modifications: ["Ej tillåten"], maxLoad: "none" },
+      { phase: 2, weeksPostOp: { min: 6, max: 12 }, allowed: true, modifications: ["Lätt gummiband"], maxLoad: "light", maxROM: 60 },
+      { phase: 3, weeksPostOp: { min: 12, max: 20 }, allowed: true, maxLoad: "moderate" }
+    ],
+    maxPainDuring: 3,
+    maxPainAfter24h: 2,
+    targetStructure: "Subscapularis, pectoralis major",
+    healingTissue: "tendon",
+    progressionCriteria: {
+      minPainFreeReps: 15,
+      minConsecutiveDays: 5,
+      maxPainDuring: 2,
+      maxPainAfter: 1
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: true,
+      formBreakdown: true,
+      compensationPatterns: ["Armbåge lämnar sidan", "Vrider kroppen"]
+    }
   },
   {
     name: "Scaption (Full Can)",
@@ -405,7 +709,48 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Start", instruction: "Stå med armarna längs sidorna, tummar uppåt.", type: "start", animationType: "pulse" },
       { title: "Lyft", instruction: "Lyft armarna snett framåt (45°) till axelhöjd.", type: "execution", animationType: "slide" },
       { title: "Sänk", instruction: "Sänk kontrollerat tillbaka till start.", type: "execution", animationType: "slide" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER - POST-OP KRITISK
+    contraindications: [
+      "Akut supraspinatus-ruptur < 12 veckor post-op",
+      "Axelfraktur < 8 veckor",
+      "Akut impingement med inflammation"
+    ],
+    precautions: [
+      "Post-op rotatorkuff - vänta tills aktiv ROM är tillåten",
+      "Impingement - håll tummen UPP (full can, ej empty can)",
+      "Frozen shoulder - begränsa lyfthöjd"
+    ],
+    redFlags: [
+      "Smärta vid 60-120° (smärtbåge)",
+      "Svaghet som förhindrar att hålla armen uppe",
+      "Svullnad eller rodnad efter träning"
+    ],
+    appropriateForSurgeries: [
+      "Rotatorkuffrekonstruktion (efter 12 veckor)",
+      "Subacromiell dekompression (efter 4 veckor)"
+    ],
+    postOpRestrictions: [
+      { phase: 1, weeksPostOp: { min: 0, max: 6 }, allowed: false, modifications: ["Ej tillåten"] },
+      { phase: 2, weeksPostOp: { min: 6, max: 12 }, allowed: false, modifications: ["Endast passiv ROM"] },
+      { phase: 3, weeksPostOp: { min: 12, max: 20 }, allowed: true, modifications: ["Utan vikt först"], maxLoad: "bodyweight", maxROM: 90 }
+    ],
+    maxPainDuring: 3,
+    maxPainAfter24h: 2,
+    targetStructure: "Supraspinatus, deltoideus",
+    healingTissue: "tendon",
+    progressionCriteria: {
+      minPainFreeReps: 15,
+      minConsecutiveDays: 5,
+      maxPainDuring: 2,
+      maxPainAfter: 1
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: true,
+      formBreakdown: true,
+      compensationPatterns: ["Höjer axeln", "Lutar kroppen"]
+    }
   },
   {
     name: "Sleeper Stretch",
@@ -433,7 +778,48 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Position", instruction: "Ligg på sidan med axeln och armbågen i 90°.", type: "start", animationType: "pulse" },
       { title: "Tryck", instruction: "Tryck underarmen mot marken med andra handen.", type: "execution", animationType: "slide" },
       { title: "Håll", instruction: "Håll stretchen i 30 sekunder.", type: "execution", animationType: "pulse" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER
+    contraindications: [
+      "Akut posterior labrumskada",
+      "Bakre axelinstabilitet",
+      "Posterior kapselreparation < 8 veckor"
+    ],
+    precautions: [
+      "SLAP-skada - försiktigt tryck",
+      "Impingement - om smärta minskar rörelseomfånget",
+      "Post-op axel - kontrollera med kirurg"
+    ],
+    redFlags: [
+      "Skarp smärta i baksidan av axeln",
+      "Domningar eller stickningar i arm/hand",
+      "Känsla av att axeln glider bakåt"
+    ],
+    appropriateForSurgeries: [
+      "Rotatorkuffrekonstruktion (efter 6 veckor)",
+      "Subacromiell dekompression",
+      "Anterior stabilisering"
+    ],
+    contraindicatedSurgeries: [
+      "Posterior kapselreparation",
+      "Posterior labrumreparation"
+    ],
+    maxPainDuring: 4,
+    maxPainAfter24h: 2,
+    targetStructure: "Posterior kapsel, infraspinatus",
+    healingTissue: "ligament",
+    progressionCriteria: {
+      minPainFreeReps: 3,
+      minConsecutiveDays: 3,
+      maxPainDuring: 3,
+      maxPainAfter: 1
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: false,
+      formBreakdown: true,
+      compensationPatterns: ["Vrider kroppen", "Lyfter axeln från underlaget"]
+    }
   },
   {
     name: "Wall Slides",
@@ -455,7 +841,42 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Start", instruction: "Rygg och underarmar mot väggen.", type: "start", animationType: "pulse" },
       { title: "Glid upp", instruction: "Glid armarna uppåt längs väggen.", type: "execution", animationType: "slide" },
       { title: "Tillbaka", instruction: "Glid ner till startposition.", type: "execution", animationType: "slide" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER
+    contraindications: [
+      "Akut rotatorkuffskada < 4 veckor",
+      "Svår frozen shoulder med < 90° flexion"
+    ],
+    precautions: [
+      "Impingement - begränsa höjd om smärta uppstår",
+      "Stelhet i bröstryggen - börja försiktigt",
+      "Post-op axel - kontrollera tillåtet ROM"
+    ],
+    redFlags: [
+      "Smärta vid specifik vinkel (smärtbåge)",
+      "Oförmåga att hålla kontakt med väggen",
+      "Domningar i arm eller hand"
+    ],
+    appropriateForSurgeries: [
+      "Subacromiell dekompression (efter 2 veckor)",
+      "AC-ledsplastik (efter 4 veckor)"
+    ],
+    maxPainDuring: 3,
+    maxPainAfter24h: 2,
+    targetStructure: "Scapulära stabilisatorer, rotatorkuffen",
+    healingTissue: "muscle",
+    progressionCriteria: {
+      minPainFreeReps: 15,
+      minConsecutiveDays: 3,
+      maxPainDuring: 2,
+      maxPainAfter: 1
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: false,
+      formBreakdown: true,
+      compensationPatterns: ["Svajar i ryggen", "Tappar kontakt med väggen"]
+    }
   },
   {
     name: "Serratus Push-up (Plus)",
@@ -483,7 +904,48 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Start", instruction: "Plankaposition med raka armar.", type: "start", animationType: "pulse" },
       { title: "Sänk", instruction: "Sänk bröstet (skulderblad ihop) utan att böja armarna.", type: "execution", animationType: "slide" },
       { title: "Pressa", instruction: "Pressa ryggen mot taket (skulderblad isär).", type: "execution", animationType: "bounce" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER
+    contraindications: [
+      "Akut axelskada < 6 veckor post-op",
+      "Handleds- eller armbågsskada",
+      "Scapular winging med nervskada"
+    ],
+    precautions: [
+      "Ryggproblem - håll neutral rygg",
+      "Svag serratus - börja på knä istället för tårna",
+      "Post-op axel - endast efter godkännande från kirurg"
+    ],
+    redFlags: [
+      "Smärta i axel eller skulderbad",
+      "Vingande skulderblad",
+      "Domningar i armar eller händer"
+    ],
+    appropriateForSurgeries: [
+      "Subacromiell dekompression (efter 8 veckor)",
+      "AC-ledsplastik (efter 8 veckor)"
+    ],
+    postOpRestrictions: [
+      { phase: 1, weeksPostOp: { min: 0, max: 6 }, allowed: false },
+      { phase: 2, weeksPostOp: { min: 6, max: 12 }, allowed: true, modifications: ["På knä istället för tårna"], maxLoad: "bodyweight" },
+      { phase: 3, weeksPostOp: { min: 12, max: 20 }, allowed: true, maxLoad: "bodyweight" }
+    ],
+    maxPainDuring: 3,
+    maxPainAfter24h: 2,
+    targetStructure: "Serratus anterior, pectoralis minor",
+    healingTissue: "muscle",
+    progressionCriteria: {
+      minPainFreeReps: 15,
+      minConsecutiveDays: 5,
+      maxPainDuring: 2,
+      maxPainAfter: 1
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: false,
+      formBreakdown: true,
+      compensationPatterns: ["Skulderbladen vingar", "Svajar i ryggen"]
+    }
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -516,7 +978,48 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Position", instruction: "Ett knä böjt, händer under ländryggen.", type: "start", animationType: "pulse" },
       { title: "Lyft", instruction: "Lyft huvud och axlar 2 cm. Spänn magen.", type: "execution", animationType: "slide" },
       { title: "Håll", instruction: "Håll i 8 sekunder.", type: "execution", animationType: "pulse" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER
+    contraindications: [
+      "Akut diskbråck med nervpåverkan",
+      "Kotfraktur < 8 veckor",
+      "Akut ländryggstrain < 2 veckor"
+    ],
+    precautions: [
+      "Diskbråck - undvik flexion under akut fas",
+      "Spinal stenos - försiktig med extension efteråt",
+      "Osteoporos - minska intensitet"
+    ],
+    redFlags: [
+      "Smärta som strålar ner i benet (ischias)",
+      "Domningar eller svaghet i benen",
+      "Blås- eller tarmfunktionsproblem"
+    ],
+    appropriateForSurgeries: [
+      "Diskektomi (efter 6 veckor)",
+      "Laminektomi (efter 8 veckor)"
+    ],
+    postOpRestrictions: [
+      { phase: 1, weeksPostOp: { min: 0, max: 6 }, allowed: false },
+      { phase: 2, weeksPostOp: { min: 6, max: 12 }, allowed: true, modifications: ["Mindre lyft"], maxLoad: "bodyweight" },
+      { phase: 3, weeksPostOp: { min: 12, max: 24 }, allowed: true }
+    ],
+    maxPainDuring: 3,
+    maxPainAfter24h: 2,
+    targetStructure: "Rectus abdominis, transversus abdominis",
+    healingTissue: "muscle",
+    progressionCriteria: {
+      minPainFreeReps: 10,
+      minConsecutiveDays: 5,
+      maxPainDuring: 2,
+      maxPainAfter: 1
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: false,
+      formBreakdown: true,
+      compensationPatterns: ["Lyfter huvudet istället för bröstkorgen", "Plattar ut ländryggen"]
+    }
   },
   {
     name: "Fågelhunden (Bird Dog)",
@@ -539,7 +1042,49 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Sträck", instruction: "Sträck motsatt arm och ben samtidigt.", type: "execution", animationType: "slide" },
       { title: "Håll", instruction: "Håll i 6-10 sekunder med stabil rygg.", type: "execution", animationType: "pulse" },
       { title: "Byt", instruction: "Återgå kontrollerat och byt sida.", type: "execution", animationType: "slide" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER
+    contraindications: [
+      "Akut diskbråck med nervpåverkan",
+      "Spinal instabilitet (spondylolisthesis grad 2+)",
+      "Akut kotfraktur"
+    ],
+    precautions: [
+      "Ländryggssmärta - håll strikt neutral rygg",
+      "Handledssmärta - använd knytnävar istället",
+      "Balanssvårigheter - börja med arm eller ben separat"
+    ],
+    redFlags: [
+      "Smärta som strålar ner i benet",
+      "Svårighet att kontrollera ryggens position",
+      "Ökad smärta efter träning"
+    ],
+    appropriateForSurgeries: [
+      "Diskektomi (efter 4 veckor)",
+      "Laminektomi (efter 6 veckor)",
+      "Spinal fusion (efter 12 veckor)"
+    ],
+    postOpRestrictions: [
+      { phase: 1, weeksPostOp: { min: 0, max: 4 }, allowed: false },
+      { phase: 2, weeksPostOp: { min: 4, max: 12 }, allowed: true, modifications: ["Endast arm ELLER ben, ej båda"], maxLoad: "bodyweight" },
+      { phase: 3, weeksPostOp: { min: 12, max: 24 }, allowed: true }
+    ],
+    maxPainDuring: 3,
+    maxPainAfter24h: 2,
+    targetStructure: "Multifidus, erector spinae, core stabilisatorer",
+    healingTissue: "muscle",
+    progressionCriteria: {
+      minPainFreeReps: 10,
+      minConsecutiveDays: 5,
+      maxPainDuring: 2,
+      maxPainAfter: 1
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: false,
+      formBreakdown: true,
+      compensationPatterns: ["Ryggen rör sig", "Roterar höften", "Svajar i ländryggen"]
+    }
   },
   {
     name: "Sidoplanka (Side Plank)",
@@ -567,7 +1112,39 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Position", instruction: "Sidoläge med armbåge under axeln.", type: "start", animationType: "pulse" },
       { title: "Lyft", instruction: "Lyft höfterna till rak kroppslinje.", type: "execution", animationType: "bounce" },
       { title: "Håll", instruction: "Håll positionen stabilt.", type: "execution", animationType: "pulse" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER
+    contraindications: [
+      "Akut axelskada",
+      "Spinal instabilitet (spondylolisthesis)",
+      "Svår höftartros"
+    ],
+    precautions: [
+      "Axelproblem - gör på knä istället för fötter",
+      "Ländryggssmärta - håll kortare tid",
+      "Svag core - börja med stöd mot vägg"
+    ],
+    redFlags: [
+      "Smärta i axel eller höft",
+      "Svårighet att hålla rak linje",
+      "Smärta som strålar ner i benet"
+    ],
+    maxPainDuring: 3,
+    maxPainAfter24h: 2,
+    targetStructure: "Quadratus lumborum, gluteus medius, obliques",
+    healingTissue: "muscle",
+    progressionCriteria: {
+      minPainFreeReps: 3,
+      minConsecutiveDays: 5,
+      maxPainDuring: 2,
+      maxPainAfter: 1
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: false,
+      formBreakdown: true,
+      compensationPatterns: ["Höften sjunker", "Roterar kroppen", "Håller andan"]
+    }
   },
   {
     name: "Bäckenlyft (Glute Bridge)",
@@ -595,7 +1172,48 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Start", instruction: "Ryggläge, knän böjda, fötter i golvet.", type: "start", animationType: "pulse" },
       { title: "Lyft", instruction: "Pressa höfterna uppåt med sätesmusklerna.", type: "execution", animationType: "bounce" },
       { title: "Sänk", instruction: "Sänk kontrollerat tillbaka.", type: "execution", animationType: "slide" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER - VANLIG POST-OP ÖVNING
+    contraindications: [
+      "Akut hamstringsskada < 2 veckor",
+      "Svår ischiassmärta"
+    ],
+    precautions: [
+      "Ländryggssmärta - håll neutral rygg",
+      "Knäsmärta - placera fötterna bredare",
+      "Post-op höft - kontrollera tillåtet ROM"
+    ],
+    redFlags: [
+      "Smärta i baksidan av låret",
+      "Smärta som strålar ner i benet",
+      "Kramper i sätesmusklerna"
+    ],
+    appropriateForSurgeries: [
+      "Höftprotes (efter 2-4 veckor)",
+      "Diskektomi (efter 2 veckor)",
+      "Knäprotes (efter 2 veckor)"
+    ],
+    postOpRestrictions: [
+      { phase: 1, weeksPostOp: { min: 0, max: 2 }, allowed: true, modifications: ["Mindre lyft"], maxLoad: "bodyweight" },
+      { phase: 2, weeksPostOp: { min: 2, max: 6 }, allowed: true },
+      { phase: 3, weeksPostOp: { min: 6, max: 12 }, allowed: true, maxLoad: "moderate" }
+    ],
+    maxPainDuring: 3,
+    maxPainAfter24h: 2,
+    targetStructure: "Gluteus maximus, hamstrings",
+    healingTissue: "muscle",
+    progressionCriteria: {
+      minPainFreeReps: 15,
+      minConsecutiveDays: 3,
+      maxPainDuring: 2,
+      maxPainAfter: 1
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: false,
+      formBreakdown: true,
+      compensationPatterns: ["Överextenderar ryggen", "Lyfter med hamstrings istället för glutes"]
+    }
   },
   {
     name: "Cat-Cow (Katt-Ko)",
@@ -623,7 +1241,38 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Start", instruction: "På alla fyra med neutral rygg.", type: "start", animationType: "pulse" },
       { title: "Katt", instruction: "Runda ryggen uppåt, haka mot bröstet.", type: "execution", animationType: "bounce" },
       { title: "Ko", instruction: "Sänk magen, blicka uppåt.", type: "execution", animationType: "slide" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER
+    contraindications: [
+      "Akut spinal instabilitet",
+      "Svår spinal stenos (extension-delen)"
+    ],
+    precautions: [
+      "Diskbråck - undvik extension (ko-positionen)",
+      "Spinal stenos - undvik eller minimera extension",
+      "Handledssmärta - gör på underarmarna"
+    ],
+    redFlags: [
+      "Smärta som strålar ut i extremiteterna",
+      "Yrsel vid nackrörelse",
+      "Ökad stelhet efter övningen"
+    ],
+    maxPainDuring: 3,
+    maxPainAfter24h: 2,
+    targetStructure: "Hela ryggraden, core",
+    healingTissue: "muscle",
+    progressionCriteria: {
+      minPainFreeReps: 15,
+      minConsecutiveDays: 3,
+      maxPainDuring: 2,
+      maxPainAfter: 1
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: false,
+      formBreakdown: true,
+      compensationPatterns: ["Forcerar rörelsen", "Håller andan"]
+    }
   },
   {
     name: "Cobra (Prone Press-up)",
@@ -652,7 +1301,46 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Pressa upp", instruction: "Sträck armarna och lyft överkroppen.", type: "execution", animationType: "bounce" },
       { title: "Håll", instruction: "Håll kort i topposition.", type: "execution", animationType: "pulse" },
       { title: "Sänk", instruction: "Sänk kontrollerat tillbaka.", type: "execution", animationType: "slide" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER - MCKENZIE-METODEN
+    contraindications: [
+      "Spinal stenos med claudicatio",
+      "Spondylolisthesis grad 2+",
+      "Facetledssyndrom med extensionspåverkan"
+    ],
+    precautions: [
+      "Diskbråck - börja med propped up position",
+      "Akut ländryggssmärta - gör försiktigt",
+      "Graviditet - modifiera eller undvik"
+    ],
+    redFlags: [
+      "Smärta som ökar vid extension",
+      "Smärta som strålar ner i benet vid rörelse",
+      "Domningar eller svaghet i benen"
+    ],
+    appropriateForSurgeries: [
+      "Diskektomi (efter 4-6 veckor, om extension rekommenderas)"
+    ],
+    contraindicatedSurgeries: [
+      "Spinal fusion (första 12 veckorna)",
+      "Laminektomi (individuell bedömning)"
+    ],
+    maxPainDuring: 4,
+    maxPainAfter24h: 2,
+    targetStructure: "Lumbar extensorer, anterior höftstrukturer",
+    healingTissue: "muscle",
+    progressionCriteria: {
+      minPainFreeReps: 10,
+      minConsecutiveDays: 3,
+      maxPainDuring: 3,
+      maxPainAfter: 1
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: false,
+      formBreakdown: true,
+      compensationPatterns: ["Spänner sätesmusklerna", "Lyfter höfterna från golvet"]
+    }
   },
   {
     name: "Dead Bug",
@@ -675,7 +1363,38 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Sträck", instruction: "Sträck ut motsatt arm och ben.", type: "execution", animationType: "slide" },
       { title: "Kontroll", instruction: "Håll ryggen i golvet.", type: "tip", animationType: "pulse" },
       { title: "Tillbaka", instruction: "Återgå och byt sida.", type: "execution", animationType: "slide" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER
+    contraindications: [
+      "Akut diskbråck med nervpåverkan",
+      "Diastasis recti (postpartum, tills läkt)"
+    ],
+    precautions: [
+      "Ländryggssmärta - börja med mindre rörelseomfång",
+      "Postpartum - kontrollera diastasis först",
+      "Svag core - börja endast med armar eller ben"
+    ],
+    redFlags: [
+      "Ryggen lyfter från underlaget",
+      "Smärta i ländryggen",
+      "Bukmusklerna buktar ut"
+    ],
+    maxPainDuring: 2,
+    maxPainAfter24h: 1,
+    targetStructure: "Transversus abdominis, core stabilisatorer",
+    healingTissue: "muscle",
+    progressionCriteria: {
+      minPainFreeReps: 10,
+      minConsecutiveDays: 5,
+      maxPainDuring: 1,
+      maxPainAfter: 0
+    },
+    regressionTriggers: {
+      painIncrease: 1,
+      swellingPresent: false,
+      formBreakdown: true,
+      compensationPatterns: ["Ryggen lyfter", "Håller andan", "Bukmusklerna buktar"]
+    }
   },
   {
     name: "Thorax Rotation",
@@ -703,7 +1422,38 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Start", instruction: "Sidoläge med knän böjda 90°.", type: "start", animationType: "pulse" },
       { title: "Öppna", instruction: "Öppna armen i en båge, följ med blicken.", type: "execution", animationType: "slide" },
       { title: "Tillbaka", instruction: "Återgå kontrollerat till start.", type: "execution", animationType: "slide" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER
+    contraindications: [
+      "Akut diskbråck",
+      "Svår ländryggsstelhet med nervpåverkan"
+    ],
+    precautions: [
+      "Axelproblem - begränsa rörelseomfång",
+      "Ländryggssmärta - håll bäckenet stabilt",
+      "Yrsel - rör huvudet långsammare"
+    ],
+    redFlags: [
+      "Smärta som strålar ut i arm eller ben",
+      "Yrsel vid rotation",
+      "Smärta som ökar efter träning"
+    ],
+    maxPainDuring: 3,
+    maxPainAfter24h: 2,
+    targetStructure: "Bröstryggen, intercostalmuskulatur",
+    healingTissue: "muscle",
+    progressionCriteria: {
+      minPainFreeReps: 10,
+      minConsecutiveDays: 3,
+      maxPainDuring: 2,
+      maxPainAfter: 1
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: false,
+      formBreakdown: true,
+      compensationPatterns: ["Knäna separerar", "Bäckenet roterar med"]
+    }
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -736,7 +1486,47 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Start", instruction: "Sidoläge med knän böjda 90°.", type: "start", animationType: "pulse" },
       { title: "Öppna", instruction: "Lyft översta knäet som en mussla.", type: "execution", animationType: "slide" },
       { title: "Sänk", instruction: "Sänk kontrollerat tillbaka.", type: "execution", animationType: "slide" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER - VANLIG POST-OP HÖFT
+    contraindications: [
+      "Akut höftfraktur",
+      "Höftprotes < 2 veckor (kontrollera restriktioner)"
+    ],
+    precautions: [
+      "Post-op höftprotes - kontrollera tillåtna vinklar",
+      "Höftartros - minska rörelseomfång vid smärta",
+      "SI-ledsproblem - stabilisera bäckenet"
+    ],
+    redFlags: [
+      "Smärta i ljumsken",
+      "Klickande eller låsande höft",
+      "Smärta som strålar ner i benet"
+    ],
+    appropriateForSurgeries: [
+      "Höftprotes (efter 2 veckor, beroende på approach)",
+      "Höftartroskopi"
+    ],
+    postOpRestrictions: [
+      { phase: 1, weeksPostOp: { min: 0, max: 2 }, allowed: true, modifications: ["Begränsad öppning beroende på operationsteknik"], maxROM: 30 },
+      { phase: 2, weeksPostOp: { min: 2, max: 6 }, allowed: true, maxROM: 45 },
+      { phase: 3, weeksPostOp: { min: 6, max: 12 }, allowed: true }
+    ],
+    maxPainDuring: 3,
+    maxPainAfter24h: 2,
+    targetStructure: "Gluteus medius, piriformis",
+    healingTissue: "muscle",
+    progressionCriteria: {
+      minPainFreeReps: 15,
+      minConsecutiveDays: 3,
+      maxPainDuring: 2,
+      maxPainAfter: 1
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: false,
+      formBreakdown: true,
+      compensationPatterns: ["Rullar höften bakåt", "Lyfter bäckenet"]
+    }
   },
   {
     name: "Höftböjarstretch (Hip Flexor Stretch)",
@@ -764,7 +1554,38 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Position", instruction: "Knästående, ett knä på golvet.", type: "start", animationType: "pulse" },
       { title: "Pressa", instruction: "Pressa höften framåt.", type: "execution", animationType: "slide" },
       { title: "Håll", instruction: "Håll stretchen i 30-60 sekunder.", type: "execution", animationType: "pulse" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER
+    contraindications: [
+      "Akut höftledsartrit",
+      "Höftprotes med extensionsrestriktion"
+    ],
+    precautions: [
+      "Knäsmärta - använd kudde under knäet",
+      "Låg ryggsmärta - undvik överextension i ryggen",
+      "Post-op höft - kontrollera tillåten extension"
+    ],
+    redFlags: [
+      "Skarp smärta i ljumsken",
+      "Smärta som strålar ner i benet",
+      "Stickningar i låret"
+    ],
+    maxPainDuring: 4,
+    maxPainAfter24h: 2,
+    targetStructure: "Iliopsoas, rectus femoris",
+    healingTissue: "muscle",
+    progressionCriteria: {
+      minPainFreeReps: 3,
+      minConsecutiveDays: 3,
+      maxPainDuring: 3,
+      maxPainAfter: 1
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: false,
+      formBreakdown: true,
+      compensationPatterns: ["Överextenderar ryggen", "Lutar överkroppen framåt"]
+    }
   },
   {
     name: "Side-lying Hip Abduction",
@@ -792,7 +1613,47 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Start", instruction: "Sidoläge, understa benet böjt.", type: "start", animationType: "pulse" },
       { title: "Lyft", instruction: "Lyft översta benet rakt upp.", type: "execution", animationType: "slide" },
       { title: "Sänk", instruction: "Sänk kontrollerat tillbaka.", type: "execution", animationType: "slide" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER - POST-OP HÖFT
+    contraindications: [
+      "Akut höftfraktur",
+      "Höftprotes med abduktionsrestriktion < 6 veckor"
+    ],
+    precautions: [
+      "Post-op höftprotes - kontrollera operationsprotokoll",
+      "Höftbursit - undvik om smärtsamt",
+      "IT-band-syndrom - stretcha efter övningen"
+    ],
+    redFlags: [
+      "Smärta på utsidan av höften",
+      "Smärta som strålar ner i benet",
+      "Klickande i höften"
+    ],
+    appropriateForSurgeries: [
+      "Höftprotes (efter 4-6 veckor, beroende på approach)",
+      "Höftartroskopi (efter 2 veckor)"
+    ],
+    postOpRestrictions: [
+      { phase: 1, weeksPostOp: { min: 0, max: 4 }, allowed: true, modifications: ["Mindre lyft"], maxROM: 30 },
+      { phase: 2, weeksPostOp: { min: 4, max: 8 }, allowed: true, maxROM: 45 },
+      { phase: 3, weeksPostOp: { min: 8, max: 12 }, allowed: true }
+    ],
+    maxPainDuring: 3,
+    maxPainAfter24h: 2,
+    targetStructure: "Gluteus medius, tensor fasciae latae",
+    healingTissue: "muscle",
+    progressionCriteria: {
+      minPainFreeReps: 15,
+      minConsecutiveDays: 5,
+      maxPainDuring: 2,
+      maxPainAfter: 1
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: false,
+      formBreakdown: true,
+      compensationPatterns: ["Rullar höften", "Böjer knäet"]
+    }
   },
   {
     name: "Piriformis Stretch",
@@ -820,7 +1681,38 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Position", instruction: "Ryggläge, fotled på motsatt knä.", type: "start", animationType: "pulse" },
       { title: "Dra", instruction: "Dra understa låret mot bröstet.", type: "execution", animationType: "slide" },
       { title: "Håll", instruction: "Känn stretchen och håll.", type: "execution", animationType: "pulse" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER
+    contraindications: [
+      "Akut ischias med svår smärta",
+      "Höftprotes med flexionsrestriktion"
+    ],
+    precautions: [
+      "Post-op höft - kontrollera tillåten flexion",
+      "Knäsmärta - modifiera positionen",
+      "Ländryggssmärta - håll ländryggen i golvet"
+    ],
+    redFlags: [
+      "Smärta som strålar ner i benet förbi knäet",
+      "Domningar eller stickningar i foten",
+      "Ökad ryggsmärta"
+    ],
+    maxPainDuring: 4,
+    maxPainAfter24h: 2,
+    targetStructure: "Piriformis, djupa höftrotatorer",
+    healingTissue: "muscle",
+    progressionCriteria: {
+      minPainFreeReps: 3,
+      minConsecutiveDays: 3,
+      maxPainDuring: 3,
+      maxPainAfter: 1
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: false,
+      formBreakdown: true,
+      compensationPatterns: ["Lyfter ryggen från golvet", "Vrider bäckenet"]
+    }
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -854,7 +1746,49 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Start", instruction: "Fötterna axelbrett isär, tår lätt utåt.", type: "start", animationType: "pulse" },
       { title: "Sänk", instruction: "Sänk dig med kontroll, knän över tår.", type: "execution", animationType: "slide" },
       { title: "Tryck upp", instruction: "Pressa upp genom hälarna.", type: "execution", animationType: "bounce" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER - POST-OP KNÄ
+    contraindications: [
+      "Akut knäskada < 2 veckor",
+      "Knäprotes < 6 veckor",
+      "ACL-rekonstruktion < 12 veckor (full squat)"
+    ],
+    precautions: [
+      "Patellofemoralt syndrom - begränsa djupet till smärtfri zon",
+      "Post-op knäprotes - börja med mini-squat",
+      "Knäartros - undvik djupa squats"
+    ],
+    redFlags: [
+      "Smärta framför knäskålen (patella)",
+      "Svullnad efter träning",
+      "Knät 'ger vika' eller låser sig"
+    ],
+    appropriateForSurgeries: [
+      "Knäprotes (efter 6 veckor, begränsad)",
+      "Meniskoperation (efter 4-6 veckor)",
+      "ACL-rekonstruktion (begränsad djup efter 8 veckor)"
+    ],
+    postOpRestrictions: [
+      { phase: 1, weeksPostOp: { min: 0, max: 6 }, allowed: false },
+      { phase: 2, weeksPostOp: { min: 6, max: 12 }, allowed: true, modifications: ["Mini-squat max 45°"], maxROM: 45 },
+      { phase: 3, weeksPostOp: { min: 12, max: 24 }, allowed: true, modifications: ["90° squat tillåten"], maxROM: 90 }
+    ],
+    maxPainDuring: 3,
+    maxPainAfter24h: 2,
+    targetStructure: "Quadriceps, gluteus maximus, hamstrings",
+    healingTissue: "muscle",
+    progressionCriteria: {
+      minPainFreeReps: 15,
+      minConsecutiveDays: 5,
+      maxPainDuring: 2,
+      maxPainAfter: 1
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: true,
+      formBreakdown: true,
+      compensationPatterns: ["Knäna går inåt", "Hälar lyfter", "Lutar framåt"]
+    }
   },
   {
     name: "Utfall (Lunge)",
@@ -883,7 +1817,49 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Stega", instruction: "Ta ett stort steg framåt.", type: "execution", animationType: "slide" },
       { title: "Sänk", instruction: "Sänk till båda knän i 90°.", type: "execution", animationType: "slide" },
       { title: "Tillbaka", instruction: "Tryck tillbaka till start.", type: "execution", animationType: "bounce" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER - POST-OP KNÄ
+    contraindications: [
+      "Akut knäskada < 4 veckor",
+      "Knäprotes < 8 veckor",
+      "Svår knäinstabilitet"
+    ],
+    precautions: [
+      "Patellofemoralt syndrom - kortare steg, mindre djup",
+      "Balanssvårigheter - håll i vägg eller stol",
+      "Post-op - börja med statiskt utfall"
+    ],
+    redFlags: [
+      "Knät 'ger vika'",
+      "Svullnad efter träning",
+      "Smärta vid landning"
+    ],
+    appropriateForSurgeries: [
+      "Knäprotes (efter 8-12 veckor)",
+      "Meniskoperation (efter 6-8 veckor)",
+      "ACL-rekonstruktion (efter 12-16 veckor)"
+    ],
+    postOpRestrictions: [
+      { phase: 1, weeksPostOp: { min: 0, max: 8 }, allowed: false },
+      { phase: 2, weeksPostOp: { min: 8, max: 16 }, allowed: true, modifications: ["Statiskt utfall först", "Kortare steg"], maxLoad: "bodyweight" },
+      { phase: 3, weeksPostOp: { min: 16, max: 24 }, allowed: true }
+    ],
+    maxPainDuring: 3,
+    maxPainAfter24h: 2,
+    targetStructure: "Quadriceps, gluteus maximus, hamstrings",
+    healingTissue: "muscle",
+    progressionCriteria: {
+      minPainFreeReps: 10,
+      minConsecutiveDays: 5,
+      maxPainDuring: 2,
+      maxPainAfter: 1
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: true,
+      formBreakdown: true,
+      compensationPatterns: ["Framknät går förbi tårna", "Lutar överkroppen", "Knät faller inåt"]
+    }
   },
   {
     name: "Knästräckning (Knee Extension)",
@@ -906,7 +1882,48 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Sträck", instruction: "Sträck benet rakt ut.", type: "execution", animationType: "slide" },
       { title: "Håll", instruction: "Spänn quadriceps i 2 sek.", type: "execution", animationType: "pulse" },
       { title: "Sänk", instruction: "Sänk kontrollerat tillbaka.", type: "execution", animationType: "slide" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER - MYCKET VANLIG POST-OP
+    contraindications: [
+      "Akut patellafraktur",
+      "Nyopererat patellarsena"
+    ],
+    precautions: [
+      "Patellofemoralt syndrom - begränsa rörelseomfång",
+      "Post-op knäprotes - börja med isometrisk aktivering",
+      "Patellarsenetendinit - undvik full extension med belastning"
+    ],
+    redFlags: [
+      "Smärta framför knäskålen",
+      "Krepitationer (knäppande ljud)",
+      "Svullnad efter träning"
+    ],
+    appropriateForSurgeries: [
+      "Knäprotes (dag 1-2 post-op)",
+      "Meniskoperation (dag 1-2 post-op)",
+      "ACL-rekonstruktion (vecka 1-2)"
+    ],
+    postOpRestrictions: [
+      { phase: 1, weeksPostOp: { min: 0, max: 2 }, allowed: true, modifications: ["Isometrisk i full extension först"], maxLoad: "bodyweight" },
+      { phase: 2, weeksPostOp: { min: 2, max: 6 }, allowed: true, modifications: ["Lägg till rörelse"], maxLoad: "light" },
+      { phase: 3, weeksPostOp: { min: 6, max: 12 }, allowed: true, maxLoad: "moderate" }
+    ],
+    maxPainDuring: 3,
+    maxPainAfter24h: 2,
+    targetStructure: "Quadriceps femoris",
+    healingTissue: "muscle",
+    progressionCriteria: {
+      minPainFreeReps: 15,
+      minConsecutiveDays: 3,
+      maxPainDuring: 2,
+      maxPainAfter: 1
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: true,
+      formBreakdown: true,
+      compensationPatterns: ["Kompenserar med höften", "Böjer inte knäet fullständigt"]
+    }
   },
   {
     name: "Hälglidning (Heel Slides)",
@@ -934,7 +1951,39 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Start", instruction: "Ryggläge med benen raka.", type: "start", animationType: "pulse" },
       { title: "Glid", instruction: "Dra hälen mot sätet.", type: "execution", animationType: "slide" },
       { title: "Tillbaka", instruction: "Glid tillbaka till rakt ben.", type: "execution", animationType: "slide" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER - STANDARD POST-OP KNÄ
+    contraindications: [],
+    precautions: [
+      "Post-op knäprotes - följ kirurgens ROM-mål",
+      "Svullnad - minska repetitioner",
+      "Smärta vid böjning - stanna vid smärtfritt ROM"
+    ],
+    redFlags: [
+      "Plötslig ökad svullnad",
+      "Smärta som förhindrar rörelse",
+      "Känsla av låsning i knäet"
+    ],
+    appropriateForSurgeries: [
+      "Knäprotes (dag 1 post-op)",
+      "ACL-rekonstruktion (dag 1 post-op)",
+      "Meniskoperation (dag 1 post-op)"
+    ],
+    maxPainDuring: 4,
+    maxPainAfter24h: 3,
+    targetStructure: "Knäledens ROM",
+    healingTissue: "ligament",
+    progressionCriteria: {
+      minPainFreeReps: 20,
+      minConsecutiveDays: 3,
+      maxPainDuring: 3,
+      maxPainAfter: 2
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: true,
+      formBreakdown: false
+    }
   },
   {
     name: "Straight Leg Raise (SLR)",
@@ -963,7 +2012,44 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Spänn", instruction: "Spänn quadriceps på det raka benet.", type: "execution", animationType: "pulse" },
       { title: "Lyft", instruction: "Lyft benet 30 cm med knäet rakt.", type: "execution", animationType: "slide" },
       { title: "Sänk", instruction: "Sänk kontrollerat tillbaka.", type: "execution", animationType: "slide" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER - STANDARD POST-OP
+    contraindications: [
+      "Akut diskbråck med SLR-positiv test",
+      "Akut quadricepsskada"
+    ],
+    precautions: [
+      "Ischiassmärta - minska lyfthöjd",
+      "Svag quadriceps - börja med isometriskt",
+      "Post-op ACL - vänta tills extension är full"
+    ],
+    redFlags: [
+      "Smärta som strålar ner i benet",
+      "Oförmåga att hålla knäet rakt",
+      "Ökad ryggsmärta"
+    ],
+    appropriateForSurgeries: [
+      "Knäprotes (dag 1-2 post-op)",
+      "ACL-rekonstruktion (vecka 1)",
+      "Meniskoperation (dag 1 post-op)",
+      "Höftprotes (vecka 1-2)"
+    ],
+    maxPainDuring: 3,
+    maxPainAfter24h: 2,
+    targetStructure: "Quadriceps, höftflexorer",
+    healingTissue: "muscle",
+    progressionCriteria: {
+      minPainFreeReps: 15,
+      minConsecutiveDays: 3,
+      maxPainDuring: 2,
+      maxPainAfter: 1
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: true,
+      formBreakdown: true,
+      compensationPatterns: ["Böjer knäet", "Roterar höften"]
+    }
   },
   {
     name: "Step-ups",
@@ -985,7 +2071,44 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Start", instruction: "Stå framför en låda/trappsteg.", type: "start", animationType: "pulse" },
       { title: "Kliv upp", instruction: "Placera ena foten på lådan och kliv upp.", type: "execution", animationType: "bounce" },
       { title: "Kliv ner", instruction: "Kliv kontrollerat ner.", type: "execution", animationType: "slide" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER
+    contraindications: [
+      "Akut knäskada < 6 veckor",
+      "Svår knäinstabilitet",
+      "Balanssvårigheter utan stöd"
+    ],
+    precautions: [
+      "Post-op knä - börja med låg höjd",
+      "Patellofemoralt syndrom - kontrollera knäposition",
+      "Höftprotes - undvik för hög steg"
+    ],
+    redFlags: [
+      "Knät 'ger vika'",
+      "Smärta vid landning",
+      "Obalans eller fall"
+    ],
+    appropriateForSurgeries: [
+      "Knäprotes (efter 8-12 veckor)",
+      "ACL-rekonstruktion (efter 12 veckor)",
+      "Höftprotes (efter 6-8 veckor)"
+    ],
+    maxPainDuring: 3,
+    maxPainAfter24h: 2,
+    targetStructure: "Quadriceps, gluteus maximus",
+    healingTissue: "muscle",
+    progressionCriteria: {
+      minPainFreeReps: 10,
+      minConsecutiveDays: 5,
+      maxPainDuring: 2,
+      maxPainAfter: 1
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: true,
+      formBreakdown: true,
+      compensationPatterns: ["Knät faller inåt", "Använder fart istället för kontroll"]
+    }
   },
   {
     name: "Spanish Squat",
@@ -1013,7 +2136,39 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Setup", instruction: "Band runt stadigt objekt, bakom knäna.", type: "start", animationType: "pulse" },
       { title: "Squat", instruction: "Sjunk ner med vertikala skenben.", type: "execution", animationType: "slide" },
       { title: "Upp", instruction: "Pressa upp till stående.", type: "execution", animationType: "bounce" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER - SPECIFIK FÖR PATELLARSENA
+    contraindications: [
+      "Akut patellarseneinflammation",
+      "Nyligen patellarseneruptur",
+      "Svår knäartros"
+    ],
+    precautions: [
+      "Patellatendinopati - börja utan smärta",
+      "Knäsmärta - minska djupet",
+      "Post-op - endast efter godkännande"
+    ],
+    redFlags: [
+      "Skarp smärta i patellarsena",
+      "Svullnad runt knäskålen",
+      "Smärta som ökar progressivt"
+    ],
+    maxPainDuring: 4,
+    maxPainAfter24h: 3,
+    targetStructure: "Quadriceps, patellarsena",
+    healingTissue: "tendon",
+    progressionCriteria: {
+      minPainFreeReps: 12,
+      minConsecutiveDays: 5,
+      maxPainDuring: 3,
+      maxPainAfter: 2
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: true,
+      formBreakdown: true,
+      compensationPatterns: ["Skenben lutar framåt", "Hälar lyfter"]
+    }
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1040,7 +2195,41 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Start", instruction: "Stå med fötterna höftbrett isär.", type: "start", animationType: "pulse" },
       { title: "Lyft", instruction: "Lyft dig upp på tå.", type: "execution", animationType: "bounce" },
       { title: "Sänk", instruction: "Sänk kontrollerat tillbaka.", type: "execution", animationType: "slide" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER
+    contraindications: [
+      "Akut hälseneruptur < 12 veckor",
+      "Akut fotledsstukning < 2 veckor"
+    ],
+    precautions: [
+      "Hälsenetendinopati - börja med dubbla ben",
+      "Plantarfasciit - undvik om morgonstyvhet",
+      "Post-op hälsena - följ protokoll noggrant"
+    ],
+    redFlags: [
+      "Plötslig smärta i hälsenan",
+      "Känsla av 'snap' i vaden",
+      "Svullnad eller missfärgning"
+    ],
+    appropriateForSurgeries: [
+      "Hälsenereparation (efter 12+ veckor)"
+    ],
+    maxPainDuring: 3,
+    maxPainAfter24h: 2,
+    targetStructure: "Gastrocnemius, soleus",
+    healingTissue: "tendon",
+    progressionCriteria: {
+      minPainFreeReps: 20,
+      minConsecutiveDays: 5,
+      maxPainDuring: 2,
+      maxPainAfter: 1
+    },
+    regressionTriggers: {
+      painIncrease: 2,
+      swellingPresent: true,
+      formBreakdown: true,
+      compensationPatterns: ["Rullar foten utåt", "Böjer knäna"]
+    }
   },
   {
     name: "Excentrisk Vadträning (Alfredson Protocol)",
@@ -1068,7 +2257,38 @@ export const EXERCISE_DATABASE: Exercise[] = [
       { title: "Position", instruction: "Framfoten på trappkant, hälen utanför.", type: "start", animationType: "pulse" },
       { title: "Sänk", instruction: "Sänk hälen långsamt under fotnivån (3 sek).", type: "execution", animationType: "slide" },
       { title: "Upp", instruction: "Använd friska benet för att komma tillbaka upp.", type: "execution", animationType: "bounce" }
-    ]
+    ],
+    // SÄKERHETSFUNKTIONER - EVIDENSBASERAD TENDINOPATI
+    contraindications: [
+      "Akut hälseneruptur",
+      "Nyligen hälseneoperation < 12 veckor"
+    ],
+    precautions: [
+      "Kronisk hälsenetendinopati - förvänta lätt smärta (< 5/10)",
+      "Insertionell tendinopati - undvik full dorsalflexion",
+      "Äldre patienter - börja med isometriskt"
+    ],
+    redFlags: [
+      "Plötslig kraftig smärta",
+      "Känsla av att något 'brister'",
+      "Smärta som ökar > 24 timmar efteråt"
+    ],
+    maxPainDuring: 5,
+    maxPainAfter24h: 3,
+    targetStructure: "Hälsenan (achilles)",
+    healingTissue: "tendon",
+    progressionCriteria: {
+      minPainFreeReps: 15,
+      minConsecutiveDays: 7,
+      maxPainDuring: 4,
+      maxPainAfter: 2
+    },
+    regressionTriggers: {
+      painIncrease: 3,
+      swellingPresent: true,
+      formBreakdown: true,
+      compensationPatterns: ["Går för snabbt ner", "Böjer knäet under nedfas"]
+    }
   },
   {
     name: "Plantarfasciastretch",

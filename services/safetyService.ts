@@ -6,9 +6,17 @@
  * - Rehabiliteringsfas
  * - Kontraindikationer
  * - Smärtnivå
+ *
+ * OBS: Använder centraliserade protokoll från postOpProtocols.ts
  */
 
 import { Exercise } from '../types';
+import {
+  getProtocol,
+  getCurrentPhase,
+  isExerciseSafe as isExerciseSafeFromProtocol,
+  POST_OP_PROTOCOLS
+} from '../data/protocols/postOpProtocols';
 
 export interface SafetyContext {
   phase: 1 | 2 | 3;
@@ -49,87 +57,6 @@ const PHASE_RESTRICTIONS: Record<string, {
   'Rotationsövningar': { allowedFromPhase: 2, warning: 'Rotationsbelastning efter skyddsfasen' },
 };
 
-// Postoperativa protokoll med tidsbaserade restriktioner
-const POSTOP_PROTOCOLS: Record<string, {
-  phase1End: number; // Dagar
-  phase2End: number;
-  restrictions: {
-    dayRange: [number, number];
-    forbidden: string[];
-    warning?: string;
-  }[];
-}> = {
-  'ACL-rekonstruktion': {
-    phase1End: 14,
-    phase2End: 84, // 12 veckor
-    restrictions: [
-      {
-        dayRange: [0, 14],
-        forbidden: ['Knäböj', 'Utfall', 'Hoppträning', 'Löpning'],
-        warning: 'Första 2 veckorna: Endast isometriska övningar och ROM'
-      },
-      {
-        dayRange: [14, 42],
-        forbidden: ['Hoppträning', 'Löpning', 'Pivotering'],
-        warning: '2-6 veckor: Gradvis belastning utan hopp/rotation'
-      },
-      {
-        dayRange: [42, 84],
-        forbidden: ['Hoppträning', 'Pivotering', 'Kontaktsport'],
-        warning: '6-12 veckor: Styrketräning utan hopp'
-      }
-    ]
-  },
-  'Meniskoperation': {
-    phase1End: 7,
-    phase2End: 42,
-    restrictions: [
-      {
-        dayRange: [0, 7],
-        forbidden: ['Knäböj', 'Trappgång belastning'],
-        warning: 'Första veckan: Avlastning och isometrisk'
-      },
-      {
-        dayRange: [7, 28],
-        forbidden: ['Djup knäböj', 'Hoppträning'],
-        warning: '1-4 veckor: Gradvis knäböj (max 90 grader)'
-      }
-    ]
-  },
-  'Rotatorkuffsutur': {
-    phase1End: 42,
-    phase2End: 84,
-    restrictions: [
-      {
-        dayRange: [0, 42],
-        forbidden: ['Axelpress', 'Armhävning', 'Rodd över huvudet', 'Kastövningar'],
-        warning: 'Första 6 veckorna: Ingen aktiv axelrörelse mot motstånd'
-      },
-      {
-        dayRange: [42, 84],
-        forbidden: ['Kastövningar', 'Tung axelpress'],
-        warning: '6-12 veckor: Lätt motstånd, ingen överarmshöjning'
-      }
-    ]
-  },
-  'Diskbråcksoperation': {
-    phase1End: 28,
-    phase2End: 84,
-    restrictions: [
-      {
-        dayRange: [0, 28],
-        forbidden: ['Marklyft', 'Framåtböjning', 'Rotation', 'Tunga lyft'],
-        warning: 'Första 4 veckorna: Undvik böjning och rotation'
-      },
-      {
-        dayRange: [28, 84],
-        forbidden: ['Marklyft med tung vikt', 'Explosiva ryggövningar'],
-        warning: '4-12 veckor: Gradvis extension, undvik tung belastning'
-      }
-    ]
-  }
-};
-
 // Generella säkerhetsregler baserat på smärtnivå
 const PAIN_BASED_RESTRICTIONS: {
   threshold: number;
@@ -150,37 +77,31 @@ const PAIN_BASED_RESTRICTIONS: {
 
 /**
  * Evaluerar om en övning är säker för given kontext
+ * Använder centraliserade protokoll från postOpProtocols.ts för post-op patienter
  */
 export function evaluateExerciseSafety(
   exercise: Exercise,
   context: SafetyContext
 ): SafetyResult {
-  const { phase, isPostOp, daysSinceSurgery, surgeryType, painLevel, injuryType } = context;
+  const { phase, isPostOp, daysSinceSurgery, surgeryType, painLevel } = context;
 
-  // 1. Kontrollera postoperativa restriktioner
+  // 1. Kontrollera postoperativa restriktioner via centraliserade protokoll
   if (isPostOp && surgeryType && daysSinceSurgery !== undefined) {
-    const protocol = POSTOP_PROTOCOLS[surgeryType];
-    if (protocol) {
-      for (const restriction of protocol.restrictions) {
-        const [start, end] = restriction.dayRange;
-        if (daysSinceSurgery >= start && daysSinceSurgery < end) {
-          // Check if exercise name matches any forbidden
-          const isForbidden = restriction.forbidden.some(forbidden =>
-            exercise.name.toLowerCase().includes(forbidden.toLowerCase()) ||
-            exercise.category?.toLowerCase().includes(forbidden.toLowerCase())
-          );
+    const safetyCheck = isExerciseSafeFromProtocol(
+      exercise.name,
+      [exercise.name.toLowerCase(), exercise.category?.toLowerCase() || ''],
+      surgeryType,
+      daysSinceSurgery
+    );
 
-          if (isForbidden) {
-            return {
-              safe: false,
-              warningLevel: 'contraindicated',
-              message: `Kontraindicerad dag ${daysSinceSurgery} efter ${surgeryType}`,
-              reason: restriction.warning,
-              recommendation: 'Följ postoperativt protokoll. Rådfråga din fysioterapeut.'
-            };
-          }
-        }
-      }
+    if (!safetyCheck.safe) {
+      return {
+        safe: false,
+        warningLevel: 'contraindicated',
+        message: `Kontraindicerad dag ${daysSinceSurgery} efter ${surgeryType}`,
+        reason: safetyCheck.reason,
+        recommendation: 'Följ postoperativt protokoll. Rådfråga din fysioterapeut.'
+      };
     }
   }
 
@@ -259,14 +180,21 @@ export function filterSafeExercises(
 
 /**
  * Hämta alla tillgängliga protokolltyper
+ * Använder centraliserade protokoll från postOpProtocols.ts
  */
 export function getAvailableProtocols(): string[] {
-  return Object.keys(POSTOP_PROTOCOLS);
+  return Object.keys(POST_OP_PROTOCOLS);
 }
 
 /**
  * Hämta protokollinformation
+ * Använder centraliserade protokoll från postOpProtocols.ts
  */
-export function getProtocolInfo(surgeryType: string): typeof POSTOP_PROTOCOLS[string] | null {
-  return POSTOP_PROTOCOLS[surgeryType] || null;
+export function getProtocolInfo(surgeryType: string) {
+  return getProtocol(surgeryType);
 }
+
+/**
+ * Wrapper för att använda centraliserade protokollfunktioner
+ */
+export { getCurrentPhase, getProtocol, isExerciseSafeFromProtocol as isExerciseSafe };

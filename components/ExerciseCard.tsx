@@ -49,6 +49,9 @@ const useFocusTrap = (isActive: boolean, containerRef: React.RefObject<HTMLEleme
 const AIMovementCoach = lazy(() => import('./AIMovementCoach'));
 const Avatar3D = lazy(() => import('./Avatar3D'));
 
+// Preload ML libraries when user hovers over AI Coach button
+import { preloadMediaPipe } from '../services/lazyMediaPipe';
+
 // Loading fallback component
 const ComponentLoader = ({ text }: { text: string }) => (
   <div className="flex flex-col items-center justify-center p-8 bg-slate-900 rounded-xl">
@@ -126,7 +129,7 @@ const evidenceLevelMap: Record<string, { label: string; description: string; col
   'expert': { label: 'Expertråd', description: 'Klinisk expertis, etablerad praxis', color: 'bg-purple-100 text-purple-800 border-purple-200' }
 };
 
-const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, onComplete, onSwap, completed, readOnly = false, onFavoriteToggle, isFavorite = false }) => {
+const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({ exercise, onComplete, onSwap, completed, readOnly = false, onFavoriteToggle, isFavorite = false }) => {
   // AI Camera State
   const [showAICoach, setShowAICoach] = useState(false);
 
@@ -136,6 +139,7 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, onComplete, onSwa
   // Swap State
   const [isSwapping, setIsSwapping] = useState(false);
   const [showSwapOptions, setShowSwapOptions] = useState(false);
+  const [swapError, setSwapError] = useState<string | null>(null);
 
   // Feedback State
   const [completionFeedback, setCompletionFeedback] = useState<{ title: string; message: string; icon: any; color: string } | null>(null);
@@ -300,11 +304,13 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, onComplete, onSwa
     if (!onSwap) return;
     setIsSwapping(true);
     setShowSwapOptions(false);
+    setSwapError(null);
     try {
         const newExercise = await generateAlternativeExercise(exercise, reason, type);
         onSwap(newExercise);
     } catch (e) {
-        alert("Kunde inte byta övning just nu.");
+        setSwapError("Kunde inte byta övning just nu. Försök igen senare.");
+        setTimeout(() => setSwapError(null), 5000); // Auto-clear after 5s
     } finally {
         setIsSwapping(false);
     }
@@ -369,6 +375,16 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, onComplete, onSwa
       aria-label={`Övning: ${exercise.name}${completed ? ' - Slutförd' : ''}`}
       aria-describedby={`exercise-desc-${exercise.name.replace(/\s+/g, '-')}`}
     >
+      {/* Swap Error Banner */}
+      {swapError && (
+        <div className="absolute top-0 left-0 right-0 z-40 bg-red-500 text-white text-sm font-medium px-4 py-2 flex items-center justify-between rounded-t-3xl animate-in slide-in-from-top duration-300">
+          <span className="flex items-center gap-2"><AlertTriangle size={16} />{swapError}</span>
+          <button onClick={() => setSwapError(null)} className="p-1 hover:bg-red-600 rounded" aria-label="Stäng felmeddelande">
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
       {/* Completed Badge */}
       {completed && (
         <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5 px-3 py-1.5 bg-green-500 text-white text-xs font-bold rounded-full shadow-lg shadow-green-500/30 animate-in zoom-in duration-300">
@@ -743,6 +759,8 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, onComplete, onSwa
               lastFocusedElementRef.current = document.activeElement as HTMLElement;
               setShowAICoach(true);
             }}
+            onMouseEnter={preloadMediaPipe} // Preload ML (~1.6MB) on hover for faster startup
+            onFocus={preloadMediaPipe} // Also preload on focus for keyboard users
             className="flex items-center justify-center gap-3 px-4 py-4 rounded-2xl bg-gradient-to-r from-cyan-500 to-cyan-600 text-white font-bold shadow-lg shadow-cyan-500/25 hover:shadow-xl hover:shadow-cyan-500/30 hover:-translate-y-0.5 transition-all active:scale-[0.98]"
             aria-label="Starta AI Rörelseanalys"
          >
@@ -798,5 +816,16 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, onComplete, onSwa
     </>
   );
 };
+
+// React.memo optimization to prevent unnecessary re-renders
+// Only re-render if exercise.id, completed, or isFavorite changes
+const ExerciseCard = React.memo(ExerciseCardComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.exercise.name === nextProps.exercise.name &&
+    prevProps.completed === nextProps.completed &&
+    prevProps.isFavorite === nextProps.isFavorite &&
+    prevProps.readOnly === nextProps.readOnly
+  );
+});
 
 export default ExerciseCard;

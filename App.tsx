@@ -11,6 +11,10 @@ import { generateRehabProgram } from './services/geminiService';
 import { storageService } from './services/storageService';
 import { BookOpen, Home, RefreshCw, LogOut, TrendingUp, Sparkles, Cloud, ShieldAlert, User, Trophy, Heart, FileText, Users, Brain } from 'lucide-react';
 import Spinner from './components/ui/Spinner';
+import { logger } from './utils/logger';
+import SectionErrorBoundary from './components/SectionErrorBoundary';
+import { ChatErrorBoundary, AIErrorBoundary, LoadingSkeleton } from './components/ErrorBoundary';
+import PerformanceMonitor from './components/PerformanceMonitor';
 
 // Lazy load heavier page components
 const ProgramView = lazy(() => import('./components/ProgramView'));
@@ -86,7 +90,7 @@ function AppContent() {
                 }
             }
         } catch (e) {
-            console.error("Init failed", e);
+            logger.error("Init failed", e);
         } finally {
             setIsInitializing(false);
         }
@@ -126,7 +130,7 @@ function AppContent() {
   const handleReset = () => {
     if (confirm("Är du säker på att du vill radera ditt nuvarande program och börja om? Detta raderar även din data från molnet.")) {
       setProgram(null);
-      storageService.clearProgram().catch(console.error);
+      storageService.clearProgram().catch((e) => logger.error("Failed to clear program", e));
       addToast('info', 'Återställd', 'Ditt program har raderats.');
       navigate('/');
     }
@@ -193,7 +197,7 @@ function AppContent() {
       </div>
 
       {/* Floating Glass Navbar */}
-      <nav className="sticky top-4 z-50 px-4 sm:px-6 lg:px-8 mb-6 print:hidden" role="navigation" aria-label="Huvudnavigation">
+      <nav className="sticky top-4 z-50 px-4 sm:px-6 lg:px-8 mb-2 print:hidden" role="navigation" aria-label="Huvudnavigation">
         <div className="max-w-6xl mx-auto">
           <div className="bg-white/70 backdrop-blur-lg border border-white/40 shadow-lg rounded-2xl px-6 h-16 flex justify-between items-center transition-all duration-300">
             <Link
@@ -323,8 +327,8 @@ function AppContent() {
               {/* Onboarding / Home Route */}
               <Route path="/" element={
                   program ? <Navigate to="/program" replace /> : (
-                      <div className="pt-8 px-4 max-w-5xl mx-auto">
-                        <div className="text-center mb-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+                      <div className="pt-2 px-4 max-w-5xl mx-auto">
+                        <div className="text-center mb-8 animate-in fade-in slide-in-from-bottom-8 duration-1000">
                             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-50 text-primary-700 text-xs font-bold uppercase tracking-wider mb-6 border border-primary-100">
                                 <Sparkles size={12} /> AI-Driven Fysioterapi
                             </div>
@@ -343,15 +347,27 @@ function AppContent() {
 
               {/* Program Route - Protected */}
               <Route path="/program" element={
-                  program ? <ProgramView program={program} /> : <Navigate to="/" replace />
+                  program ? (
+                    <SectionErrorBoundary sectionName="Träningsprogram" fallbackHeight="min-h-screen">
+                      <ProgramView program={program} />
+                    </SectionErrorBoundary>
+                  ) : <Navigate to="/" replace />
               } />
 
               {/* Library Route */}
-              <Route path="/library" element={<ExerciseLibrary />} />
+              <Route path="/library" element={
+                <SectionErrorBoundary sectionName="Övningsbibliotek" fallbackHeight="min-h-screen">
+                  <ExerciseLibrary />
+                </SectionErrorBoundary>
+              } />
 
               {/* Progress Route - Protected */}
               <Route path="/progress" element={
-                  program ? <ProgressDashboard totalExercisesInRoutine={totalExercises} /> : <Navigate to="/" replace />
+                  program ? (
+                    <SectionErrorBoundary sectionName="Framsteg" fallbackHeight="min-h-screen">
+                      <ProgressDashboard totalExercisesInRoutine={totalExercises} />
+                    </SectionErrorBoundary>
+                  ) : <Navigate to="/" replace />
               } />
 
               {/* Provider Routes */}
@@ -384,19 +400,39 @@ function AppContent() {
 
               {/* New Feature Routes */}
               <Route path="/achievements" element={
-                  program ? <Achievements /> : <Navigate to="/" replace />
+                  program ? (
+                    <SectionErrorBoundary sectionName="Prestationer" fallbackHeight="min-h-screen">
+                      <Achievements />
+                    </SectionErrorBoundary>
+                  ) : <Navigate to="/" replace />
               } />
               <Route path="/health" element={
-                  program ? <HealthDataDashboard /> : <Navigate to="/" replace />
+                  program ? (
+                    <SectionErrorBoundary sectionName="Hälsodata" fallbackHeight="min-h-screen">
+                      <HealthDataDashboard />
+                    </SectionErrorBoundary>
+                  ) : <Navigate to="/" replace />
               } />
               <Route path="/report" element={
-                  program ? <ClinicalReport /> : <Navigate to="/" replace />
+                  program ? (
+                    <SectionErrorBoundary sectionName="Klinisk rapport" fallbackHeight="min-h-screen">
+                      <ClinicalReport />
+                    </SectionErrorBoundary>
+                  ) : <Navigate to="/" replace />
               } />
               <Route path="/leaderboard" element={
-                  program ? <Leaderboard /> : <Navigate to="/" replace />
+                  program ? (
+                    <SectionErrorBoundary sectionName="Topplista" fallbackHeight="min-h-screen">
+                      <Leaderboard />
+                    </SectionErrorBoundary>
+                  ) : <Navigate to="/" replace />
               } />
               <Route path="/pain-insights" element={
-                  program ? <PainPredictionDashboard /> : <Navigate to="/" replace />
+                  program ? (
+                    <SectionErrorBoundary sectionName="Smärtinsikter" fallbackHeight="min-h-screen">
+                      <PainPredictionDashboard />
+                    </SectionErrorBoundary>
+                  ) : <Navigate to="/" replace />
               } />
 
               {/* Fallback */}
@@ -439,7 +475,11 @@ function AppContent() {
         )}
         
         {/* GLOBAL AI CHAT COMPONENT */}
-        {program && <AIChat program={program} />}
+        {program && (
+          <ChatErrorBoundary>
+            <AIChat program={program} />
+          </ChatErrorBoundary>
+        )}
       </main>
 
       {/* Footer */}
@@ -482,6 +522,8 @@ export default function App() {
   return (
     <AuthProvider>
       <AppContent />
+      {/* Performance Monitor - only visible in development mode (Ctrl+Shift+P to toggle) */}
+      <PerformanceMonitor position="bottom-right" />
     </AuthProvider>
   );
 }

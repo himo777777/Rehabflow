@@ -1,4 +1,4 @@
-import Groq from "groq-sdk";
+import { z } from "zod";
 import { UserAssessment, GeneratedProgram, Exercise, ExerciseAdjustmentType, WeeklyAnalysis, InjuryType, BodyArea } from "../types";
 import { EXERCISE_DATABASE } from "../data/exerciseDatabase";
 import { ONBOARDING_PROMPTS, RED_FLAGS } from "../data/prompts/onboardingPrompt";
@@ -7,7 +7,9 @@ import {
   getCurrentPhase,
   getPhaseRestrictionsForPrompt,
   getWeightBearingAdvice,
-  POST_OP_PROTOCOLS
+  POST_OP_PROTOCOLS,
+  isExerciseSafe,
+  getPhaseContraindications
 } from "../data/protocols/postOpProtocols";
 import {
   getSourcesByBodyArea,
@@ -46,6 +48,14 @@ import {
   DIGITAL_PROGRAMS
 } from "../data/protocols/digitalPrograms";
 import {
+  buildClinicalContext,
+  getHealingTimeline,
+  getCurrentPhase as getClinicalPhase,
+  getNormalROM,
+  calculateROMDeficit,
+  getGuidelineForCondition
+} from "../data/clinicalKnowledge";
+import {
   getDosingRecommendation,
   generateDosingPrompt,
   DosingParameters
@@ -66,26 +76,132 @@ import {
   getRateLimitErrorMessage
 } from "../lib/rateLimit";
 import { logger } from "../lib/logger";
+import {
+  aiCompletion,
+  aiCompletionStream,
+  withRetry as aiWithRetry
+} from "../lib/aiClient";
 import { PatientPainHistory, SMARTGoal, BaselineAssessmentScore, ExerciseLog, DailyPainLog, FollowUpQuestion, AIQuestionAnswer } from "../types";
-
-// --- API KEY HELPER ---
-const getApiKey = (): string => {
-  // Vite local development uses import.meta.env
-  if (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_GROQ_API_KEY) {
-    return (import.meta as any).env.VITE_GROQ_API_KEY;
-  }
-  logger.warn('No Groq API key found. Set VITE_GROQ_API_KEY in .env.local');
-  return '';
-};
-
-// Initialize the Groq client
-const groq = new Groq({
-  apiKey: getApiKey(),
-  dangerouslyAllowBrowser: true // Required for client-side usage
-});
 
 // Model to use - llama-3.3-70b-versatile is fast and capable
 const MODEL = "llama-3.3-70b-versatile";
+
+// ============================================
+// ZOD SCHEMAS FOR AI RESPONSE VALIDATION
+// ============================================
+
+// Exercise schema - validates AI-generated exercises
+const ExerciseSchema = z.object({
+  name: z.string().min(1, "Exercise name is required"),
+  description: z.string().min(1, "Description is required"),
+  sets: z.number().int().positive().max(20),
+  reps: z.string().min(1),
+  frequency: z.string().min(1),
+  tips: z.string(),
+  category: z.enum(["mobility", "strength", "balance", "endurance"]),
+  risks: z.string().optional(),
+  advancedTips: z.string().optional(),
+  difficulty: z.enum(["Lätt", "Medel", "Svår"]).optional(),
+  calories: z.string().optional(),
+  videoUrl: z.string().url().optional(),
+  evidenceLevel: z.enum(["A", "B", "C", "D", "expert"]).optional(),
+  contraindications: z.array(z.string()).optional(),
+  precautions: z.array(z.string()).optional(),
+  redFlags: z.array(z.string()).optional(),
+  maxPainDuring: z.number().min(0).max(10).optional(),
+  maxPainAfter24h: z.number().min(0).max(10).optional(),
+});
+
+// Patient education schema
+const PatientEducationSchema = z.object({
+  diagnosis: z.string().min(1),
+  explanation: z.string().min(1),
+  pathology: z.string().min(1),
+  prognosis: z.string().min(1),
+  scienceBackground: z.string().min(1),
+  dailyTips: z.array(z.string()),
+  sources: z.array(z.string()),
+});
+
+// Daily plan schema
+const DailyPlanSchema = z.object({
+  day: z.number().int().positive(),
+  focus: z.string().min(1),
+  exercises: z.array(ExerciseSchema),
+});
+
+// Rehab phase schema
+const RehabPhaseSchema = z.object({
+  phaseName: z.string().min(1),
+  durationWeeks: z.string().min(1),
+  description: z.string().min(1),
+  goals: z.array(z.string()),
+  precautions: z.array(z.string()),
+  dailyRoutine: z.array(DailyPlanSchema),
+});
+
+// Full program schema
+const GeneratedProgramSchema = z.object({
+  title: z.string().min(1),
+  summary: z.string().min(1),
+  conditionAnalysis: z.string().min(1),
+  patientEducation: PatientEducationSchema,
+  phases: z.array(RehabPhaseSchema).min(1),
+});
+
+// Weekly analysis schema
+const WeeklyAnalysisSchema = z.object({
+  decision: z.enum(["maintain", "progress", "regress"]),
+  reasoning: z.string().min(1),
+  tips: z.array(z.string()),
+  score: z.number().min(0).max(100),
+});
+
+// Follow-up question schema (for onboarding)
+const FollowUpQuestionSchema = z.object({
+  question: z.string().min(1),
+  type: z.enum(["text", "multiChoice", "scale", "yesNo"]),
+  options: z.array(z.string()).optional(),
+  min: z.number().optional(),
+  max: z.number().optional(),
+  importance: z.enum(["critical", "recommended", "optional"]).optional(),
+  category: z.string().optional(),
+});
+
+// Validate and parse with Zod, returns validated data or null on failure
+function validateWithZod<T>(
+  schema: z.ZodSchema<T>,
+  data: unknown,
+  context: string
+): T | null {
+  const result = schema.safeParse(data);
+  if (result.success) {
+    return result.data;
+  }
+  logger.warn(`Zod validation failed for ${context}:`, { issues: result.error.issues });
+  return null;
+}
+
+// Safe parse with Zod validation - combines JSON parsing with schema validation
+function safeZodParse<T>(
+  text: string,
+  schema: z.ZodSchema<T>,
+  fallback: T,
+  context: string
+): T {
+  try {
+    const parsed = JSON.parse(cleanJson(text));
+    const validated = validateWithZod(schema, parsed, context);
+    if (validated !== null) {
+      return validated;
+    }
+    logger.warn(`Using fallback for ${context} due to validation failure`);
+    return fallback;
+  } catch (e) {
+    logger.error(`JSON parse failed for ${context}:`, e);
+    return fallback;
+  }
+}
 
 // --- CACHE SYSTEM ---
 interface CacheEntry<T> {
@@ -1141,9 +1257,9 @@ const safeJSONParse = <T>(text: string, fallback: T): T => {
   }
 };
 
-// Helper function to generate content using Groq
+// Helper function to generate content using AI proxy
 const generateContent = async (prompt: string, temperature: number = 0.3): Promise<string> => {
-  const completion = await groq.chat.completions.create({
+  return await aiCompletion({
     messages: [
       {
         role: "system",
@@ -1158,8 +1274,6 @@ const generateContent = async (prompt: string, temperature: number = 0.3): Promi
     temperature,
     max_tokens: 8000,
   });
-
-  return completion.choices[0]?.message?.content || "";
 };
 
 export const generateRehabProgram = async (assessment: UserAssessment): Promise<GeneratedProgram> => {
@@ -1441,6 +1555,55 @@ export const generateRehabProgram = async (assessment: UserAssessment): Promise<
     }
   }
 
+  // ============================================
+  // KLINISK KUNSKAPSBAS INTEGRATION
+  // ============================================
+  const clinicalKnowledgeContext = buildClinicalContext(
+    assessment.surgicalDetails?.procedure,
+    daysSinceSurgery ?? undefined,
+    assessment.age,
+    assessment.injuryLocation
+  );
+
+  // ============================================
+  // ROM BASELINE DATA INTEGRATION
+  // ============================================
+  let romDirective = '';
+  if (assessment.baselineROM) {
+    const rom = assessment.baselineROM;
+    const romDetails: string[] = [];
+
+    if (rom.kneeFlexion) {
+      const normalKnee = getNormalROM('knee', 'flexion', assessment.age);
+      const deficitL = normalKnee ? calculateROMDeficit(rom.kneeFlexion.left, normalKnee) : null;
+      const deficitR = normalKnee ? calculateROMDeficit(rom.kneeFlexion.right, normalKnee) : null;
+      romDetails.push(`Knäflexion: V${rom.kneeFlexion.left}°/H${rom.kneeFlexion.right}° (symmetri: ${rom.kneeFlexion.symmetry}%)${deficitL ? ` - V: ${deficitL.severity}, H: ${deficitR?.severity}` : ''}`);
+    }
+    if (rom.hipFlexion) {
+      romDetails.push(`Höftflexion: V${rom.hipFlexion.left}°/H${rom.hipFlexion.right}° (symmetri: ${rom.hipFlexion.symmetry}%)`);
+    }
+    if (rom.shoulderFlexion) {
+      romDetails.push(`Axelflexion: V${rom.shoulderFlexion.left}°/H${rom.shoulderFlexion.right}° (symmetri: ${rom.shoulderFlexion.symmetry}%)`);
+    }
+    if (rom.shoulderAbduction) {
+      romDetails.push(`Axelabduktion: V${rom.shoulderAbduction.left}°/H${rom.shoulderAbduction.right}° (symmetri: ${rom.shoulderAbduction.symmetry}%)`);
+    }
+
+    if (romDetails.length > 0) {
+      romDirective = `
+📊 KAMERAMÄTT ROM-BASELINE (${new Date(rom.assessmentDate).toLocaleDateString('sv-SE')}):
+${romDetails.join('\n')}
+${rom.painDuringTest ? '⚠️ Smärta rapporterades under mätningen' : ''}
+${rom.aiObservations && rom.aiObservations.length > 0 ? `AI-observationer: ${rom.aiObservations.join(', ')}` : ''}
+
+VIKTIGT: Anpassa övningarna efter patientens FAKTISKA rörelseomfång, inte teoretiska normalvärden!
+- Välj övningar som ligger inom patientens ROM
+- Undvik övningar som kräver rörelse utöver uppmätt kapacitet
+- Använd ROM-data för att sätta realistiska progressionsmål
+`;
+    }
+  }
+
   const prompt = `
     Du är ett expertteam av svenska legitimerade fysioterapeuter med specialistkompetens inom ortopedisk rehabilitering och smärtbehandling.
 
@@ -1488,6 +1651,10 @@ export const generateRehabProgram = async (assessment: UserAssessment): Promise<
     ${evidenceDirective}
 
     ${dosingInfo}
+
+    ${clinicalKnowledgeContext ? `KLINISK KUNSKAPSBAS:\n${clinicalKnowledgeContext}` : ''}
+
+    ${romDirective}
 
     KRAV PÅ PROGRAMMET:
     1. Skapa ${phaseCount} distinkta faser med progressiv belastningsökning
@@ -1682,37 +1849,22 @@ export const generateRehabProgram = async (assessment: UserAssessment): Promise<
     }
 
     // ============================================
-    // ⚠️ POST-OP FAS 1 SÄKERHETSFILTER - KRITISKT
+    // ⚠️ PROTOKOLL-BASERAT SÄKERHETSFILTER - KRITISKT
     // ============================================
-    // Filtrerar AKTIVT bort osäkra övningar för post-op patienter i skyddsfasen
-    const isPostOpPhase1 = assessment.injuryType === InjuryType.POST_OP &&
-      daysSinceSurgery !== null &&
-      daysSinceSurgery < 42;
+    // Använder isExerciseSafe() från postOpProtocols för robust validering
+    // Filtrerar ALLA post-op patienter, inte bara Fas 1
 
-    if (isPostOpPhase1 && program.phases) {
-      const procedure = assessment.surgicalDetails?.procedure?.toLowerCase() || '';
-      const isShoulderSurgery = procedure.includes('axel') ||
-        procedure.includes('protes') ||
-        procedure.includes('rotator');
-
-      // Förbjudna nyckelord för post-op Fas 1
-      const forbiddenKeywords = [
-        'vikt', 'vikter', 'tung', 'tungt', 'belastning', 'motstånd',
-        'press', 'lyft', 'styrketräning', 'max', 'explosion',
-        'hopp', 'språng', 'snabb', 'power'
-      ];
-
-      // Extra förbjudet för axeloperation
-      const shoulderForbidden = isShoulderSurgery ? [
-        'overhead', 'över huvudet', 'shoulder press', 'axelpress',
-        'lateral raise', 'sidolyft', 'pullup', 'pull-up', 'chin-up',
-        'rodd', 'rowing', 'extern rotation', 'intern rotation'
-      ] : [];
-
-      const allForbidden = [...forbiddenKeywords, ...shoulderForbidden];
+    if (assessment.injuryType === InjuryType.POST_OP && daysSinceSurgery !== null && program.phases) {
+      const procedure = assessment.surgicalDetails?.procedure || assessment.injuryLocation || '';
+      const protocol = getProtocol(procedure);
+      const currentPhase = protocol ? getCurrentPhase(procedure, daysSinceSurgery) : null;
 
       let removedCount = 0;
       let modifiedCount = 0;
+      const safetyAdjustments: Array<{ original: string; reason: string; replacement?: string }> = [];
+
+      // Hämta tillåtna rörelser från protokollet för att ge säkra alternativ
+      const allowedMovements = currentPhase?.phaseData?.allowedMovements || [];
 
       for (const phase of program.phases) {
         if (!phase.dailyRoutine) continue;
@@ -1720,52 +1872,97 @@ export const generateRehabProgram = async (assessment: UserAssessment): Promise<
         for (const day of phase.dailyRoutine) {
           if (!day.exercises) continue;
 
-          // Filtrera bort osäkra övningar
+          // Filtrera bort osäkra övningar med protokoll-validering
           const safeExercises = day.exercises.filter(exercise => {
-            const name = exercise.name?.toLowerCase() || '';
-            const desc = exercise.description?.toLowerCase() || '';
-            const tips = exercise.advancedTips?.toLowerCase() || '';
-            const combinedText = `${name} ${desc} ${tips}`;
+            const exerciseName = exercise.name || '';
+            const exerciseKeywords = [
+              exerciseName.toLowerCase(),
+              exercise.description?.toLowerCase() || '',
+              ...(exercise.category ? [exercise.category.toLowerCase()] : [])
+            ];
 
-            // Kolla om övningen innehåller förbjudna ord
-            const hasForbidden = allForbidden.some(kw => combinedText.includes(kw));
+            // KRITISK: Använd protokoll-baserad säkerhetskontroll
+            const safetyCheck = isExerciseSafe(
+              exerciseName,
+              exerciseKeywords,
+              procedure,
+              daysSinceSurgery!
+            );
 
-            if (hasForbidden) {
-              logger.warn(`⚠️ SÄKERHET: Tar bort osäker övning för post-op Fas 1: ${exercise.name}`);
+            if (!safetyCheck.safe) {
+              logger.warn(`🚨 SÄKERHET: Blockerar övning "${exerciseName}" - ${safetyCheck.reason}`);
+              safetyAdjustments.push({
+                original: exerciseName,
+                reason: safetyCheck.reason || 'Kontraindicerad för nuvarande fas'
+              });
               removedCount++;
               return false;
             }
+
+            // Extra säkerhetskontroll: Generella förbjudna nyckelord
+            const name = exerciseName.toLowerCase();
+            const desc = (exercise.description || '').toLowerCase();
+            const combinedText = `${name} ${desc}`;
+
+            // Tidiga faser (< 42 dagar): Extra restriktivt
+            if (daysSinceSurgery < 42) {
+              const phase1Forbidden = [
+                'vikt', 'vikter', 'tung', 'tungt', 'belastning', 'motstånd',
+                'press', 'lyft', 'styrketräning', 'max', 'explosion',
+                'hopp', 'språng', 'snabb', 'power', 'plyometrisk'
+              ];
+
+              const hasForbidden = phase1Forbidden.some(kw => combinedText.includes(kw));
+              if (hasForbidden) {
+                logger.warn(`🚨 SÄKERHET: Blockerar "${exerciseName}" - innehåller förbjudet nyckelord i tidig fas`);
+                safetyAdjustments.push({
+                  original: exerciseName,
+                  reason: 'Innehåller förbjudet nyckelord för tidig postoperativ fas'
+                });
+                removedCount++;
+                return false;
+              }
+            }
+
             return true;
           });
 
-          // Modifiera kvarvarande övningar till ROM-only
+          // Modifiera kvarvarande övningar baserat på fas
           for (const exercise of safeExercises) {
-            // Ta bort alla vikter/sets som antyder belastning
-            if (exercise.sets && exercise.sets > 1) {
-              exercise.sets = 1;
-              modifiedCount++;
+            // Fas 1 (0-14 dagar): Endast ROM, inga sets
+            if (daysSinceSurgery < 14) {
+              if (exercise.sets && exercise.sets > 1) {
+                exercise.sets = 1;
+                modifiedCount++;
+              }
+              if (exercise.reps && !exercise.reps.toLowerCase().includes('rom')) {
+                exercise.reps = 'ROM: Smärtfri rörelse';
+                modifiedCount++;
+              }
+              const romWarning = `⚠️ FAS 1 (Dag ${daysSinceSurgery}): Endast smärtfri rörelseträning utan belastning.`;
+              if (!exercise.tips?.includes('FAS 1')) {
+                exercise.tips = exercise.tips ? `${romWarning} ${exercise.tips}` : romWarning;
+              }
+            }
+            // Fas 2 (14-42 dagar): Lätt träning
+            else if (daysSinceSurgery < 42) {
+              if (exercise.sets && exercise.sets > 2) {
+                exercise.sets = 2;
+                modifiedCount++;
+              }
+              const phase2Warning = `⚠️ FAS 2 (Dag ${daysSinceSurgery}): Lätt träning utan tungt motstånd.`;
+              if (!exercise.tips?.includes('FAS 2')) {
+                exercise.tips = exercise.tips ? `${phase2Warning} ${exercise.tips}` : phase2Warning;
+              }
             }
 
-            // Ändra reps till ROM-beskrivning
-            if (exercise.reps && !exercise.reps.toLowerCase().includes('rom')) {
-              exercise.reps = 'ROM: Smärtfri rörelse';
-              modifiedCount++;
-            }
-
-            // Lägg till varning i tips
-            const romWarning = '⚠️ POST-OP FAS 1: Endast smärtfri rörelseträning utan belastning.';
-            if (exercise.tips && !exercise.tips.includes('POST-OP')) {
-              exercise.tips = `${romWarning} ${exercise.tips}`;
-            } else if (!exercise.tips) {
-              exercise.tips = romWarning;
-            }
-
-            // Rensa advancedTips från farliga förslag
+            // Rensa advancedTips från farliga förslag (alla faser)
             if (exercise.advancedTips) {
               exercise.advancedTips = exercise.advancedTips
                 .replace(/lägg till.*vikt/gi, '')
                 .replace(/öka.*belastning/gi, '')
                 .replace(/använd.*motstånd/gi, '')
+                .replace(/öka.*intensitet/gi, '')
                 .trim();
             }
           }
@@ -1774,11 +1971,17 @@ export const generateRehabProgram = async (assessment: UserAssessment): Promise<
         }
       }
 
-      logger.info(`🔒 Post-op Fas 1 säkerhetsfilter tillämpat`, {
+      // Spara säkerhetsjusteringar i programmet för UI-feedback
+      (program as any).safetyAdjustments = safetyAdjustments;
+
+      logger.info(`🔒 Protokoll-baserat säkerhetsfilter tillämpat`, {
+        protocol: protocol?.name || 'Generellt',
+        phase: currentPhase?.phase || 'Okänd',
         removedExercises: removedCount,
         modifiedExercises: modifiedCount,
-        procedure: assessment.surgicalDetails?.procedure,
-        daysSinceSurgery
+        procedure,
+        daysSinceSurgery,
+        adjustments: safetyAdjustments.length > 0 ? safetyAdjustments.slice(0, 5) : 'Inga'
       });
     }
 
@@ -2638,13 +2841,13 @@ Svara kortfattat på Svenska (max 3-4 meningar).`;
   ];
 
   try {
-    const completion = await withRetry(() => groq.chat.completions.create({
+    const response = await aiWithRetry(() => aiCompletion({
       messages,
       model: MODEL,
       temperature: 0.7,
       max_tokens: 500,
     }));
-    return completion.choices[0]?.message?.content || "Ursäkta, något gick fel. Försök igen.";
+    return response || "Ursäkta, något gick fel. Försök igen.";
   } catch (e) {
     logger.error("Chat failed", e);
     return "Något gick fel med anslutningen. Försök igen om en stund.";
@@ -2675,27 +2878,17 @@ Använd enkel svenska som patienten lätt förstår.`;
     }))
   ];
 
-  let fullResponse = "";
-
   try {
-    const stream = await withRetry(() => groq.chat.completions.create({
+    const response = await aiCompletionStream({
       messages,
       model: MODEL,
       temperature: 0.7,
       max_tokens: 800,
-      stream: true,
-    }));
+      onChunk,
+      onComplete,
+    });
 
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content || "";
-      if (content) {
-        fullResponse += content;
-        onChunk(content);
-      }
-    }
-
-    onComplete?.();
-    return fullResponse || "Ursäkta, något gick fel. Försök igen.";
+    return response || "Ursäkta, något gick fel. Försök igen.";
   } catch (e) {
     logger.error("Streaming chat failed", e);
     onComplete?.();
@@ -3283,30 +3476,21 @@ GÖR EN TYDLIG SAMMANFATTNING och fråga:
     }))
   ];
 
-  let fullResponse = "";
-
   try {
-    const stream = await withRetry(() => groq.chat.completions.create({
+    const response = await aiCompletionStream({
       messages,
       model: MODEL,
       temperature: 0.7,
       max_tokens: 1000,
-      stream: true,
-    }));
-
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content || "";
-      if (content) {
-        fullResponse += content;
-        onChunk(content);
-      }
-    }
-
-    onComplete?.();
-    onStateUpdate?.(updatedState);
+      onChunk,
+      onComplete: () => {
+        onComplete?.();
+        onStateUpdate?.(updatedState);
+      },
+    });
 
     return {
-      response: fullResponse || "Ursäkta, något gick fel. Försök igen.",
+      response: response || "Ursäkta, något gick fel. Försök igen.",
       updatedState
     };
   } catch (e) {
@@ -3477,13 +3661,13 @@ export const summarizeConversation = async (
   `;
 
   try {
-    const completion = await withRetry(() => groq.chat.completions.create({
+    const response = await aiWithRetry(() => aiCompletion({
       messages: [{ role: "user", content: prompt }],
       model: MODEL,
       temperature: 0.3,
       max_tokens: 200,
     }));
-    return completion.choices[0]?.message?.content || "";
+    return response || "";
   } catch (e) {
     logger.error("Failed to summarize conversation", e);
     return "";
@@ -3635,10 +3819,10 @@ const buildPatientContext = (
 
   // Livsstilsfaktorer
   if (assessment.lifestyle) {
-    if (assessment.lifestyle.stressLevel === 'Hög' || assessment.lifestyle.stressLevel === 'Mycket hög') {
+    if (assessment.lifestyle.stress === 'Hög') {
       parts.push('Rapporterar HÖG STRESS - överväg psykosociala faktorer.');
     }
-    if (assessment.lifestyle.sleepQuality === 'Dålig') {
+    if (assessment.lifestyle.sleep === 'Dålig') {
       parts.push('Sover DÅLIGT - kan påverka smärtupplevelse och läkning.');
     }
     if (assessment.lifestyle.fearAvoidance) {
@@ -3647,13 +3831,13 @@ const buildPatientContext = (
   }
 
   // Tidigare behandling
-  if (assessment.previousTreatment && assessment.previousTreatment.length > 0) {
-    parts.push(`Har provat: ${assessment.previousTreatment.join(', ')}.`);
+  if (assessment.painHistory?.previousTreatments && assessment.painHistory.previousTreatments.length > 0) {
+    parts.push(`Har provat: ${assessment.painHistory.previousTreatments.join(', ')}.`);
   }
 
   // Mål
-  if (assessment.goals && assessment.goals.length > 0) {
-    parts.push(`Patientens mål: ${assessment.goals.join(', ')}.`);
+  if (assessment.goals) {
+    parts.push(`Patientens mål: ${assessment.goals}.`);
   }
 
   return parts.join('\n');
@@ -3768,7 +3952,7 @@ export const generateFollowUpQuestions = async (
 
   const bodyPart = mapBodyPartToSwedish(assessment.injuryLocation || 'okänd');
   const injuryType = assessment.injuryType || 'kronisk';
-  const age = assessment.age || 'okänd ålder';
+  const age = assessment.age ? String(assessment.age) : 'okänd ålder';
   const activityLevel = assessment.activityLevel || 'okänd aktivitetsnivå';
   const workload = assessment.lifestyle?.workload || 'okänd';
 

@@ -123,11 +123,29 @@ export const AXELPROTES: PostOpProtocol = {
         'handled_rotation'
       ],
       forbiddenMovements: [
+        // Anatomiska rörelser
         'aktiv_abduktion',
+        'abduktion',
         'extern_rotation',
+        'intern_rotation',
+        'flexion',
+        'axelflexion',
+        // Aktiviteter
         'lyft_över_axelhöjd',
+        'lyft',
+        'armlyft',
+        'sidolyft',
         'armhävningar',
-        'dragningar'
+        'dragningar',
+        'press',
+        'rodd',
+        // Svenska AI-termer
+        'axelrörelse',
+        'höja_armen',
+        'lyfta_armen',
+        'styrketräning',
+        'motstånd',
+        'vikt'
       ],
       goals: [
         'Smärtlindring',
@@ -228,15 +246,39 @@ export const AXELPROTES: PostOpProtocol = {
   },
 
   excludeKeywords: [
+    // Engelska termer
     'overhead',
     'press',
     'push_up',
     'pullup',
+    'pull_up',
+    'chin_up',
     'kast',
     'swing',
     'snatch',
     'clean',
-    'jerk'
+    'jerk',
+    'lateral_raise',
+    'front_raise',
+    'shoulder_press',
+    'military_press',
+    'rowing',
+    // Svenska termer - KRITISKT för AI-genererade övningar
+    'axelflexion',
+    'axel_flexion',
+    'flexion',
+    'abduktion',
+    'sidolyft',
+    'lyft',
+    'höjning',
+    'armlyft',
+    'rotation',
+    'rotera',
+    'vikt',
+    'belastning',
+    'motstånd',
+    'styrketräning',
+    'styrka'
   ],
 
   weightBearingProgression: {
@@ -391,12 +433,39 @@ export const ROTATORKUFFSUTUR: PostOpProtocol = {
   },
 
   excludeKeywords: [
+    // Engelska termer
     'press',
     'pullup',
+    'pull_up',
+    'chin_up',
     'kast',
     'overhead',
     'push_up',
-    'rotation_mot_motstånd'
+    'rotation_mot_motstånd',
+    'lateral_raise',
+    'front_raise',
+    'shoulder_press',
+    'rowing',
+    // Svenska termer - KRITISKT för AI-genererade övningar
+    'axelflexion',
+    'axel_flexion',
+    'flexion',
+    'abduktion',
+    'sidolyft',
+    'lyft',
+    'höjning',
+    'armlyft',
+    'rotation',
+    'rotera',
+    'vikt',
+    'belastning',
+    'motstånd',
+    'styrketräning',
+    'styrka',
+    // Extra strikta för rotatorkuff (sutur måste skyddas)
+    'aktiv_axelrörelse',
+    'extern_rotation',
+    'intern_rotation'
   ],
 
   weightBearingProgression: {
@@ -1395,6 +1464,230 @@ export const SPONDYLODES: PostOpProtocol = {
 };
 
 // ============================================
+// HALSRYGG / NACKE
+// ============================================
+
+export const HALSRYGG_DISKBRACKSOPERATION: PostOpProtocol = {
+  id: 'halsrygg_diskbrack',
+  name: 'Halsryggsdiskbråck operation (ACDF)',
+  englishName: 'Anterior Cervical Discectomy and Fusion',
+  bodyArea: 'nacke',
+  description: 'Operation för diskbråck i halsryggen med fusion. Kräver strikta nackrörelserestriktioner.',
+
+  phases: {
+    1: {
+      weeks: '0-6',
+      daysStart: 0,
+      daysEnd: 42,
+      restrictions: ['halskrage_obligatorisk', 'ingen_nackrotation', 'ingen_flexion', 'ingen_extension'],
+      allowedMovements: ['gång', 'andningsövningar', 'axelrullningar_försiktigt'],
+      forbiddenMovements: ['nackrotation', 'nackflexion', 'nackextension', 'vridning', 'huvudvridning', 'nickning', 'tunga_lyft'],
+      goals: ['Läkning av fusion', 'Smärtkontroll', 'Behålla allmän funktion'],
+      precautions: ['Använd halskrage enligt ordination', 'Undvik bilkörning']
+    },
+    2: {
+      weeks: '6-12',
+      daysStart: 43,
+      daysEnd: 84,
+      restrictions: ['försiktig_mobilisering', 'ingen_belastning'],
+      allowedMovements: ['lätt_nackrörlighet', 'isometrisk_styrketräning', 'gång'],
+      forbiddenMovements: ['kraftig_rotation', 'tunga_lyft', 'kontaktsporter'],
+      goals: ['Gradvis ökad rörlighet', 'Bibehålla nackmuskelfunktion'],
+      precautions: ['Gradvis ökning av aktivitet']
+    },
+    3: {
+      weeks: '12+',
+      daysStart: 85,
+      daysEnd: null,
+      restrictions: [],
+      allowedMovements: ['normal_nackrörlighet', 'styrketräning_gradvis'],
+      forbiddenMovements: ['extrem_rotation', 'kontaktsporter_tills_godkänd'],
+      goals: ['Full återhämtning', 'Återgång till normala aktiviteter'],
+      precautions: ['Lyssna på kroppens signaler']
+    }
+  },
+
+  absoluteContraindications: ['nackrotation_forcerad', 'tunga_lyft_över_5kg'],
+  relativeContraindications: ['bilkörning_tidigt', 'kontorsstol_utan_stöd'],
+  forbiddenExerciseTypes: {
+    phase1: ['stärkning', 'plyometri'],
+    phase2: ['stärkning'],
+    phase3: []
+  },
+  excludeKeywords: ['nackvridning', 'huvudvridning', 'nackning', 'nackflex', 'nackextension', 'yoga_nacke', 'axelstående'],
+  weightBearingProgression: { phase1: 'Avlastad', phase2: 'Partiell', phase3: 'Fullt' },
+  requiresSupervision: { phase1: true, phase2: true, phase3: false },
+  redFlags: ['armdomningar', 'svaghet_i_händer', 'balanssvårigheter', 'blåstömningsproblem'],
+  expectedRecoveryWeeks: 16,
+  sources: ['SOF Cervicalriktlinjer', 'North American Spine Society']
+};
+
+// ============================================
+// ARMBÅGE
+// ============================================
+
+export const ARMBAGSPROTES: PostOpProtocol = {
+  id: 'armbagsprotes',
+  name: 'Armbågsprotes (Total Elbow Arthroplasty)',
+  englishName: 'Total Elbow Arthroplasty',
+  bodyArea: 'armbåge',
+  description: 'Total ersättning av armbågsleden med protes. Kräver strikta lyftrestriktioner livet ut.',
+
+  phases: {
+    1: {
+      weeks: '0-6',
+      daysStart: 0,
+      daysEnd: 42,
+      restrictions: ['ingen_belastning', 'ingen_lyft', 'mitella'],
+      allowedMovements: ['fingerrörelser', 'handledscirklar', 'axelrörelser_försiktigt'],
+      forbiddenMovements: ['armböjning_mot_motstånd', 'armsträckning', 'pronation', 'supination', 'lyft', 'drag', 'stöd'],
+      goals: ['Läkning', 'Ödemreduktion', 'Behålla hand/axelfunktion'],
+      precautions: ['Absolut ingen belastning', 'Mitella vid vila']
+    },
+    2: {
+      weeks: '6-12',
+      daysStart: 43,
+      daysEnd: 84,
+      restrictions: ['max_1kg_lyft', 'ingen_repetitiv_belastning'],
+      allowedMovements: ['aktiv_armrörelse_utan_vikt', 'lätt_styrketräning_hand'],
+      forbiddenMovements: ['lyft_över_1kg', 'stödja_på_armbåge', 'push_pull'],
+      goals: ['Gradvis ökad rörlighet', 'Lätt funktionsträning'],
+      precautions: ['Begränsa lyft till 1kg']
+    },
+    3: {
+      weeks: '12+',
+      daysStart: 85,
+      daysEnd: null,
+      restrictions: ['livslång_lyftrestriktion_max_5kg'],
+      allowedMovements: ['normal_armrörelse', 'lätt_vardagsaktivitet'],
+      forbiddenMovements: ['tunga_lyft', 'stöta_på_armbåge', 'golf', 'tennis'],
+      goals: ['Fungerande vardagsfunktion', 'Smärtfrihet'],
+      precautions: ['LIVSLÅNG restriktion: Max 5kg lyft med opererad arm']
+    }
+  },
+
+  absoluteContraindications: ['tunga_lyft', 'kontaktsporter', 'stödja_på_armbåge'],
+  relativeContraindications: ['golf', 'tennis', 'repetitiv_belastning'],
+  forbiddenExerciseTypes: { phase1: ['stärkning', 'plyometri', 'stabilitet'], phase2: ['stärkning', 'plyometri'], phase3: ['stärkning'] },
+  excludeKeywords: ['armhävning', 'bicepscurl', 'tricepspress', 'push-up', 'planka', 'rodd', 'pull', 'lyft_armbåge'],
+  weightBearingProgression: { phase1: 'Avlastad', phase2: 'Partiell', phase3: 'Partiell' },
+  requiresSupervision: { phase1: true, phase2: true, phase3: false },
+  redFlags: ['ökad svullnad', 'instabilitet', 'nervskador_hand', 'infektion'],
+  expectedRecoveryWeeks: 16,
+  sources: ['Mayo Clinic TEA Protocol', 'AAOS Elbow Guidelines']
+};
+
+// ============================================
+// HANDLED
+// ============================================
+
+export const HANDLEDSFRAKTUR_ORIF: PostOpProtocol = {
+  id: 'handledsfraktur',
+  name: 'Handledsfraktur med platta (ORIF)',
+  englishName: 'Distal Radius Fracture ORIF',
+  bodyArea: 'handled',
+  description: 'Operativ fixering av handledsfraktur. Kräver immobilisering följt av gradvis mobilisering.',
+
+  phases: {
+    1: {
+      weeks: '0-6',
+      daysStart: 0,
+      daysEnd: 42,
+      restrictions: ['gips_eller_skena', 'ingen_belastning', 'ingen_vridning'],
+      allowedMovements: ['fingerrörelser', 'armbågsrörelser', 'axelrörelser'],
+      forbiddenMovements: ['handled_flexion', 'handled_extension', 'greppstyrka', 'vridning', 'lyft'],
+      goals: ['Frakturläkning', 'Behålla fingerrörlighet', 'Ödemkontroll'],
+      precautions: ['Elevation vid vila', 'Fingerträning viktigt']
+    },
+    2: {
+      weeks: '6-10',
+      daysStart: 43,
+      daysEnd: 70,
+      restrictions: ['försiktig_mobilisering', 'ingen_tung_belastning'],
+      allowedMovements: ['aktiv_handledsrörelse', 'lätt_greppträning', 'supination_pronation'],
+      forbiddenMovements: ['tung_belastning', 'stöd_på_hand', 'yoga_plankor'],
+      goals: ['Återfå handledsrörlighet', 'Påbörja styrketräning'],
+      precautions: ['Gradvis ökning', 'Smärta = stoppsignal']
+    },
+    3: {
+      weeks: '10+',
+      daysStart: 71,
+      daysEnd: null,
+      restrictions: [],
+      allowedMovements: ['full_handledsrörelse', 'styrketräning'],
+      forbiddenMovements: [],
+      goals: ['Full funktion', 'Återgång till aktiviteter'],
+      precautions: ['Kan ta 6-12 månader till full styrka']
+    }
+  },
+
+  absoluteContraindications: ['stöd_på_hand_tidigt', 'tung_lyft_under_läkning'],
+  relativeContraindications: ['yoga_med_handstöd', 'cykling_med_grepp'],
+  forbiddenExerciseTypes: { phase1: ['stärkning', 'stabilitet'], phase2: ['stärkning'], phase3: [] },
+  excludeKeywords: ['push-up', 'planka', 'greppövning', 'handledscirklar_tidig', 'handstående'],
+  weightBearingProgression: { phase1: 'Avlastad', phase2: 'Partiell', phase3: 'Fullt' },
+  requiresSupervision: { phase1: false, phase2: true, phase3: false },
+  redFlags: ['kraftig_svullnad', 'domning_fingrar', 'infektion', 'karpaltunnelsymtom'],
+  expectedRecoveryWeeks: 12,
+  sources: ['AAOS Distal Radius Guidelines', 'Handkirurgföreningen']
+};
+
+// ============================================
+// FOTLED
+// ============================================
+
+export const FOTLEDSFRAKTUR_ORIF: PostOpProtocol = {
+  id: 'fotledsfraktur',
+  name: 'Fotledsfraktur med platta (ORIF)',
+  englishName: 'Ankle Fracture ORIF',
+  bodyArea: 'fotled',
+  description: 'Operativ fixering av fotledsfraktur. Kräver avlastning följt av progressiv belastning.',
+
+  phases: {
+    1: {
+      weeks: '0-6',
+      daysStart: 0,
+      daysEnd: 42,
+      restrictions: ['ingen_belastning', 'gips_walker', 'kryckor_obligatoriskt'],
+      allowedMovements: ['tåspretning', 'knärörelser', 'höftrörelser', 'överkroppsträning'],
+      forbiddenMovements: ['gång_utan_hjälpmedel', 'belastning', 'hopp', 'trappgång', 'fotledsrörelser'],
+      goals: ['Frakturläkning', 'Bibehålla muskelstyrka ben', 'Ödemkontroll'],
+      precautions: ['Strikt avlastning', 'Elevation', 'Trombosprofylax enligt ordination']
+    },
+    2: {
+      weeks: '6-10',
+      daysStart: 43,
+      daysEnd: 70,
+      restrictions: ['partiell_belastning', 'walker_boot'],
+      allowedMovements: ['fotledsrörelse_passiv', 'partiell_gång', 'cykel_utan_motstånd'],
+      forbiddenMovements: ['full_belastning', 'hopp', 'löpning', 'trappgång_utan_stöd'],
+      goals: ['Gradvis ökad belastning', 'Återfå fotledsrörlighet'],
+      precautions: ['Gradvis ökning 25% per vecka', 'Följ viktbärandeprotokoll']
+    },
+    3: {
+      weeks: '10+',
+      daysStart: 71,
+      daysEnd: null,
+      restrictions: [],
+      allowedMovements: ['full_gång', 'balanträning', 'styrketräning_gradvis'],
+      forbiddenMovements: ['kontaktsporter_utan_godkännande'],
+      goals: ['Full belastning', 'Återgång till aktiviteter'],
+      precautions: ['Balanträning viktigt', 'Löpning tidigast 12 veckor']
+    }
+  },
+
+  absoluteContraindications: ['belastning_utan_godkännande', 'hopp_tidigt'],
+  relativeContraindications: ['gång_på_ojämnt_underlag', 'längre_promenader_tidigt'],
+  forbiddenExerciseTypes: { phase1: ['stabilitet', 'plyometri'], phase2: ['plyometri'], phase3: [] },
+  excludeKeywords: ['gång', 'promenad', 'hopp', 'löpning', 'trappor', 'stående_på_ett_ben', 'calf_raises_tidigt'],
+  weightBearingProgression: { phase1: 'Avlastad', phase2: 'Partiell', phase3: 'Fullt' },
+  requiresSupervision: { phase1: false, phase2: true, phase3: false },
+  redFlags: ['kraftig_svullnad', 'missfärgning', 'extrem_smärta', 'feber', 'vadsmärta_DVT'],
+  expectedRecoveryWeeks: 16,
+  sources: ['AAOS Ankle Fracture Guidelines', 'Svensk Ortopedisk Förening']
+};
+
+// ============================================
 // SAMLAD PROTOKOLL-DATABAS
 // ============================================
 
@@ -1435,7 +1728,40 @@ export const POST_OP_PROTOCOLS: Record<string, PostOpProtocol> = {
   'spondylodes': SPONDYLODES,
   'ryggsteloperation': SPONDYLODES,
   'spinal_fusion': SPONDYLODES,
-  'fusion': SPONDYLODES
+  'fusion': SPONDYLODES,
+
+  // Nacke / Halsrygg
+  'halsrygg': HALSRYGG_DISKBRACKSOPERATION,
+  'halsrygg_diskbrack': HALSRYGG_DISKBRACKSOPERATION,
+  'nacke': HALSRYGG_DISKBRACKSOPERATION,
+  'nackoperation': HALSRYGG_DISKBRACKSOPERATION,
+  'acdf': HALSRYGG_DISKBRACKSOPERATION,
+  'cervical': HALSRYGG_DISKBRACKSOPERATION,
+  'cervical_fusion': HALSRYGG_DISKBRACKSOPERATION,
+
+  // Armbåge
+  'armbagsprotes': ARMBAGSPROTES,
+  'armbågsprotes': ARMBAGSPROTES,
+  'armbåge': ARMBAGSPROTES,
+  'armbågsoperation': ARMBAGSPROTES,
+  'elbow_replacement': ARMBAGSPROTES,
+  'tea': ARMBAGSPROTES,
+
+  // Handled
+  'handledsfraktur': HANDLEDSFRAKTUR_ORIF,
+  'handled': HANDLEDSFRAKTUR_ORIF,
+  'handledsoperation': HANDLEDSFRAKTUR_ORIF,
+  'distal_radius': HANDLEDSFRAKTUR_ORIF,
+  'radiusfraktur': HANDLEDSFRAKTUR_ORIF,
+  'colles': HANDLEDSFRAKTUR_ORIF,
+
+  // Fotled
+  'fotledsfraktur': FOTLEDSFRAKTUR_ORIF,
+  'fotled': FOTLEDSFRAKTUR_ORIF,
+  'fotledsoperation': FOTLEDSFRAKTUR_ORIF,
+  'ankle_fracture': FOTLEDSFRAKTUR_ORIF,
+  'malleol': FOTLEDSFRAKTUR_ORIF,
+  'vrist': FOTLEDSFRAKTUR_ORIF
 };
 
 // ============================================

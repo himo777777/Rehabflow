@@ -1,6 +1,9 @@
-import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { UserAssessment, InjuryType, PatientPainHistory, SMARTGoal, BaselineAssessmentScore, FollowUpQuestion, AIQuestionAnswer } from '../types';
+import React, { useState, useRef, useMemo, useEffect, lazy, Suspense } from 'react';
+import { UserAssessment, InjuryType, PatientPainHistory, SMARTGoal, BaselineAssessmentScore, FollowUpQuestion, AIQuestionAnswer, BaselineROM } from '../types';
 import { generateFollowUpQuestions, shouldShowTSK11, generateAssessmentSummary } from '../services/geminiService';
+
+// Lazy load ROM Assessment for optional camera-based measurement
+const ROMAssessment = lazy(() => import('./ROMAssessment'));
 import {
   User, ShieldCheck,
   Activity as Pulse, Zap, Target,
@@ -702,6 +705,12 @@ const Onboarding: React.FC<OnboardingProps> = ({ onSubmit, isLoading }) => {
 
   // State för att spåra senast skippade steg (för feedback)
   const [lastSkippedStep, setLastSkippedStep] = useState<number | null>(null);
+
+  // ROM Assessment state (optional camera-based measurement)
+  const [showROMOffer, setShowROMOffer] = useState(false);
+  const [showROMAssessment, setShowROMAssessment] = useState(false);
+  const [romBaseline, setRomBaseline] = useState<BaselineROM | null>(null);
+  const [romDeclined, setRomDeclined] = useState(false);
 
   // Simplified step navigation - no skipping with AI-driven flow
   const handleNext = () => {
@@ -2871,10 +2880,16 @@ const Onboarding: React.FC<OnboardingProps> = ({ onSubmit, isLoading }) => {
             ) : (
                 <button
                     onClick={() => {
+                        // Show ROM offer if not already done or declined
+                        if (!romBaseline && !romDeclined) {
+                            setShowROMOffer(true);
+                            return;
+                        }
                         // Include AI assessment data in the submission
                         const updatedData: UserAssessment = {
                             ...data,
                             goals: data.smartGoal?.specific || data.goals,
+                            baselineROM: romBaseline || undefined,
                             // Store AI assessment answers
                             aiAssessment: {
                                 questions: aiAnswers.map(a => ({
@@ -2896,6 +2911,120 @@ const Onboarding: React.FC<OnboardingProps> = ({ onSubmit, isLoading }) => {
             )}
         </div>
       </div>
+
+      {/* ROM Offer Modal - Optional camera-based measurement */}
+      {showROMOffer && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Pulse className="w-8 h-8 text-blue-600" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">
+                Vill du mäta din rörlighet?
+              </h3>
+              <p className="text-slate-600 mb-6">
+                Med kameran kan vi mäta din nuvarande rörlighet och följa dina framsteg över tid.
+                Detta är helt valfritt och tar cirka 2-3 minuter.
+              </p>
+
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={() => {
+                    setShowROMOffer(false);
+                    setShowROMAssessment(true);
+                  }}
+                  className="w-full py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-semibold transition-colors flex items-center justify-center gap-2"
+                >
+                  <Scan className="w-5 h-5" />
+                  Ja, mät min rörlighet
+                </button>
+                <button
+                  onClick={() => {
+                    setShowROMOffer(false);
+                    setRomDeclined(true);
+                    // Proceed with submission
+                    const updatedData: UserAssessment = {
+                      ...data,
+                      goals: data.smartGoal?.specific || data.goals,
+                      aiAssessment: {
+                        questions: aiAnswers.map(a => ({
+                          id: a.questionId,
+                          question: a.question,
+                          answer: a.answer
+                        })),
+                        completedAt: new Date().toISOString()
+                      }
+                    };
+                    onSubmit(updatedData);
+                  }}
+                  className="w-full py-3 text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl font-medium transition-colors"
+                >
+                  Nej tack, hoppa över
+                </button>
+              </div>
+
+              <p className="text-xs text-slate-400 mt-4">
+                Du kan alltid göra detta senare i appen
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ROM Assessment Component */}
+      {showROMAssessment && (
+        <Suspense fallback={
+          <div className="fixed inset-0 bg-white z-50 flex items-center justify-center">
+            <div className="text-center">
+              <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+              <p className="text-slate-600">Laddar rörlighetsmätning...</p>
+            </div>
+          </div>
+        }>
+          <ROMAssessment
+            patientAge={data.age}
+            injuryLocation={data.injuryLocation}
+            onComplete={(baseline) => {
+              setRomBaseline(baseline);
+              setShowROMAssessment(false);
+              // Proceed with submission including ROM data
+              const updatedData: UserAssessment = {
+                ...data,
+                goals: data.smartGoal?.specific || data.goals,
+                baselineROM: baseline,
+                aiAssessment: {
+                  questions: aiAnswers.map(a => ({
+                    id: a.questionId,
+                    question: a.question,
+                    answer: a.answer
+                  })),
+                  completedAt: new Date().toISOString()
+                }
+              };
+              onSubmit(updatedData);
+            }}
+            onSkip={() => {
+              setShowROMAssessment(false);
+              setRomDeclined(true);
+              // Proceed with submission without ROM
+              const updatedData: UserAssessment = {
+                ...data,
+                goals: data.smartGoal?.specific || data.goals,
+                aiAssessment: {
+                  questions: aiAnswers.map(a => ({
+                    id: a.questionId,
+                    question: a.question,
+                    answer: a.answer
+                  })),
+                  completedAt: new Date().toISOString()
+                }
+              };
+              onSubmit(updatedData);
+            }}
+          />
+        </Suspense>
+      )}
     </>
   );
 };

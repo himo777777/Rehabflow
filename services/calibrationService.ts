@@ -411,6 +411,15 @@ export class ThresholdCalculator {
 
 /**
  * Get default calibration data if no calibration is available
+ *
+ * FAS 9: Uppdaterade värden baserat på antropometrisk data
+ * Tidigare värden var orealistiska och gav felaktig baseline
+ *
+ * Anatomiska normalvärden:
+ * - Armbåge extended: 160-165° (inte 170°)
+ * - Knä extended: 170-180° (175° är ok)
+ * - Höft i stående: 168-176° (175° är ok)
+ * - Axel vid sidan: 20-30° (30° är ok)
  */
 export function getDefaultCalibration(): CalibrationData {
   return {
@@ -419,12 +428,45 @@ export function getDefaultCalibration(): CalibrationData {
     armLength: 0.4,
     legLength: 0.5,
     neutralJointAngles: {
-      leftElbow: 170,
-      rightElbow: 170,
-      leftShoulder: 30,
-      rightShoulder: 30,
-      leftHip: 175,
-      rightHip: 175,
+      // FAS 9: Realistiska anatomiska värden
+      leftElbow: 162,      // Normalt 160-165° (var 170°)
+      rightElbow: 162,
+      leftShoulder: 25,    // Normalt 20-30° vid sidan
+      rightShoulder: 25,
+      leftHip: 172,        // Normalt 168-176° (var 175°)
+      rightHip: 172,
+      leftKnee: 175,       // Normalt 170-180° - ok
+      rightKnee: 175,
+    },
+    capturedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * FAS 9: Generera kalibrering baserat på längd
+ * Ger mer realistiska proportioner för olika kroppslängder
+ */
+export function getCalibrationForHeight(heightCm: number): CalibrationData {
+  // Normalisera höjd till 0-1 skala (antar 150-200cm range)
+  const normalizedHeight = Math.max(0.4, Math.min(0.8, (heightCm - 100) / 150));
+
+  // Antropometriska proportioner baserat på höjd
+  const shoulderWidth = normalizedHeight * 0.42;  // ~42% av normaliserad höjd
+  const armLength = heightCm * 0.0036;            // Arm ≈ 36% av höjd
+  const legLength = heightCm * 0.0048;            // Ben ≈ 48% av höjd
+
+  return {
+    standingHeight: normalizedHeight,
+    shoulderWidth,
+    armLength,
+    legLength,
+    neutralJointAngles: {
+      leftElbow: 162,
+      rightElbow: 162,
+      leftShoulder: 25,
+      rightShoulder: 25,
+      leftHip: 172,
+      rightHip: 172,
       leftKnee: 175,
       rightKnee: 175,
     },

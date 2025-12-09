@@ -1,10 +1,8 @@
 
 import React, { useEffect, useRef, useState, useMemo, useCallback, lazy, Suspense } from 'react';
 import { X, RefreshCw, AlertTriangle, Activity, BrainCircuit, Layers, Zap, Trophy, Timer, ScanLine, Target, Loader2, Pause, Play, FlipHorizontal } from 'lucide-react';
-// Use namespace imports to handle potential ESM/CJS interop issues with MediaPipe
-import * as poseLib from '@mediapipe/pose';
-import * as cameraUtils from '@mediapipe/camera_utils';
-import * as drawingUtils from '@mediapipe/drawing_utils';
+// Lazy load MediaPipe modules for better initial bundle size
+import { loadMediaPipeModules, MediaPipeModules } from '../services/lazyMediaPipe';
 
 // Import movement analysis services
 import { PoseReconstructor, getPoseReconstructor, JointAngle3D } from '../services/poseReconstruction';
@@ -16,6 +14,26 @@ import ExerciseSummary from './ExerciseSummary';
 import { RepScore, FormIssue, RepPhase, MovementSession } from '../types';
 import { getAnimationMapping } from '../data/exerciseAnimationMap';
 import { logger } from '../utils/logger';
+import { speechService } from '../services/speechService';
+import SectionErrorBoundary from './SectionErrorBoundary';
+import { getDeviceCapability, getCameraConstraints, getMediaPipeConfig, PerformanceMonitor } from '../services/adaptiveCameraService';
+import { FrameThrottler, getExerciseSpeed } from '../services/frameThrottler';
+// FAS 10: Emotionell AI-Coach - Affektiv Computing
+import {
+  emotionalIntelligenceService,
+  EmotionalAnalysis,
+  EmotionalState,
+  getEmotionalStateEmoji,
+  getEmotionalStateDescription,
+  getEmotionalStateColor
+} from '../services/emotionalIntelligenceService';
+// FAS 9: Kompensationsdetektion
+import {
+  detectCompensations,
+  getTopCompensations,
+  getExerciseCategory,
+  CompensationPattern
+} from '../services/compensationDetectionService';
 
 // Lazy load the 3D Avatar - RealisticAvatar3D with GLB model support
 // Falls back to simple humanoid if model not found
@@ -27,7 +45,25 @@ interface AIMovementCoachProps {
   onClose: () => void;
 }
 
-type ExerciseMode = 'LEGS' | 'PRESS' | 'PULL' | 'LUNGE' | 'CORE' | 'STRETCH' | 'BALANCE' | 'PUSH' | 'GENERAL';
+type ExerciseMode = 'LEGS' | 'PRESS' | 'PULL' | 'LUNGE' | 'CORE' | 'STRETCH' | 'BALANCE' | 'PUSH' | 'SHOULDER' | 'GENERAL';
+
+// FAS 9: Differentierad feedback-prioritet
+type FeedbackPriority = 'critical' | 'corrective' | 'encouragement';
+
+// FAS 9: Debounce-tider per prioritet (ms)
+const DEBOUNCE_BY_PRIORITY: Record<FeedbackPriority, number> = {
+  critical: 2000,      // Kritiska fel (knävalgus, smärta): 2 sek
+  corrective: 4000,    // Korrigeringar (tempo, form): 4 sek
+  encouragement: 8000  // Uppmuntran: 8 sek
+};
+
+// FAS 9: Ideal tempo för rehab (ms)
+const IDEAL_TEMPO = {
+  eccentricMin: 2000,  // 2 sek ner (minimum)
+  eccentricMax: 4000,  // 4 sek ner (max)
+  concentricMin: 1000, // 1 sek upp (minimum)
+  concentricMax: 2000  // 2 sek upp (max)
+};
 
 // Exercise-specific encouragement messages
 const ENCOURAGEMENT_MESSAGES: Record<string, string[]> = {
@@ -80,6 +116,7 @@ const EXERCISE_ROM_TARGETS: Record<ExerciseMode, { min: number; max: number; opt
   CORE: { min: 0, max: 45, optimal: 30 },      // Core - bålvinkel
   STRETCH: { min: 0, max: 180, optimal: 120 }, // Stretch
   BALANCE: { min: 0, max: 30, optimal: 15 },   // Balans - stabilitet
+  SHOULDER: { min: 30, max: 160, optimal: 120 }, // Axelrörlighet - flexion/abduktion
   GENERAL: { min: 60, max: 120, optimal: 90 }  // Generellt
 };
 
@@ -273,6 +310,42 @@ const EXERCISE_VALIDATION_RULES: Record<ExerciseMode, ValidationRule[]> = {
         return { valid: true };
       },
       description: 'Kontrollerar stående bens alignment',
+      enabled: true
+    }
+  ],
+  SHOULDER: [
+    {
+      check: (_angles, lm) => {
+        // Check shoulder elevation - shoulder shouldn't shrug up
+        if (!lm.lShldr || !lm.rShldr || !lm.lHip || !lm.rHip) return { valid: true };
+        const leftShoulderY = lm.lShldr.y;
+        const rightShoulderY = lm.rShldr.y;
+        const avgHipY = (lm.lHip.y + lm.rHip.y) / 2;
+        const leftDist = avgHipY - leftShoulderY;
+        const rightDist = avgHipY - rightShoulderY;
+        // If shoulder is too close to hip (shrugged), warn
+        if (leftDist < 0.15 || rightDist < 0.15) {
+          return { valid: false, issue: 'Sänk axlarna', severity: 'warning' as const };
+        }
+        return { valid: true };
+      },
+      description: 'Kontrollerar att axlarna inte höjs',
+      enabled: true
+    },
+    {
+      check: (_angles, lm) => {
+        // Check for asymmetry in shoulder movement
+        if (!lm.lShldr || !lm.rShldr || !lm.lElbow || !lm.rElbow) return { valid: true };
+        const leftArmAngle = Math.abs(lm.lElbow.y - lm.lShldr.y);
+        const rightArmAngle = Math.abs(lm.rElbow.y - lm.rShldr.y);
+        const diff = Math.abs(leftArmAngle - rightArmAngle);
+        if (diff > 0.1) {
+          const side = leftArmAngle > rightArmAngle ? 'Vänster' : 'Höger';
+          return { valid: false, issue: `${side} arm rör sig mer`, severity: 'warning' as const };
+        }
+        return { valid: true };
+      },
+      description: 'Kontrollerar symmetrisk axelrörelse',
       enabled: true
     }
   ],
@@ -798,8 +871,10 @@ interface Particle {
 const AIMovementCoach: React.FC<AIMovementCoachProps> = ({ exerciseName, videoUrl, onClose }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const mediaPipeModulesRef = useRef<MediaPipeModules | null>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
+  const [isLoadingML, setIsLoadingML] = useState(true);
 
   // Calibration State
   const [isCalibrated, setIsCalibrated] = useState(false);
@@ -879,7 +954,15 @@ const AIMovementCoach: React.FC<AIMovementCoachProps> = ({ exerciseName, videoUr
   const repTimestamps = useRef<number[]>([]);
   const qualityHistory = useRef<number[]>([]);
 
+  // FAS 10: Emotionell AI-Coach State
+  const [emotionalState, setEmotionalState] = useState<EmotionalState>('NEUTRAL');
+  const [emotionalAnalysis, setEmotionalAnalysis] = useState<EmotionalAnalysis | null>(null);
+  const [showEmotionalIndicator, setShowEmotionalIndicator] = useState(true);
+  const lastBreakSuggestionTime = useRef(0);
+
   const lastSpoke = useRef(0);
+  const lastMessage = useRef('');
+  const lastPrioritySpoke = useRef(0);
   const lastRepTime = useRef(Date.now());
   const landmarkHistory = useRef<any[]>([]); // Store history for trails
   const particles = useRef<Particle[]>([]); // Store particles for rewards
@@ -887,29 +970,99 @@ const AIMovementCoach: React.FC<AIMovementCoachProps> = ({ exerciseName, videoUr
 
   const exerciseMode: ExerciseMode = useMemo(() => {
       const name = exerciseName.toLowerCase();
-      // Prioritera specifika matchningar först
-      if (name.match(/utfall|lunge|split/)) return 'LUNGE';
-      if (name.match(/planka|core|mage|bål|crunch|sit.?up/)) return 'CORE';
-      if (name.match(/stretch|töj|mjukgör|böj.*fram|nacke|mobility/)) return 'STRETCH';
-      if (name.match(/armhävning|push.?up|dipp/)) return 'PUSH';
-      if (name.match(/balans|enben|stå.*på.*ett/)) return 'BALANCE';
-      if (name.match(/knä|ben|squat|hopp|wad|vad/)) return 'LEGS';
-      if (name.match(/press|lyft|axel|hantel|triceps/)) return 'PRESS';
-      if (name.match(/rodd|curl|biceps|drag|row/)) return 'PULL';
+      // Prioritera specifika matchningar först - mer specifika mönster först
+
+      // LUNGE - utfall och varianter
+      if (name.match(/utfall|lunge|split.?squat|bulgarian|step.?up/)) return 'LUNGE';
+
+      // CORE - mage, rygg, bål
+      if (name.match(/planka|plank|core|mage|bål|crunch|sit.?up|dead.?bug|bird.?dog|cat.?cow|kattko/)) return 'CORE';
+
+      // STRETCH - töjning, rörlighet
+      if (name.match(/stretch|töj|mjukgör|böj.*fram|nacke.*stretch|hip.*flexor|piriformis|hamstring.*stretch/)) return 'STRETCH';
+
+      // PUSH - tryckövningar
+      if (name.match(/armhävning|push.?up|dipp|chest.*press|bänkpress/)) return 'PUSH';
+
+      // BALANCE - balansövningar
+      if (name.match(/balans|balance|enben|stå.*på.*ett|tandem|single.*leg.*stand/)) return 'BALANCE';
+
+      // SHOULDER - axelövningar och rörlighet
+      if (name.match(/axel|shoulder|skulder|rotator|rotations?cuff|abduktion|abduction|elevation|flexion.*axel|pendel|codman/)) return 'SHOULDER';
+
+      // LEGS - benövningar (efter shoulder för att undvika falska positiver)
+      if (name.match(/knäböj|squat|knä.*extension|leg.*press|hopp|wadlyft|calf|häl|hip.*thrust|glute.*bridge|höft.*lyft|höftbrygga/)) return 'LEGS';
+
+      // PRESS - övriga tryckövningar för överkropp
+      if (name.match(/press|lyft.*hantel|overhead|military|triceps.*ext/)) return 'PRESS';
+
+      // PULL - dragövningar
+      if (name.match(/rodd|row|curl|biceps|drag|pulldown|pull.?up|lat|latissimus/)) return 'PULL';
+
+      // GENERAL som fallback
       return 'GENERAL';
   }, [exerciseName]);
   
-  const speak = (text: string, priority = false) => {
-      if (isMuted || !window.speechSynthesis) return;
+  // FAS 9: Refs för att spåra senaste tal per prioritet
+  const lastSpokeByPriority = useRef<Record<FeedbackPriority, number>>({
+    critical: 0,
+    corrective: 0,
+    encouragement: 0
+  });
+
+  // FAS 9: Förbättrad speak-funktion med tre prioritetsnivåer
+  // critical: 2s debounce (knävalgus, smärta)
+  // corrective: 4s debounce (tempo, formfel)
+  // encouragement: 8s debounce (uppmuntran)
+  // FAS 10: Nu med emotionell anpassning
+  const speak = useCallback((
+    text: string,
+    priority: FeedbackPriority | boolean = 'encouragement',
+    context?: { isCorrection?: boolean; isEncouragement?: boolean; isMilestone?: boolean }
+  ) => {
+      if (isMuted) return;
       const now = Date.now();
-      if (!priority && now - lastSpoke.current < 4000) return;
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'sv-SE';
-      utterance.rate = 1.1; 
-      window.speechSynthesis.speak(utterance);
+
+      // Konvertera gammal boolean-API till ny prioritet för bakåtkompatibilitet
+      const actualPriority: FeedbackPriority =
+        priority === true ? 'critical' :
+        priority === false ? 'encouragement' :
+        priority;
+
+      // FAS 10: Anpassa meddelande baserat på emotionellt tillstånd
+      let adaptedText = text;
+      if (context) {
+        adaptedText = emotionalIntelligenceService.getAdaptedMessage(text, context);
+      }
+
+      // Normalisera text för jämförelse (ta bort siffror för rep-räkning)
+      const normalizedText = adaptedText.replace(/^\d+\.\s*/, '').trim().toLowerCase();
+
+      // Förhindra upprepning av samma meddelande baserat på prioritet
+      const debounceTime = DEBOUNCE_BY_PRIORITY[actualPriority];
+      if (normalizedText === lastMessage.current && now - lastSpoke.current < debounceTime) {
+        return;
+      }
+
+      // Debounce baserat på prioritet
+      const lastTime = lastSpokeByPriority.current[actualPriority];
+      if (now - lastTime < debounceTime) return;
+
+      // Använd speechService (stöder ElevenLabs om konfigurerat)
+      speechService.speak(adaptedText).catch(err => {
+        console.warn('[AIMovementCoach] Speech error:', err);
+      });
+
+      // Uppdatera timestamps
       lastSpoke.current = now;
-  };
+      lastMessage.current = normalizedText;
+      lastSpokeByPriority.current[actualPriority] = now;
+
+      // Också uppdatera legacy refs för bakåtkompatibilitet
+      if (actualPriority === 'critical') {
+        lastPrioritySpoke.current = now;
+      }
+  }, [isMuted]);
 
   // Countdown timer effect - handles 3-2-1 countdown after calibration
   useEffect(() => {
@@ -927,7 +1080,7 @@ const AIMovementCoach: React.FC<AIMovementCoachProps> = ({ exerciseName, videoUr
       setIsCalibrated(true);
       speak("Kör!", true);
     }
-  }, [countdownActive, countdownValue]);
+  }, [countdownActive, countdownValue, speak]);
 
   // Toggle pause/resume functionality
   const togglePause = useCallback(() => {
@@ -939,7 +1092,7 @@ const AIMovementCoach: React.FC<AIMovementCoachProps> = ({ exerciseName, videoUr
       }
       return !prev;
     });
-  }, []);
+  }, [speak]);
 
   // Helper to get angle from 3D joint angles (provided by PoseReconstructor)
   // Falls back to 0 if angle not available
@@ -1304,6 +1457,39 @@ const AIMovementCoach: React.FC<AIMovementCoachProps> = ({ exerciseName, videoUr
         const currentSymmetry = poseReconstructor.calculateSymmetry(jointAngles3D);
         setSymmetryScore(Math.round(currentSymmetry));
 
+        // FAS 9: Detect compensation patterns
+        const exerciseCat = getExerciseCategory(exerciseName);
+        const compensations = detectCompensations(poseLandmarks, jointAngles3D, exerciseCat);
+
+        // If severe compensations detected, give immediate feedback
+        if (compensations.length > 0) {
+          const topCompensations = getTopCompensations(compensations, 1);
+          const severeComp = topCompensations.find(c => c.severity === 'severe');
+          if (severeComp) {
+            speak(severeComp.correction, 'critical', { isCorrection: true });
+          }
+        }
+
+        // FAS 10: Update Emotional Intelligence with pose data
+        emotionalIntelligenceService.updatePose(poseLandmarks);
+
+        // FAS 10: Periodically analyze emotional state and check for break suggestions
+        const emotionalResult = emotionalIntelligenceService.analyzeEmotionalState();
+        if (emotionalResult.primaryState !== emotionalState) {
+          setEmotionalState(emotionalResult.primaryState);
+          setEmotionalAnalysis(emotionalResult);
+        }
+
+        // FAS 10: Check if break should be suggested (max once per 2 minutes)
+        const now = Date.now();
+        if (now - lastBreakSuggestionTime.current > 120000) {
+          const breakCheck = emotionalIntelligenceService.shouldSuggestBreak();
+          if (breakCheck.suggest) {
+            speak(breakCheck.reason, 'corrective', { isEncouragement: true });
+            lastBreakSuggestionTime.current = now;
+          }
+        }
+
         // Process frame through RepScoringService
         const scoringFeedback = repScoringService.processFrame(jointAngles3D, currentSymmetry, Date.now());
 
@@ -1319,10 +1505,15 @@ const AIMovementCoach: React.FC<AIMovementCoachProps> = ({ exerciseName, videoUr
           setCurrentRepScore(newScore);
           setReps(completedReps.length);
 
+          // FAS 10: Record rep completion for emotional tracking
+          const repSuccess = newScore.overall >= 60;
+          emotionalIntelligenceService.recordRep(repSuccess);
+
           // Speak rep count with encouragement based on score
+          // FAS 10: Now with emotional context
           const repNum = completedReps.length;
           if (newScore.overall >= 90) {
-            speak(`${repNum}. ${getEncouragement('GREAT_REP')}`, true);
+            speak(`${repNum}. ${getEncouragement('GREAT_REP')}`, true, { isEncouragement: true });
             // Extra celebration for great reps
             if (lHip) {
               spawnParticles(lHip.x * width, lHip.y * height, '#22c55e');
@@ -1330,7 +1521,7 @@ const AIMovementCoach: React.FC<AIMovementCoachProps> = ({ exerciseName, videoUr
               spawnParticles(lHip.x * width + 50, lHip.y * height, '#22c55e');
             }
           } else if (newScore.overall >= 70) {
-            speak(`${repNum}. ${getEncouragement('GOOD_REP')}`, true);
+            speak(`${repNum}. ${getEncouragement('GOOD_REP')}`, true, { isEncouragement: true });
             if (lHip) {
               spawnParticles(lHip.x * width, lHip.y * height, '#22c55e');
             }
@@ -1339,8 +1530,9 @@ const AIMovementCoach: React.FC<AIMovementCoachProps> = ({ exerciseName, videoUr
           }
 
           // Milestone encouragement at specific rep counts
+          // FAS 10: With milestone context for emotional adaptation
           if (repNum === 5 || repNum === 10 || repNum === 15 || repNum === 20) {
-            setTimeout(() => speak(getEncouragement('KEEP_GOING'), false), 1500);
+            setTimeout(() => speak(getEncouragement('KEEP_GOING'), false, { isMilestone: true }), 1500);
           }
 
           // Update Session Analytics
@@ -1483,7 +1675,7 @@ const AIMovementCoach: React.FC<AIMovementCoachProps> = ({ exerciseName, videoUr
             canvasCtx.font = "bold 14px monospace";
             canvasCtx.fillText("MÅLDJUP", width * 0.82, targetY);
 
-            // VALGUS CHECK
+            // VALGUS CHECK - FAS 9: Använder 'critical' prioritet för säkerhet
             if (mainAngle < 140) {
                 const hipWidth = Math.abs(lHip.x - rHip.x);
                 const kneeWidth = Math.abs(lKnee.x - rKnee.x);
@@ -1491,7 +1683,7 @@ const AIMovementCoach: React.FC<AIMovementCoachProps> = ({ exerciseName, videoUr
                     issues.push("Inåtvinkling");
                     jointHighlights.push({ x: lKnee.x, y: lKnee.y, color: '#ef4444' });
                     jointHighlights.push({ x: rKnee.x, y: rKnee.y, color: '#ef4444' });
-                    speak("Pressa ut knäna!", true);
+                    speak("Pressa ut knäna!", 'critical');
                     setFormScore(s => Math.max(0, s - 0.5));
                 }
             }
@@ -1504,21 +1696,44 @@ const AIMovementCoach: React.FC<AIMovementCoachProps> = ({ exerciseName, videoUr
                     feedbackMsg = "Bromsa...";
                 } else feedbackMsg = "Stå upprätt";
             } else if (motionState === 'ECCENTRIC') {
+                // FAS 9: REALTIDS-TEMPO FEEDBACK under nedgång
+                // Beräkna progress: 0% = start (160°), 100% = botten (100°)
+                const eccentricProgress = Math.min(100, Math.max(0,
+                  ((160 - mainAngle) / (160 - 100)) * 100
+                ));
+                const elapsedTime = Date.now() - lastRepTime.current;
+
+                // Ideal tid för nuvarande progress (2-4 sekunder total)
+                const idealTimeForProgress = (eccentricProgress / 100) * IDEAL_TEMPO.eccentricMin;
+                const maxTimeForProgress = (eccentricProgress / 100) * IDEAL_TEMPO.eccentricMax;
+
+                // Realtidsfeedback om för snabbt (vid 50% progress)
+                if (eccentricProgress > 50 && eccentricProgress < 80) {
+                  if (elapsedTime < idealTimeForProgress * 0.6) {
+                    // >40% snabbare än ideal = för snabbt
+                    feedbackMsg = "Sakta ner!";
+                    speak("Sakta ner", 'corrective');
+                  } else if (elapsedTime > maxTimeForProgress) {
+                    // Lite snabbare ok om > 4 sek
+                    feedbackMsg = "Bra kontroll";
+                  }
+                }
+
                 if (mainAngle < 100) {
                     const descentTime = Date.now() - lastRepTime.current;
-                    if (descentTime < 1500) {
+                    if (descentTime < IDEAL_TEMPO.eccentricMin) {
                         // Too fast - use varied tempo feedback
                         issues.push("För snabbt!");
-                        speak(getEncouragement('TEMPO_SLOW'), false);
+                        speak(getEncouragement('TEMPO_SLOW'), 'corrective');
                         setFormScore(s => Math.max(0, s - 2));
-                    } else if (descentTime >= 2500 && descentTime <= 4000) {
+                    } else if (descentTime >= IDEAL_TEMPO.eccentricMin && descentTime <= IDEAL_TEMPO.eccentricMax) {
                         // Good tempo - occasional positive feedback
                         if (Math.random() > 0.7) {
-                          speak(getEncouragement('TEMPO_GOOD'), false);
+                          speak(getEncouragement('TEMPO_GOOD'), 'encouragement');
                         }
                     }
                     setMotionState('TURN');
-                    speak("Bra djup! Håll.", false);
+                    speak("Bra djup! Håll.", 'encouragement');
                     feedbackMsg = "Perfekt djup!";
                     skeletonColor = 'rgba(34, 197, 94, 1)'; // Green
                     setFormScore(s => Math.min(100, s + 1));
@@ -1689,6 +1904,91 @@ const AIMovementCoach: React.FC<AIMovementCoachProps> = ({ exerciseName, videoUr
                 });
             }
         }
+        // SHOULDER MOBILITY LOGIC
+        else if (exerciseMode === 'SHOULDER' && lShldr && lElbow && lWrist) {
+            // Use shoulder flexion angle from PoseReconstructor
+            const leftShoulderAngle = getAngle3D(jointAngles3D, 'leftShoulderFlexion');
+            const rightShoulderAngle = getAngle3D(jointAngles3D, 'rightShoulderFlexion');
+            mainAngle = Math.max(leftShoulderAngle, rightShoulderAngle); // Use highest arm angle
+
+            updateROM(mainAngle);
+
+            // ASYMMETRY CHECK: Kontrollera bilateral obalans för axlar
+            const shoulderDiff = Math.abs(leftShoulderAngle - rightShoulderAngle);
+            const avgShoulderAngle = (leftShoulderAngle + rightShoulderAngle) / 2;
+            const asymmetryPercent = avgShoulderAngle > 0 ? (shoulderDiff / avgShoulderAngle) * 100 : 0;
+
+            if (asymmetryPercent > 20 && avgShoulderAngle > 30) {
+                const dominantSide = leftShoulderAngle > rightShoulderAngle ? 'left' : 'right';
+                setAsymmetry({ detected: true, side: dominantSide, percentage: Math.round(asymmetryPercent) });
+                issues.push(dominantSide === 'left'
+                    ? `Vänster axel lyfts mer (${Math.round(asymmetryPercent)}%)`
+                    : `Höger axel lyfts mer (${Math.round(asymmetryPercent)}%)`);
+                jointHighlights.push({
+                    x: dominantSide === 'left' ? lShldr.x : rShldr.x,
+                    y: dominantSide === 'left' ? lShldr.y : rShldr.y,
+                    color: '#f97316'
+                });
+            } else {
+                setAsymmetry({ detected: false, side: null, percentage: 0 });
+            }
+
+            // EXERCISE-SPECIFIC VALIDATION for shoulder
+            const validationRules = EXERCISE_VALIDATION_RULES[exerciseMode] || [];
+            const landmarkMap = { lHip, rHip, lKnee, rKnee, lAnkle, rAnkle, lShldr, rShldr, lElbow, rElbow, lWrist, rWrist };
+            const angleMap: Record<string, number> = {};
+            Object.entries(jointAngles3D).forEach(([key, val]) => { angleMap[key] = val.angle; });
+
+            for (const rule of validationRules) {
+              if (!rule.enabled) continue;
+              const result = rule.check(angleMap, landmarkMap);
+              if (!result.valid && result.issue) {
+                issues.push(result.issue);
+                const color = result.severity === 'critical' ? '#ef4444' : '#f59e0b';
+                if (lShldr && result.issue.toLowerCase().includes('axl')) {
+                  jointHighlights.push({ x: lShldr.x, y: lShldr.y, color });
+                  jointHighlights.push({ x: rShldr.x, y: rShldr.y, color });
+                }
+                if (result.severity === 'critical') {
+                  speak(result.issue, true);
+                }
+              }
+            }
+
+            // Shoulder angle gauge - show on both shoulders
+            const shoulderRomTarget = EXERCISE_ROM_TARGETS.SHOULDER;
+
+            // Left shoulder gauge
+            angleGauges.push({
+              center: lShldr,
+              angle: leftShoulderAngle,
+              targetStart: shoulderRomTarget.min,
+              targetEnd: shoulderRomTarget.max,
+              optimal: shoulderRomTarget.optimal
+            });
+
+            // Right shoulder gauge
+            angleGauges.push({
+              center: rShldr,
+              angle: rightShoulderAngle,
+              targetStart: shoulderRomTarget.min,
+              targetEnd: shoulderRomTarget.max,
+              optimal: shoulderRomTarget.optimal
+            });
+
+            // Feedback based on ROM
+            if (mainAngle > 120) {
+                feedbackMsg = "Bra rörlighet!";
+                skeletonColor = 'rgba(34, 197, 94, 1)'; // Green
+                setFormScore(s => Math.min(100, s + 0.2));
+            } else if (mainAngle > 60) {
+                feedbackMsg = `Axelvinkel: ${Math.round(mainAngle)}° - Fortsätt uppåt`;
+                skeletonColor = 'rgba(245, 158, 11, 1)'; // Amber
+            } else {
+                feedbackMsg = `Axelvinkel: ${Math.round(mainAngle)}°`;
+                skeletonColor = 'rgba(6, 182, 212, 1)'; // Cyan
+            }
+        }
         } // End of if (!skipAnalysis)
     }
 
@@ -1747,7 +2047,10 @@ const AIMovementCoach: React.FC<AIMovementCoachProps> = ({ exerciseName, videoUr
     }
 
     // 3. AR EXOSUIT (REPLACES STICK FIGURE)
-    const drawLandmarks = (drawingUtils as any).drawLandmarks || (drawingUtils as any).default?.drawLandmarks;
+    const modules = mediaPipeModulesRef.current;
+    const drawLandmarks = modules?.drawingUtils
+      ? ((modules.drawingUtils as any).drawLandmarks || (modules.drawingUtils as any).default?.drawLandmarks)
+      : null;
 
     // Muskelgrupps-highlighting baserat på övningsläge
     const getMuscleColor = (limbType: 'quad' | 'ham' | 'glute' | 'calf' | 'chest' | 'back' | 'shoulder' | 'arm' | 'core') => {
@@ -1780,6 +2083,10 @@ const AIMovementCoach: React.FC<AIMovementCoachProps> = ({ exerciseName, videoUr
             // Visa vilken muskel som töjs
             if (limbType === 'ham') return '#8b5cf6'; // Lila för töjda muskler
             if (limbType === 'calf' || limbType === 'back') return '#a78bfa';
+        } else if (exerciseMode === 'SHOULDER') {
+            // Axelrörlighet - markera axel och arm
+            if (limbType === 'shoulder') return isActive ? activeColor : '#06b6d4';
+            if (limbType === 'arm') return isActive ? secondaryColor : inactiveColor;
         }
         return inactiveColor;
     };
@@ -1810,6 +2117,34 @@ const AIMovementCoach: React.FC<AIMovementCoachProps> = ({ exerciseName, videoUr
             // Torque Rings på armbågar
             drawJointTurbine(canvasCtx, lElbow, width, height, 1, getMuscleColor('arm'));
             drawJointTurbine(canvasCtx, rElbow, width, height, -1, getMuscleColor('arm'));
+        }
+        // SHOULDER: Fokus på axelrörlighet med tydliga axelmarkeringar
+        else if (exerciseMode === 'SHOULDER') {
+            // Överarm (Shoulder to Elbow) - highlight
+            drawExosuitLimb(canvasCtx, lShldr, lElbow, width, height, getMuscleColor('shoulder'), 35);
+            drawExosuitLimb(canvasCtx, rShldr, rElbow, width, height, getMuscleColor('shoulder'), 35);
+            // Underarm (Elbow to Wrist)
+            drawExosuitLimb(canvasCtx, lElbow, lWrist, width, height, getMuscleColor('arm'), 25);
+            drawExosuitLimb(canvasCtx, rElbow, rWrist, width, height, getMuscleColor('arm'), 25);
+
+            // Torque Rings på AXLARNA (inte armbågar)
+            drawJointTurbine(canvasCtx, lShldr, width, height, 1, getMuscleColor('shoulder'));
+            drawJointTurbine(canvasCtx, rShldr, width, height, -1, getMuscleColor('shoulder'));
+
+            // Extra highlight på axellederna
+            if (lShldr && rShldr) {
+                canvasCtx.save();
+                canvasCtx.shadowBlur = 15;
+                canvasCtx.shadowColor = getMuscleColor('shoulder');
+                canvasCtx.beginPath();
+                canvasCtx.arc(lShldr.x * width, lShldr.y * height, 12, 0, Math.PI * 2);
+                canvasCtx.fillStyle = getMuscleColor('shoulder');
+                canvasCtx.fill();
+                canvasCtx.beginPath();
+                canvasCtx.arc(rShldr.x * width, rShldr.y * height, 12, 0, Math.PI * 2);
+                canvasCtx.fill();
+                canvasCtx.restore();
+            }
         }
         // CORE: Fokus på bål + ben
         else if (exerciseMode === 'CORE') {
@@ -1997,53 +2332,67 @@ const AIMovementCoach: React.FC<AIMovementCoachProps> = ({ exerciseName, videoUr
   useEffect(() => {
     setTimeout(() => speak(`System redo. Ställ dig så hela kroppen syns.`), 1000);
 
-    const Pose = (poseLib as any).Pose || (poseLib as any).default?.Pose;
-    const Camera = (cameraUtils as any).Camera || (cameraUtils as any).default?.Camera;
-
-    if (!Pose) {
-      console.error('[AIMovementCoach] MediaPipe Pose not found');
-      setPermissionDenied(true);
-      return;
-    }
-
-    logger.debug('[AIMovementCoach] Initializing MediaPipe Pose with ULTRA precision...');
-    const pose = new Pose({locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`});
-    // Ultra-precision settings:
-    // modelComplexity: 2 = Highest accuracy (heaviest model)
-    // smoothLandmarks: true = Temporal smoothing
-    // enableSegmentation: false = Focus on pose only, better performance
-    // minDetectionConfidence: 0.7 = Higher threshold for better quality
-    // minTrackingConfidence: 0.7 = Higher threshold for stable tracking
-    pose.setOptions({
-      modelComplexity: 2,
-      smoothLandmarks: true,
-      enableSegmentation: false,
-      minDetectionConfidence: 0.7,
-      minTrackingConfidence: 0.7,
-      smoothSegmentation: false // Not needed, saves processing
-    });
-    pose.onResults(onResults);
-
+    let isMounted = true;
+    let pose: any = null;
     let camera: any = null;
     let animationFrameId: number | null = null;
     let stream: MediaStream | null = null;
-    let isMounted = true;
 
-    const initCamera = async () => {
-      if (!videoRef.current || !isMounted) return;
-
-      logger.debug('[AIMovementCoach] Starting camera initialization...');
-
-      // Always use getUserMedia directly for better cross-browser support
+    const initMediaPipeAndCamera = async () => {
       try {
-        logger.debug('[AIMovementCoach] Requesting camera access...');
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-            facingMode: 'user'
-          }
+        setIsLoadingML(true);
+        logger.debug('[AIMovementCoach] Loading MediaPipe modules...');
+
+        // Dynamically load MediaPipe modules (~1.6MB only when needed)
+        const modules = await loadMediaPipeModules();
+        mediaPipeModulesRef.current = modules;
+
+        if (!isMounted) return;
+
+        const { poseLib } = modules;
+        const Pose = (poseLib as any).Pose || (poseLib as any).default?.Pose;
+
+        if (!Pose) {
+          console.error('[AIMovementCoach] MediaPipe Pose not found');
+          setPermissionDenied(true);
+          setIsLoadingML(false);
+          return;
+        }
+
+        // FAS 8: Get adaptive device capability for optimal performance
+        const deviceCapability = getDeviceCapability();
+        const mediaPipeConfig = getMediaPipeConfig(deviceCapability);
+        const cameraConstraints = getCameraConstraints(deviceCapability);
+
+        logger.debug(`[AIMovementCoach] Device tier: ${deviceCapability.tier}, resolution: ${deviceCapability.resolution.width}x${deviceCapability.resolution.height}, FPS: ${deviceCapability.targetFPS}`);
+        logger.debug('[AIMovementCoach] Initializing MediaPipe Pose with ADAPTIVE precision...');
+        pose = new Pose({locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`});
+
+        // Adaptive settings based on device capability:
+        // modelComplexity: 0-2, based on device tier (0=fastest, 2=most accurate)
+        // smoothLandmarks: true = Temporal smoothing
+        // enableSegmentation: false = Focus on pose only, better performance
+        // minDetectionConfidence: Lower on weaker devices for smoother tracking
+        // minTrackingConfidence: Lower on weaker devices for smoother tracking
+        pose.setOptions({
+          modelComplexity: mediaPipeConfig.modelComplexity,
+          smoothLandmarks: mediaPipeConfig.smoothLandmarks,
+          enableSegmentation: mediaPipeConfig.enableSegmentation,
+          minDetectionConfidence: mediaPipeConfig.minDetectionConfidence,
+          minTrackingConfidence: mediaPipeConfig.minTrackingConfidence,
+          smoothSegmentation: mediaPipeConfig.smoothSegmentation
         });
+        pose.onResults(onResults);
+
+        setIsLoadingML(false);
+
+        // Now initialize camera with adaptive settings
+        if (!videoRef.current || !isMounted) return;
+
+        logger.debug('[AIMovementCoach] Starting camera initialization with adaptive settings...');
+        logger.debug(`[AIMovementCoach] Requesting camera: ${deviceCapability.resolution.width}x${deviceCapability.resolution.height} @ ${deviceCapability.targetFPS}fps`);
+
+        stream = await navigator.mediaDevices.getUserMedia(cameraConstraints);
 
         if (!isMounted || !videoRef.current) {
           stream.getTracks().forEach(track => track.stop());
@@ -2072,21 +2421,52 @@ const AIMovementCoach: React.FC<AIMovementCoachProps> = ({ exerciseName, videoUr
           await pose.initialize();
         }
 
-        // Process frames
+        // FAS 8: Initialize frame throttler and performance monitor
+        const frameThrottler = new FrameThrottler({ targetFPS: deviceCapability.targetFPS });
+        const performanceMonitor = new PerformanceMonitor();
+
+        // Adapt throttler to exercise type
+        const exerciseSpeed = getExerciseSpeed(exerciseName);
+        frameThrottler.setExercise(exerciseName);
+        logger.debug(`[AIMovementCoach] Exercise "${exerciseName}" speed: ${exerciseSpeed}`);
+
+        // Process frames with throttling
         let frameCount = 0;
         const processFrame = async () => {
           if (!isMounted) return;
+
+          // FAS 8: Only process frame if throttler allows
+          if (!frameThrottler.shouldProcessFrame()) {
+            if (isMounted) {
+              animationFrameId = requestAnimationFrame(processFrame);
+            }
+            return;
+          }
+
           if (videoRef.current && videoRef.current.readyState >= 2) {
+            const startTime = performance.now();
             try {
               await pose.send({ image: videoRef.current });
               if (frameCount === 0) {
                 logger.debug('[AIMovementCoach] First frame sent to pose model');
               }
               frameCount++;
+
+              // FAS 8: Report processing time for adaptive FPS adjustment
+              const processingTime = performance.now() - startTime;
+              frameThrottler.reportProcessingTime(processingTime);
+              performanceMonitor.recordFrame(processingTime);
+
+              // Log performance metrics every 100 frames
+              if (frameCount % 100 === 0) {
+                const metrics = performanceMonitor.getMetrics();
+                logger.debug(`[AIMovementCoach] Performance: ${metrics.averageFPS.toFixed(1)} FPS, ${metrics.averageLatency.toFixed(1)}ms latency, CPU: ${metrics.cpuPressure}`);
+              }
             } catch (err) {
               if (frameCount === 0) {
                 console.error('[AIMovementCoach] Error sending frame:', err);
               }
+              performanceMonitor.recordDroppedFrame();
             }
           }
           if (isMounted) {
@@ -2096,22 +2476,23 @@ const AIMovementCoach: React.FC<AIMovementCoachProps> = ({ exerciseName, videoUr
         processFrame();
 
       } catch (err: any) {
-        console.error('[AIMovementCoach] Camera initialization failed:', err);
+        console.error('[AIMovementCoach] Initialization failed:', err);
+        setIsLoadingML(false);
         if (isMounted) {
           setPermissionDenied(true);
         }
       }
     };
 
-    initCamera();
+    initMediaPipeAndCamera();
 
     return () => {
       isMounted = false;
       if (camera) try { camera.stop(); } catch(e) { }
       if (animationFrameId) cancelAnimationFrame(animationFrameId);
       if (stream) stream.getTracks().forEach(track => track.stop());
-      try { pose.close(); } catch(e) { }
-      window.speechSynthesis.cancel();
+      try { if (pose) pose.close(); } catch(e) { }
+      speechService.stop();
     };
   }, [exerciseMode, isCalibrated]);
 
@@ -2161,17 +2542,21 @@ const AIMovementCoach: React.FC<AIMovementCoachProps> = ({ exerciseName, videoUr
             </button>
           </div>
 
-          <Suspense fallback={
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Loader2 className="animate-spin text-cyan-400" size={48} />
-            </div>
-          }>
-            <RealisticAvatar3D
-              mode={exerciseMode}
-              gender={avatarGender}
-              exerciseName={exerciseName}
-            />
-          </Suspense>
+          <SectionErrorBoundary sectionName="3D Avatar" fallbackHeight="h-full">
+            <Suspense fallback={
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Loader2 className="animate-spin text-cyan-400" size={48} />
+              </div>
+            }>
+              <div className="w-full h-full">
+                <RealisticAvatar3D
+                  mode={exerciseMode}
+                  gender={avatarGender}
+                  exerciseName={exerciseName}
+                />
+              </div>
+            </Suspense>
+          </SectionErrorBoundary>
           
           <div className="absolute bottom-8 left-8 right-8 text-center pointer-events-none">
               <p className="text-white/40 text-[10px] uppercase tracking-widest mb-1 flex items-center justify-center gap-2">
@@ -2429,6 +2814,64 @@ const AIMovementCoach: React.FC<AIMovementCoachProps> = ({ exerciseName, videoUr
                                     </div>
                                   </div>
                                 </div>
+                            </div>
+                        )}
+
+                        {/* FAS 10: EMOTIONAL STATE INDICATOR */}
+                        {showEmotionalIndicator && emotionalState !== 'NEUTRAL' && (
+                            <div className="flex flex-col items-center gap-1 relative group">
+                                <div
+                                  className={`relative w-14 h-14 rounded-full border-4 flex items-center justify-center bg-black/50 backdrop-blur-md transition-all duration-500 ${getEmotionalStateColor(emotionalState)}`}
+                                  style={{ borderColor: getEmotionalStateColor(emotionalState).includes('emerald') ? '#10b981' :
+                                           getEmotionalStateColor(emotionalState).includes('amber') ? '#f59e0b' :
+                                           getEmotionalStateColor(emotionalState).includes('red') ? '#ef4444' :
+                                           getEmotionalStateColor(emotionalState).includes('blue') ? '#3b82f6' :
+                                           getEmotionalStateColor(emotionalState).includes('purple') ? '#8b5cf6' : '#64748b' }}
+                                >
+                                    <span className="text-2xl">{getEmotionalStateEmoji(emotionalState)}</span>
+                                    {/* Pulse effect for strong emotions */}
+                                    {(emotionalState === 'FRUSTRATED' || emotionalState === 'MOTIVATED' || emotionalState === 'CONFIDENT') && (
+                                      <div className="absolute inset-0 rounded-full border-2 animate-ping opacity-30"
+                                           style={{ borderColor: emotionalState === 'FRUSTRATED' ? '#ef4444' :
+                                                    emotionalState === 'MOTIVATED' ? '#10b981' : '#3b82f6' }}></div>
+                                    )}
+                                </div>
+                                <span className={`text-[10px] font-bold uppercase tracking-widest ${getEmotionalStateColor(emotionalState)}`}>
+                                    {getEmotionalStateDescription(emotionalState).split(' ')[0]}
+                                </span>
+
+                                {/* Hover tooltip with full emotional analysis */}
+                                {emotionalAnalysis && (
+                                  <div className="absolute left-full ml-2 top-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-slate-900/95 border border-slate-700 rounded-lg p-3 min-w-[200px] z-50 backdrop-blur-md">
+                                    <div className="text-xs font-bold text-cyan-400 mb-2 flex items-center gap-2">
+                                      <span className="text-lg">{getEmotionalStateEmoji(emotionalState)}</span>
+                                      {getEmotionalStateDescription(emotionalState)}
+                                    </div>
+                                    <div className="space-y-2">
+                                      <div className="text-[10px] text-slate-400">
+                                        <span className="font-semibold">Confidence:</span> {Math.round(emotionalAnalysis.confidence * 100)}%
+                                      </div>
+                                      <div className="text-[10px] text-slate-400">
+                                        <span className="font-semibold">Coachingstil:</span> {emotionalAnalysis.recommendedStyle}
+                                      </div>
+                                      {emotionalAnalysis.secondaryState && (
+                                        <div className="text-[10px] text-slate-500">
+                                          <span className="font-semibold">Sekundär:</span> {getEmotionalStateDescription(emotionalAnalysis.secondaryState)}
+                                        </div>
+                                      )}
+                                      <div className="pt-2 border-t border-slate-700">
+                                        <div className="text-[10px] text-slate-300 italic">
+                                          {emotionalAnalysis.recommendedStyle === 'ENCOURAGING' && 'Du gör bra ifrån dig! Fortsätt så!'}
+                                          {emotionalAnalysis.recommendedStyle === 'CALMING' && 'Ta det lugnt, en rörelse i taget.'}
+                                          {emotionalAnalysis.recommendedStyle === 'CHALLENGING' && 'Utmana dig själv lite extra!'}
+                                          {emotionalAnalysis.recommendedStyle === 'SUPPORTIVE' && 'Det är okej att ta pauser.'}
+                                          {emotionalAnalysis.recommendedStyle === 'CELEBRATORY' && 'Fantastiskt jobbat!'}
+                                          {emotionalAnalysis.recommendedStyle === 'MOTIVATING' && 'Bara några reps till!'}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
                             </div>
                         )}
 

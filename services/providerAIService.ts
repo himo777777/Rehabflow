@@ -3,7 +3,6 @@
  * Generates AI-powered reports and recommendations for healthcare providers
  */
 
-import Groq from "groq-sdk";
 import {
   AIReport,
   PatientSummary,
@@ -15,20 +14,7 @@ import {
   AIRecommendations,
   TrendDirection
 } from "../types";
-
-// --- API KEY HELPER ---
-const getApiKey = (): string => {
-  if (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_GROQ_API_KEY) {
-    return (import.meta as any).env.VITE_GROQ_API_KEY;
-  }
-  console.warn('No Groq API key found');
-  return '';
-};
-
-const groq = new Groq({
-  apiKey: getApiKey(),
-  dangerouslyAllowBrowser: true
-});
+import { aiCompletion, withRetry } from "../lib/aiClient";
 
 const MODEL = "llama-3.3-70b-versatile";
 
@@ -133,7 +119,7 @@ Skriv en professionell veckorapport på svenska i JSON-format med följande stru
 Svara ENDAST med JSON, ingen annan text.`;
 
   try {
-    const completion = await groq.chat.completions.create({
+    const responseText = await aiCompletion({
       messages: [
         {
           role: "system",
@@ -145,8 +131,6 @@ Svara ENDAST med JSON, ingen annan text.`;
       temperature: 0.3,
       max_tokens: 2000
     });
-
-    const responseText = completion.choices[0]?.message?.content || '';
     const cleaned = cleanJson(responseText);
     const parsed = JSON.parse(cleaned);
 
@@ -241,7 +225,7 @@ Ge 3-5 konkreta behandlingsrekommendationer i JSON-format:
 Svara ENDAST med JSON-array, ingen annan text.`;
 
   try {
-    const completion = await groq.chat.completions.create({
+    const responseText = await aiCompletion({
       messages: [
         {
           role: "system",
@@ -254,7 +238,6 @@ Svara ENDAST med JSON-array, ingen annan text.`;
       max_tokens: 1500
     });
 
-    const responseText = completion.choices[0]?.message?.content || '';
     const cleaned = cleanJson(responseText);
     const recommendations: TreatmentRecommendation[] = JSON.parse(cleaned);
 
@@ -316,7 +299,7 @@ Skriv en professionell utskrivningssammanfattning på svenska i JSON-format:
 Svara ENDAST med JSON, ingen annan text.`;
 
   try {
-    const completion = await groq.chat.completions.create({
+    const responseText = await aiCompletion({
       messages: [
         {
           role: "system",
@@ -329,7 +312,6 @@ Svara ENDAST med JSON, ingen annan text.`;
       max_tokens: 2000
     });
 
-    const responseText = completion.choices[0]?.message?.content || '';
     const cleaned = cleanJson(responseText);
     const parsed = JSON.parse(cleaned);
 
@@ -445,7 +427,7 @@ export const generateQuickSummary = async (
 Svara ENDAST med 1-2 korta meningar på svenska.`;
 
   try {
-    const completion = await groq.chat.completions.create({
+    const response = await aiCompletion({
       messages: [
         {
           role: "system",
@@ -458,7 +440,7 @@ Svara ENDAST med 1-2 korta meningar på svenska.`;
       max_tokens: 100
     });
 
-    return completion.choices[0]?.message?.content?.trim() || 'Status ej tillgänglig';
+    return response?.trim() || 'Status ej tillgänglig';
   } catch (error) {
     console.error('Failed to generate quick summary:', error);
     return 'Kunde inte generera sammanfattning';

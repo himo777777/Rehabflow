@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { MessageSquare, X, Send, Bot, Loader2, RefreshCw, AlertCircle, Sparkles, History, Mic, MicOff } from 'lucide-react';
+import { logger } from '../utils/logger';
 
 // TypeScript declarations for Web Speech API
 interface SpeechRecognitionEvent extends Event {
@@ -45,8 +46,9 @@ import {
   summarizeConversation,
   ConversationMemory
 } from '../services/geminiService';
-import { GeneratedProgram } from '../types';
+import { GeneratedProgram, InjuryType } from '../types';
 import { UI_CONFIG } from '../constants';
+import { storageService } from '../services/storageService';
 
 interface AIChatProps {
   program: GeneratedProgram;
@@ -225,11 +227,43 @@ const AIChat: React.FC<AIChatProps> = ({ program }) => {
     setMessages(prev => [...prev, { role: 'model', text: '', isStreaming: true, timestamp: Date.now() }]);
 
     try {
+      // Hämta assessment för post-op säkerhetskontext
+      const assessment = storageService.getAssessmentDraft();
+      const isPostOp = assessment?.injuryType === InjuryType.POST_OP;
+      const surgeryDate = assessment?.surgicalDetails?.date;
+      const daysSinceSurgery = surgeryDate
+        ? Math.floor((Date.now() - new Date(surgeryDate).getTime()) / (1000 * 60 * 60 * 24))
+        : null;
+      const isEarlyPostOp = isPostOp && daysSinceSurgery !== null && daysSinceSurgery < 42;
+
+      // Bygg säkerhetskontext för post-op patienter
+      let postOpSafetyContext = '';
+      if (isPostOp && assessment?.surgicalDetails) {
+        const procedure = assessment.surgicalDetails.procedure;
+        const restrictions = assessment.surgicalDetails.surgeonRestrictions;
+        const weightBearing = assessment.surgicalDetails.weightBearing;
+
+        postOpSafetyContext = `
+🚨 KRITISKT - POST-OP PATIENT:
+- Operation: ${procedure}
+- Dagar sedan operation: ${daysSinceSurgery}
+- Fas: ${isEarlyPostOp ? 'Skyddsfas (0-6 veckor) - EXTRA FÖRSIKTIGHET' : 'Rehabiliteringsfas'}
+- Belastning: ${weightBearing}
+${restrictions ? `- Kirurgens restriktioner: ${restrictions}` : ''}
+
+⚠️ SÄKERHETSINSTRUKTIONER:
+${isEarlyPostOp ? `- Rekommendera ALDRIG övningar som ökar belastning, vikt eller motstånd
+- Om patienten frågar om förbjudna aktiviteter (t.ex. "kan jag göra push-ups?"), VARNA tydligt och föreslå säkra alternativ
+- Prioritera: immobilisering, vila, passiva rörelser, antiinflammatoriska strategier` : ''}
+`;
+      }
+
       const context = `
         Programtitel: ${program.title}
         Analys: ${program.conditionAnalysis}
         Nuvarande fas: ${program.phases[0].phaseName}
         Mål: ${program.phases[0].goals.join(', ')}
+        ${postOpSafetyContext}
         ${currentConversation?.summary ? `Sammanfattning av tidigare: ${currentConversation.summary}` : ''}
       `;
 
@@ -284,7 +318,7 @@ const AIChat: React.FC<AIChatProps> = ({ program }) => {
         }
       );
     } catch (e) {
-      console.error('Chat error:', e);
+      logger.error('Chat error', e);
       setLastFailedMessage(messageText);
       // Remove streaming message and add error
       setMessages(prev => {

@@ -6,9 +6,10 @@
 
 import { MovementSession, CalibrationData, TimestampedLandmarks } from '../types';
 import { logger } from '../utils/logger';
+import type { ExerciseAnimationData } from './avatarAnimationService';
 
 const DB_NAME = 'rehabflow-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Updated for animation cache stores
 
 // Store names
 const STORES = {
@@ -17,6 +18,9 @@ const STORES = {
   LANDMARKS: 'landmarks',
   CALIBRATIONS: 'calibrations',
   PENDING_UPLOADS: 'pending_uploads',
+  // Sprint 5.4: Animation caching
+  ANIMATION_CACHE: 'animation_cache',
+  EXERCISE_META: 'exercise_meta',
 } as const;
 
 /**
@@ -52,6 +56,46 @@ export interface StoredLandmarks {
   sessionId: string;
   landmarks: TimestampedLandmarks[];
   timestamp: number;
+}
+
+/**
+ * Sprint 5.4: Cached animation data for offline use
+ */
+export interface CachedAnimation {
+  /** Exercise name as key */
+  exerciseName: string;
+  /** Full animation data */
+  animation: ExerciseAnimationData;
+  /** When cached */
+  cachedAt: number;
+  /** Cache version for invalidation */
+  version: number;
+  /** Size in bytes (approximate) */
+  sizeBytes: number;
+  /** Access count for LRU */
+  accessCount: number;
+  /** Last accessed time */
+  lastAccessed: number;
+}
+
+/**
+ * Sprint 5.4: Exercise metadata for quick lookup
+ */
+export interface CachedExerciseMeta {
+  /** Exercise name as key */
+  exerciseName: string;
+  /** Exercise category */
+  category: 'mobility' | 'strength' | 'balance' | 'endurance';
+  /** Duration in seconds */
+  duration: number;
+  /** Number of phases */
+  phaseCount: number;
+  /** Default tempo */
+  defaultTempo: number;
+  /** Whether full animation is cached */
+  hasFullAnimation: boolean;
+  /** When cached */
+  cachedAt: number;
 }
 
 /**
@@ -103,6 +147,21 @@ function openDB(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(STORES.PENDING_UPLOADS)) {
         const uploadStore = db.createObjectStore(STORES.PENDING_UPLOADS, { keyPath: 'id' });
         uploadStore.createIndex('sessionId', 'sessionId', { unique: false });
+      }
+
+      // Sprint 5.4: Animation cache store
+      if (!db.objectStoreNames.contains(STORES.ANIMATION_CACHE)) {
+        const animStore = db.createObjectStore(STORES.ANIMATION_CACHE, { keyPath: 'exerciseName' });
+        animStore.createIndex('category', 'animation.category', { unique: false });
+        animStore.createIndex('cachedAt', 'cachedAt', { unique: false });
+        animStore.createIndex('lastAccessed', 'lastAccessed', { unique: false });
+      }
+
+      // Sprint 5.4: Exercise metadata store
+      if (!db.objectStoreNames.contains(STORES.EXERCISE_META)) {
+        const metaStore = db.createObjectStore(STORES.EXERCISE_META, { keyPath: 'exerciseName' });
+        metaStore.createIndex('category', 'category', { unique: false });
+        metaStore.createIndex('hasFullAnimation', 'hasFullAnimation', { unique: false });
       }
 
       logger.debug('[IndexedDB] Database upgraded to version', DB_VERSION);
@@ -577,6 +636,348 @@ export const indexedDBService = {
       store.delete(id)
     );
     logger.debug('[IndexedDB] Pending upload removed:', id);
+  },
+
+  // ============================================
+  // ANIMATION CACHE (Sprint 5.4)
+  // ============================================
+
+  /**
+   * Save animation to cache
+   */
+  saveAnimation: async (exerciseName: string, animation: ExerciseAnimationData): Promise<void> => {
+    const sizeBytes = JSON.stringify(animation).length;
+    const cachedAnimation: CachedAnimation = {
+      exerciseName,
+      animation,
+      cachedAt: Date.now(),
+      version: 1,
+      sizeBytes,
+      accessCount: 0,
+      lastAccessed: Date.now(),
+    };
+
+    await withTransaction(STORES.ANIMATION_CACHE, 'readwrite', (store) =>
+      store.put(cachedAnimation)
+    );
+
+    logger.debug('[IndexedDB] Animation cached:', exerciseName, `(${Math.round(sizeBytes / 1024)}KB)`);
+  },
+
+  /**
+   * Get cached animation by exercise name
+   */
+  getAnimation: async (exerciseName: string): Promise<ExerciseAnimationData | null> => {
+    const cached = await withTransaction<CachedAnimation | undefined>(
+      STORES.ANIMATION_CACHE,
+      'readonly',
+      (store) => store.get(exerciseName)
+    );
+
+    if (cached) {
+      // Update access stats asynchronously
+      indexedDBService.updateAnimationAccessStats(exerciseName).catch(() => {});
+      return cached.animation;
+    }
+
+    return null;
+  },
+
+  /**
+   * Update access statistics for LRU eviction
+   */
+  updateAnimationAccessStats: async (exerciseName: string): Promise<void> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORES.ANIMATION_CACHE, 'readwrite');
+      const store = transaction.objectStore(STORES.ANIMATION_CACHE);
+      const getRequest = store.get(exerciseName);
+
+      getRequest.onsuccess = () => {
+        const cached = getRequest.result as CachedAnimation | undefined;
+        if (cached) {
+          cached.accessCount += 1;
+          cached.lastAccessed = Date.now();
+          store.put(cached);
+        }
+        resolve();
+      };
+
+      getRequest.onerror = () => {
+        reject(getRequest.error);
+      };
+
+      transaction.oncomplete = () => {
+        db.close();
+      };
+    });
+  },
+
+  /**
+   * Get all cached animations for a category
+   */
+  getCachedAnimationsByCategory: async (category: string): Promise<CachedAnimation[]> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORES.ANIMATION_CACHE, 'readonly');
+      const store = transaction.objectStore(STORES.ANIMATION_CACHE);
+      const index = store.index('category');
+      const request = index.getAll(category);
+
+      request.onsuccess = () => {
+        resolve(request.result || []);
+      };
+
+      request.onerror = () => {
+        reject(request.error);
+      };
+
+      transaction.oncomplete = () => {
+        db.close();
+      };
+    });
+  },
+
+  /**
+   * Get all cached animation names (for checking what's cached)
+   */
+  getCachedAnimationNames: async (): Promise<string[]> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORES.ANIMATION_CACHE, 'readonly');
+      const store = transaction.objectStore(STORES.ANIMATION_CACHE);
+      const request = store.getAllKeys();
+
+      request.onsuccess = () => {
+        resolve((request.result as string[]) || []);
+      };
+
+      request.onerror = () => {
+        reject(request.error);
+      };
+
+      transaction.oncomplete = () => {
+        db.close();
+      };
+    });
+  },
+
+  /**
+   * Clear old animations based on LRU policy
+   * Keeps the most recently accessed animations up to maxCount
+   */
+  clearOldAnimations: async (maxCount: number = 20): Promise<number> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORES.ANIMATION_CACHE, 'readwrite');
+      const store = transaction.objectStore(STORES.ANIMATION_CACHE);
+      const index = store.index('lastAccessed');
+      const request = index.getAll();
+
+      request.onsuccess = () => {
+        const all = (request.result as CachedAnimation[]) || [];
+
+        if (all.length <= maxCount) {
+          resolve(0);
+          return;
+        }
+
+        // Sort by lastAccessed ascending (oldest first)
+        all.sort((a, b) => a.lastAccessed - b.lastAccessed);
+
+        // Delete oldest entries
+        const toDelete = all.slice(0, all.length - maxCount);
+        let deleted = 0;
+
+        toDelete.forEach((item) => {
+          const deleteRequest = store.delete(item.exerciseName);
+          deleteRequest.onsuccess = () => {
+            deleted++;
+          };
+        });
+
+        logger.debug('[IndexedDB] Cleared', toDelete.length, 'old animations');
+        resolve(toDelete.length);
+      };
+
+      request.onerror = () => {
+        reject(request.error);
+      };
+
+      transaction.oncomplete = () => {
+        db.close();
+      };
+    });
+  },
+
+  /**
+   * Get animation cache statistics
+   */
+  getAnimationCacheStats: async (): Promise<{
+    count: number;
+    totalSizeBytes: number;
+    oldestCachedAt: number | null;
+    newestCachedAt: number | null;
+  }> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORES.ANIMATION_CACHE, 'readonly');
+      const store = transaction.objectStore(STORES.ANIMATION_CACHE);
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        const all = (request.result as CachedAnimation[]) || [];
+
+        if (all.length === 0) {
+          resolve({
+            count: 0,
+            totalSizeBytes: 0,
+            oldestCachedAt: null,
+            newestCachedAt: null,
+          });
+          return;
+        }
+
+        const totalSizeBytes = all.reduce((sum, item) => sum + item.sizeBytes, 0);
+        const cachedTimes = all.map((item) => item.cachedAt);
+
+        resolve({
+          count: all.length,
+          totalSizeBytes,
+          oldestCachedAt: Math.min(...cachedTimes),
+          newestCachedAt: Math.max(...cachedTimes),
+        });
+      };
+
+      request.onerror = () => {
+        reject(request.error);
+      };
+
+      transaction.oncomplete = () => {
+        db.close();
+      };
+    });
+  },
+
+  /**
+   * Clear all cached animations
+   */
+  clearAnimationCache: async (): Promise<void> => {
+    await withTransaction(STORES.ANIMATION_CACHE, 'readwrite', (store) =>
+      store.clear()
+    );
+    logger.debug('[IndexedDB] Animation cache cleared');
+  },
+
+  // ============================================
+  // EXERCISE METADATA (Sprint 5.4)
+  // ============================================
+
+  /**
+   * Save exercise metadata
+   */
+  saveExerciseMeta: async (meta: CachedExerciseMeta): Promise<void> => {
+    await withTransaction(STORES.EXERCISE_META, 'readwrite', (store) =>
+      store.put(meta)
+    );
+    logger.debug('[IndexedDB] Exercise meta saved:', meta.exerciseName);
+  },
+
+  /**
+   * Get exercise metadata
+   */
+  getExerciseMeta: async (exerciseName: string): Promise<CachedExerciseMeta | null> => {
+    const result = await withTransaction<CachedExerciseMeta | undefined>(
+      STORES.EXERCISE_META,
+      'readonly',
+      (store) => store.get(exerciseName)
+    );
+    return result || null;
+  },
+
+  /**
+   * Get all exercise metadata
+   */
+  getAllExerciseMeta: async (): Promise<CachedExerciseMeta[]> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORES.EXERCISE_META, 'readonly');
+      const store = transaction.objectStore(STORES.EXERCISE_META);
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        resolve(request.result || []);
+      };
+
+      request.onerror = () => {
+        reject(request.error);
+      };
+
+      transaction.oncomplete = () => {
+        db.close();
+      };
+    });
+  },
+
+  /**
+   * Get exercise metadata by category
+   */
+  getExerciseMetaByCategory: async (category: CachedExerciseMeta['category']): Promise<CachedExerciseMeta[]> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORES.EXERCISE_META, 'readonly');
+      const store = transaction.objectStore(STORES.EXERCISE_META);
+      const index = store.index('category');
+      const request = index.getAll(category);
+
+      request.onsuccess = () => {
+        resolve(request.result || []);
+      };
+
+      request.onerror = () => {
+        reject(request.error);
+      };
+
+      transaction.oncomplete = () => {
+        db.close();
+      };
+    });
+  },
+
+  /**
+   * Get exercises with cached animations
+   */
+  getExercisesWithCachedAnimations: async (): Promise<CachedExerciseMeta[]> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORES.EXERCISE_META, 'readonly');
+      const store = transaction.objectStore(STORES.EXERCISE_META);
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        // Filter for exercises with cached animations
+        const all = (request.result as CachedExerciseMeta[]) || [];
+        resolve(all.filter((item) => item.hasFullAnimation));
+      };
+
+      request.onerror = () => {
+        reject(request.error);
+      };
+
+      transaction.oncomplete = () => {
+        db.close();
+      };
+    });
+  },
+
+  /**
+   * Clear exercise metadata cache
+   */
+  clearExerciseMetaCache: async (): Promise<void> => {
+    await withTransaction(STORES.EXERCISE_META, 'readwrite', (store) =>
+      store.clear()
+    );
+    logger.debug('[IndexedDB] Exercise meta cache cleared');
   },
 
   // ============================================

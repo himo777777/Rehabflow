@@ -514,3 +514,290 @@ export const onAuthStateChange = (callback: (user: AuthUser | null) => void): ((
     subscription.unsubscribe();
   };
 };
+
+// ============================================================================
+// PROVIDER-PATIENT AUTHORIZATION
+// ============================================================================
+
+export type RelationshipType = 'treating' | 'consulting' | 'covering' | 'supervising';
+export type AccessLevel = 'full' | 'read_only' | 'limited';
+
+export interface ProviderPatientRelationship {
+  id: string;
+  providerId: string;
+  patientId: string;
+  clinicId?: string;
+  relationshipType: RelationshipType;
+  accessLevel: AccessLevel;
+  grantedAt: string;
+  expiresAt?: string;
+  patientConsentGiven: boolean;
+  patientConsentAt?: string;
+}
+
+export interface PatientInfo {
+  patientId: string;
+  patientEmail: string;
+  relationshipType: RelationshipType;
+  accessLevel: AccessLevel;
+  grantedAt: string;
+  expiresAt?: string;
+}
+
+export interface ProviderInfo {
+  providerId: string;
+  providerEmail: string;
+  relationshipType: RelationshipType;
+  accessLevel: AccessLevel;
+  clinicName?: string;
+  grantedAt: string;
+}
+
+/**
+ * Check if current user (provider) has access to a specific patient
+ */
+export const hasPatientAccess = async (
+  patientId: string,
+  requiredLevel: AccessLevel = 'read_only'
+): Promise<boolean> => {
+  if (!supabase) {
+    // Demo mode - allow access for demo purposes
+    return true;
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('has_patient_access', {
+      p_provider_id: (await getCurrentUser())?.id,
+      p_patient_id: patientId,
+      p_required_level: requiredLevel,
+    });
+
+    if (error) {
+      logger.error('hasPatientAccess error', error);
+      return false;
+    }
+
+    return data === true;
+  } catch (e) {
+    logger.error('hasPatientAccess exception', e);
+    return false;
+  }
+};
+
+/**
+ * Get all patients for the current provider
+ */
+export const getProviderPatients = async (): Promise<PatientInfo[]> => {
+  if (!supabase) {
+    return [];
+  }
+
+  try {
+    const user = await getCurrentUser();
+    if (!user || user.role !== 'provider') {
+      return [];
+    }
+
+    const { data, error } = await supabase.rpc('get_provider_patients', {
+      p_provider_id: user.id,
+    });
+
+    if (error) {
+      logger.error('getProviderPatients error', error);
+      return [];
+    }
+
+    return (data || []).map((row: Record<string, unknown>) => ({
+      patientId: row.patient_id as string,
+      patientEmail: row.patient_email as string,
+      relationshipType: row.relationship_type as RelationshipType,
+      accessLevel: row.access_level as AccessLevel,
+      grantedAt: row.granted_at as string,
+      expiresAt: row.expires_at as string | undefined,
+    }));
+  } catch (e) {
+    logger.error('getProviderPatients exception', e);
+    return [];
+  }
+};
+
+/**
+ * Get all providers for the current patient
+ */
+export const getPatientProviders = async (): Promise<ProviderInfo[]> => {
+  if (!supabase) {
+    return [];
+  }
+
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return [];
+    }
+
+    const { data, error } = await supabase.rpc('get_patient_providers', {
+      p_patient_id: user.id,
+    });
+
+    if (error) {
+      logger.error('getPatientProviders error', error);
+      return [];
+    }
+
+    return (data || []).map((row: Record<string, unknown>) => ({
+      providerId: row.provider_id as string,
+      providerEmail: row.provider_email as string,
+      relationshipType: row.relationship_type as RelationshipType,
+      accessLevel: row.access_level as AccessLevel,
+      clinicName: row.clinic_name as string | undefined,
+      grantedAt: row.granted_at as string,
+    }));
+  } catch (e) {
+    logger.error('getPatientProviders exception', e);
+    return [];
+  }
+};
+
+/**
+ * Grant provider access to a patient (provider initiates)
+ */
+export const grantPatientAccess = async (
+  patientId: string,
+  options?: {
+    relationshipType?: RelationshipType;
+    accessLevel?: AccessLevel;
+    clinicId?: string;
+    expiresAt?: string;
+    notes?: string;
+  }
+): Promise<{ relationshipId: string | null; error: string | null }> => {
+  if (!supabase) {
+    return { relationshipId: crypto.randomUUID(), error: null };
+  }
+
+  try {
+    const user = await getCurrentUser();
+    if (!user || user.role !== 'provider') {
+      return { relationshipId: null, error: 'Endast vårdgivare kan bevilja åtkomst' };
+    }
+
+    const { data, error } = await supabase.rpc('grant_patient_access', {
+      p_provider_id: user.id,
+      p_patient_id: patientId,
+      p_relationship_type: options?.relationshipType || 'treating',
+      p_access_level: options?.accessLevel || 'full',
+      p_clinic_id: options?.clinicId || null,
+      p_expires_at: options?.expiresAt || null,
+      p_notes: options?.notes || null,
+    });
+
+    if (error) {
+      logger.error('grantPatientAccess error', error);
+      return { relationshipId: null, error: 'Kunde inte bevilja åtkomst' };
+    }
+
+    return { relationshipId: data as string, error: null };
+  } catch (e) {
+    logger.error('grantPatientAccess exception', e);
+    return { relationshipId: null, error: 'Ett fel uppstod' };
+  }
+};
+
+/**
+ * Patient gives consent to provider access
+ */
+export const consentToProvider = async (
+  providerId: string
+): Promise<{ success: boolean; error: string | null }> => {
+  if (!supabase) {
+    return { success: true, error: null };
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('consent_to_provider', {
+      p_provider_id: providerId,
+    });
+
+    if (error) {
+      logger.error('consentToProvider error', error);
+      return { success: false, error: 'Kunde inte ge samtycke' };
+    }
+
+    return { success: data === true, error: data ? null : 'Ingen väntande relation hittades' };
+  } catch (e) {
+    logger.error('consentToProvider exception', e);
+    return { success: false, error: 'Ett fel uppstod' };
+  }
+};
+
+/**
+ * Revoke provider access (can be called by either party)
+ */
+export const revokePatientAccess = async (
+  providerId: string,
+  patientId: string,
+  reason?: string
+): Promise<{ success: boolean; error: string | null }> => {
+  if (!supabase) {
+    return { success: true, error: null };
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('revoke_patient_access', {
+      p_provider_id: providerId,
+      p_patient_id: patientId,
+      p_reason: reason || 'Relationen avslutad',
+    });
+
+    if (error) {
+      logger.error('revokePatientAccess error', error);
+      return { success: false, error: 'Kunde inte återkalla åtkomst' };
+    }
+
+    return { success: data === true, error: data ? null : 'Ingen aktiv relation hittades' };
+  } catch (e) {
+    logger.error('revokePatientAccess exception', e);
+    return { success: false, error: 'Ett fel uppstod' };
+  }
+};
+
+/**
+ * Get pending consent requests for current patient
+ */
+export const getPendingConsentRequests = async (): Promise<ProviderInfo[]> => {
+  if (!supabase) {
+    return [];
+  }
+
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return [];
+    }
+
+    const { data, error } = await supabase
+      .from('provider_patients')
+      .select('provider_id, relationship_type, access_level, granted_at, clinic_id')
+      .eq('patient_id', user.id)
+      .eq('patient_consent_given', false)
+      .is('revoked_at', null);
+
+    if (error) {
+      logger.error('getPendingConsentRequests error', error);
+      return [];
+    }
+
+    // Map the results - in production, would need to fetch provider emails separately
+    return (data || []).map((row) => ({
+      providerId: row.provider_id as string,
+      providerEmail: 'Provider', // Would require separate lookup
+      relationshipType: row.relationship_type as RelationshipType,
+      accessLevel: row.access_level as AccessLevel,
+      clinicName: undefined, // Would require separate lookup
+      grantedAt: row.granted_at as string,
+    }));
+  } catch (e) {
+    logger.error('getPendingConsentRequests exception', e);
+    return [];
+  }
+};

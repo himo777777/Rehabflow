@@ -2498,6 +2498,419 @@ export const eccentricCalfRaiseAnimation: ExerciseAnimationData = {
 };
 
 // ==========================================
+// FAS 8: NYA REHABILITERINGSANIMATIONER
+// Kritiska övningar för post-op patienter
+// ==========================================
+
+/**
+ * 33. Pendulum Swing (Codman Exercises)
+ * Passiv axelrörelse för tidig post-op rehabilitering
+ * KRITISK för axelprotes/rotatorkuff fas 1
+ */
+export const pendulumSwingAnimation: ExerciseAnimationData = {
+  exerciseName: 'Pendulum Swing',
+  category: 'mobility',
+  duration: 4,
+  loop: true,
+  defaultTempo: 0.5,
+  keyframes: [
+    {
+      time: 0,
+      joints: {
+        spine: { x: Math.PI / 6, y: 0, z: 0 }, // Böjd framåt
+        leftShoulder: { x: -Math.PI / 8, y: 0, z: 0 },
+        leftElbow: { x: 0, y: 0, z: 0 },
+        rightShoulder: { x: -Math.PI / 8, y: 0, z: 0 },
+        rightElbow: { x: 0, y: 0, z: 0 },
+      },
+      expression: 'neutral',
+    },
+    {
+      time: 0.25,
+      joints: {
+        spine: { x: Math.PI / 6, y: 0, z: 0 },
+        leftShoulder: { x: -Math.PI / 8, y: 0, z: Math.PI / 12 }, // Swing left
+        leftElbow: { x: 0, y: 0, z: 0 },
+        rightShoulder: { x: -Math.PI / 8, y: 0, z: Math.PI / 12 },
+        rightElbow: { x: 0, y: 0, z: 0 },
+      },
+      expression: 'focused',
+    },
+    {
+      time: 0.5,
+      joints: {
+        spine: { x: Math.PI / 6, y: 0, z: 0 },
+        leftShoulder: { x: -Math.PI / 8, y: 0, z: 0 },
+        leftElbow: { x: 0, y: 0, z: 0 },
+        rightShoulder: { x: -Math.PI / 8, y: 0, z: 0 },
+        rightElbow: { x: 0, y: 0, z: 0 },
+      },
+      expression: 'neutral',
+    },
+    {
+      time: 0.75,
+      joints: {
+        spine: { x: Math.PI / 6, y: 0, z: 0 },
+        leftShoulder: { x: -Math.PI / 8, y: 0, z: -Math.PI / 12 }, // Swing right
+        leftElbow: { x: 0, y: 0, z: 0 },
+        rightShoulder: { x: -Math.PI / 8, y: 0, z: -Math.PI / 12 },
+        rightElbow: { x: 0, y: 0, z: 0 },
+      },
+      expression: 'focused',
+    },
+    {
+      time: 1,
+      joints: {
+        spine: { x: Math.PI / 6, y: 0, z: 0 },
+        leftShoulder: { x: -Math.PI / 8, y: 0, z: 0 },
+        leftElbow: { x: 0, y: 0, z: 0 },
+        rightShoulder: { x: -Math.PI / 8, y: 0, z: 0 },
+        rightElbow: { x: 0, y: 0, z: 0 },
+      },
+      expression: 'neutral',
+    },
+  ],
+  phases: [
+    { name: 'Pendla vänster', startTime: 0, endTime: 0.25, description: 'Låt armen pendla åt vänster' },
+    { name: 'Mitt', startTime: 0.25, endTime: 0.5, description: 'Passera mitten' },
+    { name: 'Pendla höger', startTime: 0.5, endTime: 0.75, description: 'Låt armen pendla åt höger' },
+    { name: 'Tillbaka', startTime: 0.75, endTime: 1, description: 'Tillbaka till start' },
+  ],
+};
+
+/**
+ * 34. Straight Leg Raise (Rakt benlyft)
+ * Klassisk knä-rehabiliteringsövning
+ * KRITISK för ACL/menisk post-op
+ */
+export const straightLegRaiseAnimation: ExerciseAnimationData = {
+  exerciseName: 'Straight Leg Raise',
+  category: 'strength',
+  duration: 4,
+  loop: true,
+  defaultTempo: 1,
+  keyframes: [
+    {
+      time: 0,
+      joints: {
+        leftHip: { x: 0, y: 0, z: 0 },
+        leftKnee: { x: 0, y: 0, z: 0 },
+        leftAnkle: { x: Math.PI / 12, y: 0, z: 0 }, // Dorsalflexion
+        rightHip: { x: Math.PI / 8, y: 0, z: 0 },
+        rightKnee: { x: Math.PI / 4, y: 0, z: 0 },
+        rightAnkle: { x: 0, y: 0, z: 0 },
+        spine: { x: 0, y: 0, z: 0 },
+      },
+      rootPosition: { x: 0, y: 0, z: 0 },
+      expression: 'neutral',
+    },
+    {
+      time: 0.4,
+      joints: {
+        leftHip: { x: -Math.PI / 4, y: 0, z: 0 }, // Höftflexion
+        leftKnee: { x: 0, y: 0, z: 0 }, // Håll knät rakt
+        leftAnkle: { x: Math.PI / 12, y: 0, z: 0 },
+        rightHip: { x: Math.PI / 8, y: 0, z: 0 },
+        rightKnee: { x: Math.PI / 4, y: 0, z: 0 },
+        rightAnkle: { x: 0, y: 0, z: 0 },
+        spine: { x: 0, y: 0, z: 0 },
+      },
+      rootPosition: { x: 0, y: 0, z: 0 },
+      expression: 'focused',
+    },
+    {
+      time: 0.6,
+      joints: {
+        leftHip: { x: -Math.PI / 4, y: 0, z: 0 },
+        leftKnee: { x: 0, y: 0, z: 0 },
+        leftAnkle: { x: Math.PI / 12, y: 0, z: 0 },
+        rightHip: { x: Math.PI / 8, y: 0, z: 0 },
+        rightKnee: { x: Math.PI / 4, y: 0, z: 0 },
+        rightAnkle: { x: 0, y: 0, z: 0 },
+        spine: { x: 0, y: 0, z: 0 },
+      },
+      rootPosition: { x: 0, y: 0, z: 0 },
+      expression: 'encouraging',
+    },
+    {
+      time: 1,
+      joints: {
+        leftHip: { x: 0, y: 0, z: 0 },
+        leftKnee: { x: 0, y: 0, z: 0 },
+        leftAnkle: { x: Math.PI / 12, y: 0, z: 0 },
+        rightHip: { x: Math.PI / 8, y: 0, z: 0 },
+        rightKnee: { x: Math.PI / 4, y: 0, z: 0 },
+        rightAnkle: { x: 0, y: 0, z: 0 },
+        spine: { x: 0, y: 0, z: 0 },
+      },
+      rootPosition: { x: 0, y: 0, z: 0 },
+      expression: 'happy',
+    },
+  ],
+  phases: [
+    { name: 'Lyft', startTime: 0, endTime: 0.4, description: 'Lyft benet rakt upp med spänd quad' },
+    { name: 'Håll', startTime: 0.4, endTime: 0.6, description: 'Håll i toppläget' },
+    { name: 'Sänk', startTime: 0.6, endTime: 1, description: 'Sänk kontrollerat' },
+  ],
+};
+
+/**
+ * 35. Dead Bug
+ * Core-stabilisering utan ryggbelastning
+ * KRITISK för post-op rygg och bålstabilitet
+ */
+export const deadBugAnimation: ExerciseAnimationData = {
+  exerciseName: 'Dead Bug',
+  category: 'strength',
+  duration: 4,
+  loop: true,
+  defaultTempo: 1,
+  keyframes: [
+    {
+      time: 0,
+      joints: {
+        // Startposition: liggande med höfter och knän i 90°
+        leftHip: { x: -Math.PI / 2, y: 0, z: 0 },
+        leftKnee: { x: Math.PI / 2, y: 0, z: 0 },
+        rightHip: { x: -Math.PI / 2, y: 0, z: 0 },
+        rightKnee: { x: Math.PI / 2, y: 0, z: 0 },
+        leftShoulder: { x: -Math.PI / 2, y: 0, z: 0 },
+        leftElbow: { x: 0, y: 0, z: 0 },
+        rightShoulder: { x: -Math.PI / 2, y: 0, z: 0 },
+        rightElbow: { x: 0, y: 0, z: 0 },
+        spine: { x: 0, y: 0, z: 0 },
+      },
+      expression: 'neutral',
+    },
+    {
+      time: 0.5,
+      joints: {
+        // Motsatt arm och ben ut
+        leftHip: { x: -Math.PI / 2, y: 0, z: 0 },
+        leftKnee: { x: Math.PI / 2, y: 0, z: 0 },
+        rightHip: { x: -Math.PI / 8, y: 0, z: 0 }, // Höger ben ut
+        rightKnee: { x: Math.PI / 12, y: 0, z: 0 },
+        leftShoulder: { x: -Math.PI * 0.9, y: 0, z: 0 }, // Vänster arm över huvud
+        leftElbow: { x: 0, y: 0, z: 0 },
+        rightShoulder: { x: -Math.PI / 2, y: 0, z: 0 },
+        rightElbow: { x: 0, y: 0, z: 0 },
+        spine: { x: 0, y: 0, z: 0 },
+      },
+      expression: 'focused',
+    },
+    {
+      time: 1,
+      joints: {
+        leftHip: { x: -Math.PI / 2, y: 0, z: 0 },
+        leftKnee: { x: Math.PI / 2, y: 0, z: 0 },
+        rightHip: { x: -Math.PI / 2, y: 0, z: 0 },
+        rightKnee: { x: Math.PI / 2, y: 0, z: 0 },
+        leftShoulder: { x: -Math.PI / 2, y: 0, z: 0 },
+        leftElbow: { x: 0, y: 0, z: 0 },
+        rightShoulder: { x: -Math.PI / 2, y: 0, z: 0 },
+        rightElbow: { x: 0, y: 0, z: 0 },
+        spine: { x: 0, y: 0, z: 0 },
+      },
+      expression: 'happy',
+    },
+  ],
+  phases: [
+    { name: 'Start', startTime: 0, endTime: 0.2, description: 'Spänn bålen, aktivera core' },
+    { name: 'Sträck', startTime: 0.2, endTime: 0.5, description: 'Sträck motsatt arm och ben' },
+    { name: 'Tillbaka', startTime: 0.5, endTime: 1, description: 'Tillbaka med kontroll' },
+  ],
+};
+
+/**
+ * 36. Terminal Knee Extension
+ * Slutfas knäextension för quadriceps
+ * KRITISK för ACL post-op fas 2+
+ */
+export const terminalKneeExtensionAnimation: ExerciseAnimationData = {
+  exerciseName: 'Terminal Knee Extension',
+  category: 'strength',
+  duration: 3,
+  loop: true,
+  defaultTempo: 1,
+  keyframes: [
+    {
+      time: 0,
+      joints: {
+        leftHip: { x: 0, y: 0, z: 0 },
+        leftKnee: { x: Math.PI / 6, y: 0, z: 0 }, // Böjt ~30°
+        leftAnkle: { x: 0, y: 0, z: 0 },
+        rightHip: { x: 0, y: 0, z: 0 },
+        rightKnee: { x: 0, y: 0, z: 0 },
+        rightAnkle: { x: 0, y: 0, z: 0 },
+        spine: { x: 0, y: 0, z: 0 },
+      },
+      expression: 'neutral',
+    },
+    {
+      time: 0.4,
+      joints: {
+        leftHip: { x: 0, y: 0, z: 0 },
+        leftKnee: { x: 0, y: 0, z: 0 }, // Full extension
+        leftAnkle: { x: 0, y: 0, z: 0 },
+        rightHip: { x: 0, y: 0, z: 0 },
+        rightKnee: { x: 0, y: 0, z: 0 },
+        rightAnkle: { x: 0, y: 0, z: 0 },
+        spine: { x: 0, y: 0, z: 0 },
+      },
+      expression: 'focused',
+    },
+    {
+      time: 0.6,
+      joints: {
+        leftHip: { x: 0, y: 0, z: 0 },
+        leftKnee: { x: 0, y: 0, z: 0 },
+        leftAnkle: { x: 0, y: 0, z: 0 },
+        rightHip: { x: 0, y: 0, z: 0 },
+        rightKnee: { x: 0, y: 0, z: 0 },
+        rightAnkle: { x: 0, y: 0, z: 0 },
+        spine: { x: 0, y: 0, z: 0 },
+      },
+      expression: 'encouraging',
+    },
+    {
+      time: 1,
+      joints: {
+        leftHip: { x: 0, y: 0, z: 0 },
+        leftKnee: { x: Math.PI / 6, y: 0, z: 0 },
+        leftAnkle: { x: 0, y: 0, z: 0 },
+        rightHip: { x: 0, y: 0, z: 0 },
+        rightKnee: { x: 0, y: 0, z: 0 },
+        rightAnkle: { x: 0, y: 0, z: 0 },
+        spine: { x: 0, y: 0, z: 0 },
+      },
+      expression: 'neutral',
+    },
+  ],
+  phases: [
+    { name: 'Sträck', startTime: 0, endTime: 0.4, description: 'Sträck ut knät helt' },
+    { name: 'Håll', startTime: 0.4, endTime: 0.6, description: 'Håll full extension' },
+    { name: 'Släpp', startTime: 0.6, endTime: 1, description: 'Kontrollerat tillbaka' },
+  ],
+};
+
+/**
+ * 37. Ankle Pumps (Fotpump)
+ * Cirkulationsfrämjande efter benoperationer
+ * KRITISK för alla post-op ben (DVT-prevention)
+ */
+export const anklePumpsAnimation: ExerciseAnimationData = {
+  exerciseName: 'Ankle Pumps',
+  category: 'mobility',
+  duration: 2,
+  loop: true,
+  defaultTempo: 1,
+  keyframes: [
+    {
+      time: 0,
+      joints: {
+        leftAnkle: { x: Math.PI / 4, y: 0, z: 0 }, // Dorsalflexion
+        rightAnkle: { x: Math.PI / 4, y: 0, z: 0 },
+        leftKnee: { x: 0, y: 0, z: 0 },
+        rightKnee: { x: 0, y: 0, z: 0 },
+      },
+      expression: 'neutral',
+    },
+    {
+      time: 0.5,
+      joints: {
+        leftAnkle: { x: -Math.PI / 4, y: 0, z: 0 }, // Plantarflexion
+        rightAnkle: { x: -Math.PI / 4, y: 0, z: 0 },
+        leftKnee: { x: 0, y: 0, z: 0 },
+        rightKnee: { x: 0, y: 0, z: 0 },
+      },
+      expression: 'focused',
+    },
+    {
+      time: 1,
+      joints: {
+        leftAnkle: { x: Math.PI / 4, y: 0, z: 0 },
+        rightAnkle: { x: Math.PI / 4, y: 0, z: 0 },
+        leftKnee: { x: 0, y: 0, z: 0 },
+        rightKnee: { x: 0, y: 0, z: 0 },
+      },
+      expression: 'neutral',
+    },
+  ],
+  phases: [
+    { name: 'Upp', startTime: 0, endTime: 0.5, description: 'Dra tårna mot dig' },
+    { name: 'Ner', startTime: 0.5, endTime: 1, description: 'Peka tårna nedåt' },
+  ],
+};
+
+/**
+ * 38. Quad Sets (Isometrisk quadriceps)
+ * Tidig quadriceps-aktivering
+ * KRITISK för knä post-op fas 1
+ */
+export const quadSetsAnimation: ExerciseAnimationData = {
+  exerciseName: 'Quad Sets',
+  category: 'strength',
+  duration: 3,
+  loop: true,
+  defaultTempo: 1,
+  keyframes: [
+    {
+      time: 0,
+      joints: {
+        leftHip: { x: 0, y: 0, z: 0 },
+        leftKnee: { x: 0, y: 0, z: 0 },
+        leftAnkle: { x: 0, y: 0, z: 0 },
+        rightHip: { x: 0, y: 0, z: 0 },
+        rightKnee: { x: 0, y: 0, z: 0 },
+        rightAnkle: { x: 0, y: 0, z: 0 },
+      },
+      expression: 'neutral',
+    },
+    {
+      time: 0.2,
+      joints: {
+        leftHip: { x: 0, y: 0, z: 0 },
+        leftKnee: { x: -0.05, y: 0, z: 0 }, // Slight hyperextension from quad contraction
+        leftAnkle: { x: Math.PI / 12, y: 0, z: 0 },
+        rightHip: { x: 0, y: 0, z: 0 },
+        rightKnee: { x: 0, y: 0, z: 0 },
+        rightAnkle: { x: 0, y: 0, z: 0 },
+      },
+      expression: 'focused',
+    },
+    {
+      time: 0.7,
+      joints: {
+        leftHip: { x: 0, y: 0, z: 0 },
+        leftKnee: { x: -0.05, y: 0, z: 0 },
+        leftAnkle: { x: Math.PI / 12, y: 0, z: 0 },
+        rightHip: { x: 0, y: 0, z: 0 },
+        rightKnee: { x: 0, y: 0, z: 0 },
+        rightAnkle: { x: 0, y: 0, z: 0 },
+      },
+      expression: 'encouraging',
+    },
+    {
+      time: 1,
+      joints: {
+        leftHip: { x: 0, y: 0, z: 0 },
+        leftKnee: { x: 0, y: 0, z: 0 },
+        leftAnkle: { x: 0, y: 0, z: 0 },
+        rightHip: { x: 0, y: 0, z: 0 },
+        rightKnee: { x: 0, y: 0, z: 0 },
+        rightAnkle: { x: 0, y: 0, z: 0 },
+      },
+      expression: 'happy',
+    },
+  ],
+  phases: [
+    { name: 'Spänn', startTime: 0, endTime: 0.2, description: 'Spänn lårmuskeln, tryck knät mot underlaget' },
+    { name: 'Håll', startTime: 0.2, endTime: 0.7, description: 'Håll spänningen' },
+    { name: 'Släpp', startTime: 0.7, endTime: 1, description: 'Slappna av' },
+  ],
+};
+
+// ==========================================
 // EXERCISE ANIMATIONS MAP
 // All animations organized by key for lookup
 // ==========================================
@@ -2509,6 +2922,10 @@ export const eccentricCalfRaiseAnimation: ExerciseAnimationData = {
 export const EXERCISE_ANIMATIONS: Record<string, ExerciseAnimationData> = {
   // === STANDING ANIMATIONS ===
   'axelflexion': shoulderFlexionAnimation,
+  'axelrörlighet': shoulderFlexionAnimation,
+  'axelmobilitet': shoulderFlexionAnimation,
+  'axelpendel': shoulderFlexionAnimation,
+  'shoulder_mobility': shoulderFlexionAnimation,
   'armlyft': shoulderFlexionAnimation,
   'shoulder_flexion': shoulderFlexionAnimation,
   'arm_raise': shoulderFlexionAnimation,
@@ -2638,6 +3055,51 @@ export const EXERCISE_ANIMATIONS: Record<string, ExerciseAnimationData> = {
   'forearmRotation': forearmRotationAnimation,
   'underarmsrotation': forearmRotationAnimation,
 
+  // === NEW REHABILITATION ANIMATIONS (FAS 8) ===
+  // Pendulum / Codman (Post-op shoulder)
+  'pendulum_swing': pendulumSwingAnimation,
+  'pendulumSwing': pendulumSwingAnimation,
+  'pendel': pendulumSwingAnimation,
+  'pendelrörelse': pendulumSwingAnimation,
+  'codman': pendulumSwingAnimation,
+  'codman_exercises': pendulumSwingAnimation,
+  'axelpendel_codman': pendulumSwingAnimation,
+
+  // Straight Leg Raise (Post-op knee/hip)
+  'straight_leg_raise': straightLegRaiseAnimation,
+  'straightLegRaise': straightLegRaiseAnimation,
+  'rakt_benlyft': straightLegRaiseAnimation,
+  'slr': straightLegRaiseAnimation,
+  'benlyft_liggande': straightLegRaiseAnimation,
+
+  // Dead Bug (Core stabilization)
+  'dead_bug': deadBugAnimation,
+  'deadBug': deadBugAnimation,
+  'döda_insekten': deadBugAnimation,
+  'core_stability': deadBugAnimation,
+
+  // Terminal Knee Extension (ACL post-op)
+  'terminal_knee_extension': terminalKneeExtensionAnimation,
+  'terminalKneeExtension': terminalKneeExtensionAnimation,
+  'tke': terminalKneeExtensionAnimation,
+  'slutfas_knäextension': terminalKneeExtensionAnimation,
+
+  // Ankle Pumps (DVT prevention)
+  'ankle_pumps': anklePumpsAnimation,
+  'anklePumps': anklePumpsAnimation,
+  'fotpump': anklePumpsAnimation,
+  'fotledsrörelser': anklePumpsAnimation,
+  'ankelpump': anklePumpsAnimation,
+  'cirkulation_fötter': anklePumpsAnimation,
+
+  // Quad Sets (Post-op knee phase 1)
+  'quad_sets': quadSetsAnimation,
+  'quadSets': quadSetsAnimation,
+  'quad_set': quadSetsAnimation,
+  'quadriceps_aktivering': quadSetsAnimation,
+  'isometrisk_quad': quadSetsAnimation,
+  'lårmuskeln_spänn': quadSetsAnimation,
+
   // === IDLE ===
   'idle': idleAnimation,
 };
@@ -2647,102 +3109,676 @@ export const EXERCISE_ANIMATIONS: Record<string, ExerciseAnimationData> = {
  * Maps Swedish and English terms to their corresponding animations
  */
 const EXERCISE_KEYWORD_MAP: Record<string, ExerciseAnimationData> = {
-  // === ARM & SHOULDER EXERCISES ===
-  'armlyft': shoulderFlexionAnimation,
-  'arm_lyft': shoulderFlexionAnimation,
-  'armhävning': wallPushUpAnimation,
-  'arm_hävning': wallPushUpAnimation,
-  'skulderbladsstabilisering': serratusPushUpAnimation,
-  'skulderblad': serratusPushUpAnimation,
-  'rotatorkuff': shoulderExternalRotationAnimation,
-  'rotator': shoulderExternalRotationAnimation,
-  'utåtrotation': shoulderExternalRotationAnimation,
-  'inåtrotation': shoulderExternalRotationAnimation,
-  'axelrotation': shoulderExternalRotationAnimation,
-  'lateral_raise': shoulderFlexionAnimation,
-  'lateral': shoulderFlexionAnimation,
-  'front_raise': shoulderFlexionAnimation,
-  'overhead': shoulderFlexionAnimation,
-
-  // === LEG EXERCISES ===
-  'benlyft': hipAbductionAnimation,
-  'benpress': squatAnimation,
-  'bensträckning': kneeExtensionAnimation,
-  'vadlyft': calfRaiseAnimation,
-  'vadmuskel': calfRaiseAnimation,
-  'häl': calfRaiseAnimation,
-  'tå_hävning': calfRaiseAnimation,
-  'stärkande': squatAnimation,
-  'quadriceps': kneeExtensionAnimation,
-  'quad': kneeExtensionAnimation,
-  'hamstring': gluteBridgeAnimation,
-  'ischiokrurala': gluteBridgeAnimation,
-  'baksida_lår': gluteBridgeAnimation,
-  'lår': squatAnimation,
-
-  // === HIP EXERCISES ===
-  'höftlyft': gluteBridgeAnimation,
-  'höftrotation': hipAbductionAnimation,
-  'höftflexor': hipFlexorStretchAnimation,
-  'höftböjare': hipFlexorStretchAnimation,
-  'iliopsoas': hipFlexorStretchAnimation,
-  'gluteus': gluteBridgeAnimation,
-  'gluteal': gluteBridgeAnimation,
-  'sätes': gluteBridgeAnimation,
-  'rumpa': gluteBridgeAnimation,
-  'bäcken': gluteBridgeAnimation,
-  'adduktor': hipAbductionAnimation,
-  'abduktor': hipAbductionAnimation,
-
-  // === KNEE EXERCISES ===
-  'knäböjning': squatAnimation,
-  'knästräckning': kneeExtensionAnimation,
-  'terminal_knee': kneeExtensionAnimation,
-  'patella': kneeExtensionAnimation,
-  'acl': squatAnimation,
-  'menisk': squatAnimation,
-
-  // === CORE EXERCISES ===
-  'magmuskel': mcGillCurlUpAnimation,
-  'mage': mcGillCurlUpAnimation,
-  'bukmuskel': mcGillCurlUpAnimation,
-  'crunch': mcGillCurlUpAnimation,
-  'situp': mcGillCurlUpAnimation,
-  'planka': sidePlankAnimation,
-  'rygglyft': cobraAnimation,
-  'rygg_extension': cobraAnimation,
-  'extension_rygg': cobraAnimation,
-  'bålstabilitet': trunkRotationAnimation,
-  'stabilisering': trunkRotationAnimation,
-  'dead_bug': birdDogAnimation,
-
-  // === BALANCE EXERCISES ===
-  'enbensbalans': singleLegBalanceAnimation,
-  'enbensstående': singleLegBalanceAnimation,
-  'proprioception': singleLegBalanceAnimation,
-  'viktig_balans': singleLegBalanceAnimation,
-
-  // === STRETCH EXERCISES ===
-  'stretch': hipFlexorStretchAnimation,
-  'töjning': hipFlexorStretchAnimation,
-  'rörlighet': catCowAnimation,
-  'mobilitet': catCowAnimation,
-  'flexibilitet': catCowAnimation,
-
-  // === NECK EXERCISES ===
+  // =============================================
+  // NECK EXERCISES (Nacke)
+  // =============================================
+  'retraktion_av_nacke': chinTuckAnimation,
+  'chin_tucks': chinTuckAnimation,
+  'chin_tuck': chinTuckAnimation,
+  'haka_in': chinTuckAnimation,
+  'isometrisk_nackextension': neckExtensionAnimation,
+  'nackextension': neckExtensionAnimation,
+  'levator_scapulae_stretch': neckStretchAnimation,
+  'levator_scapulae': neckStretchAnimation,
+  'isometrisk_nackflexion': neckExtensionAnimation,
+  'nackflexion': neckExtensionAnimation,
+  'övre_trapezius_stretch': neckStretchAnimation,
+  'trapezius_stretch': neckStretchAnimation,
+  'trapezius': neckStretchAnimation,
   'nacke': chinTuckAnimation,
   'hals': chinTuckAnimation,
   'cervical': chinTuckAnimation,
   'retraktion': chinTuckAnimation,
 
-  // === WRIST/HAND EXERCISES ===
+  // New neck exercises from templates
+  'prn_aktivering': chinTuckAnimation,
+  'prn aktivering': chinTuckAnimation,
+  'öga_huvud_koordination': chinTuckAnimation,
+  'öga-huvud koordination': chinTuckAnimation,
+  'öga-huvud': chinTuckAnimation,
+  'eye_head': chinTuckAnimation,
+  'vor_x1': chinTuckAnimation,
+  'vor_x1_övning': chinTuckAnimation,
+  'vor x1 övning': chinTuckAnimation,
+  'vor_x2': chinTuckAnimation,
+  'vor_x2_övning': chinTuckAnimation,
+  'vor x2 övning': chinTuckAnimation,
+  'vor': chinTuckAnimation,
+  'vestibular': chinTuckAnimation,
+  'liggande_nacknickning': chinTuckAnimation,
+  'liggande nacknickning': chinTuckAnimation,
+  'nacknickning': chinTuckAnimation,
+  'suboccipital': neckStretchAnimation,
+  'suboccipital_release': neckStretchAnimation,
+  'suboccipital release': neckStretchAnimation,
+  'hållningskorrigering': chinTuckAnimation,
+  'postural': chinTuckAnimation,
+  'posture': chinTuckAnimation,
+  'motståndsträning': neckExtensionAnimation,
+  'motståndsträning_alla_riktningar': neckExtensionAnimation,
+  'motståndsträning alla riktningar': neckExtensionAnimation,
+  'resistance_all': neckExtensionAnimation,
+  'snags': chinTuckAnimation,
+  'cervikala_snags': chinTuckAnimation,
+  'cervikala snags': chinTuckAnimation,
+  'mulligan': chinTuckAnimation,
+
+  // Additional neck templates
+  'deep_neck_flexor': chinTuckAnimation,
+  'dnf': chinTuckAnimation,
+  'craniocervical': chinTuckAnimation,
+  'craniocervikal': chinTuckAnimation,
+  'neural_glide': neckStretchAnimation,
+  'neural_slider': neckStretchAnimation,
+  'neural_tensioner': neckStretchAnimation,
+  'thoracic_extension': cobraAnimation,
+  'pec_minor': neckStretchAnimation,
+  'flexor_endurance': neckExtensionAnimation,
+  'extensor_strength': neckExtensionAnimation,
+  'scapular_retraction': chinTuckAnimation,
+  'lower_trap': chinTuckAnimation,
+  'prone_retraction': chinTuckAnimation,
+  'self_traction': neckStretchAnimation,
+
+  // =============================================
+  // SHOULDER EXERCISES (Axel)
+  // =============================================
+  'pendling': shoulderFlexionAnimation,
+  'codman': shoulderFlexionAnimation,
+  'codmans': shoulderFlexionAnimation,
+  'axelrörlighet': shoulderFlexionAnimation,
+  'axel_rörlighet': shoulderFlexionAnimation,
+  'axelmobilitet': shoulderFlexionAnimation,
+  'axelpendel': shoulderFlexionAnimation,
+  'pendel': shoulderFlexionAnimation,
+  'axelflexion': shoulderFlexionAnimation,
+  'axelabduktion': shoulderFlexionAnimation,
+  'axelcirklar': shoulderFlexionAnimation,
+  'axelsträckning': shoulderFlexionAnimation,
+  'armcirklar': shoulderFlexionAnimation,
+  'armlyft': shoulderFlexionAnimation,
+  'arm_lyft': shoulderFlexionAnimation,
+
+  'utåtrotation_med_gummiband': shoulderExternalRotationAnimation,
+  'utåtrotation': shoulderExternalRotationAnimation,
+  'external_rotation': shoulderExternalRotationAnimation,
+  'inåtrotation_med_gummiband': shoulderExternalRotationAnimation,
+  'inåtrotation': shoulderExternalRotationAnimation,
+  'internal_rotation': shoulderExternalRotationAnimation,
+  'rotatorkuff': shoulderExternalRotationAnimation,
+  'rotator': shoulderExternalRotationAnimation,
+  'axelrotation': shoulderExternalRotationAnimation,
+
+  'scaption': fullCanAnimation,
+  'full_can': fullCanAnimation,
+  'fullcan': fullCanAnimation,
+  'supraspinatus': fullCanAnimation,
+
+  'sleeper_stretch': shoulderExternalRotationAnimation,
+  'sleeper': shoulderExternalRotationAnimation,
+
+  'wall_slides': wallSlidesAnimation,
+  'wallslides': wallSlidesAnimation,
+  'väggglid': wallSlidesAnimation,
+
+  'serratus_push_up': serratusPushUpAnimation,
+  'serratus_pushup': serratusPushUpAnimation,
+  'serratus': serratusPushUpAnimation,
+  'plus_push_up': serratusPushUpAnimation,
+  'skulderbladsstabilisering': serratusPushUpAnimation,
+  'skulderblad': serratusPushUpAnimation,
+
+  'armhävning': wallPushUpAnimation,
+  'arm_hävning': wallPushUpAnimation,
+  'lateral_raise': shoulderFlexionAnimation,
+  'lateral': shoulderFlexionAnimation,
+  'front_raise': shoulderFlexionAnimation,
+  'overhead': shoulderFlexionAnimation,
+
+  // Additional shoulder exercises (from expanded templates)
+  'prone_er': shoulderExternalRotationAnimation,
+  'pronliggande_utåtrotation': shoulderExternalRotationAnimation,
+  'sidelying_er': shoulderExternalRotationAnimation,
+  'sidoliggande_utåtrotation': shoulderExternalRotationAnimation,
+  'ir_standing': shoulderExternalRotationAnimation,
+  'inåtrotation_stående': shoulderExternalRotationAnimation,
+  'prone_w': fullCanAnimation,
+  'liggande_w': fullCanAnimation,
+  'w_lyft': fullCanAnimation,
+  'prone_i': fullCanAnimation,
+  'liggande_i': fullCanAnimation,
+  'i_lyft': fullCanAnimation,
+  'low_row': serratusPushUpAnimation,
+  'låg_rodd': serratusPushUpAnimation,
+  'high_row': serratusPushUpAnimation,
+  'hög_rodd': serratusPushUpAnimation,
+  'face_pull': shoulderExternalRotationAnimation,
+  'wand_flexion': shoulderFlexionAnimation,
+  'stavflexion': shoulderFlexionAnimation,
+  'wand_er': shoulderExternalRotationAnimation,
+  'wand_ir': shoulderExternalRotationAnimation,
+  'stav': shoulderFlexionAnimation,
+  'table_slides': shoulderFlexionAnimation,
+  'bordsglidning': shoulderFlexionAnimation,
+  'finger_walk': shoulderFlexionAnimation,
+  'fingerpromenad': shoulderFlexionAnimation,
+  'frontlyft': shoulderFlexionAnimation,
+  'sidolyft': shoulderFlexionAnimation,
+  'reverse_fly': shoulderExternalRotationAnimation,
+  'omvänd_fly': shoulderExternalRotationAnimation,
+  'overhead_press': shoulderFlexionAnimation,
+  'axelpress': shoulderFlexionAnimation,
+  'arnold_press': shoulderFlexionAnimation,
+  'wall_pushup': wallPushUpAnimation,
+  'väggarmhävning': wallPushUpAnimation,
+  'incline_pushup': wallPushUpAnimation,
+  'lutande_armhävning': wallPushUpAnimation,
+  'pushup_plus': serratusPushUpAnimation,
+  'armhävning_plus': serratusPushUpAnimation,
+  'rhythmic_stab': shoulderExternalRotationAnimation,
+  'rytmisk_stabilisering': shoulderExternalRotationAnimation,
+  'ball_squeeze': serratusPushUpAnimation,
+  'bollklämning': serratusPushUpAnimation,
+  'quadruped_reach': shoulderFlexionAnimation,
+  'fyrfota_räckning': shoulderFlexionAnimation,
+  'pullover': shoulderFlexionAnimation,
+  'upright_row': shoulderFlexionAnimation,
+  'uppåtrodd': shoulderFlexionAnimation,
+  'shrug': shoulderFlexionAnimation,
+  'axelryckningar': shoulderFlexionAnimation,
+  'corner_stretch': shoulderExternalRotationAnimation,
+  'hörnstretch': shoulderExternalRotationAnimation,
+  'towel_stretch_ir': shoulderExternalRotationAnimation,
+  'handdukstretch': shoulderExternalRotationAnimation,
+  'lat_stretch': shoulderFlexionAnimation,
+  'latissimus_stretch': shoulderFlexionAnimation,
+  'eccentric_er': shoulderExternalRotationAnimation,
+  'excentrisk_utåtrotation': shoulderExternalRotationAnimation,
+  'eccentric_flexion': shoulderFlexionAnimation,
+  'excentrisk_flexion': shoulderFlexionAnimation,
+
+  // =============================================
+  // CORE EXERCISES (Bål/Mage)
+  // =============================================
+  'mcgill_curl_up': mcGillCurlUpAnimation,
+  'mcgill_curlup': mcGillCurlUpAnimation,
+  'mcgill': mcGillCurlUpAnimation,
+  'curl_up': mcGillCurlUpAnimation,
+  'magmuskel': mcGillCurlUpAnimation,
+  'mage': mcGillCurlUpAnimation,
+  'bukmuskel': mcGillCurlUpAnimation,
+  'crunch': mcGillCurlUpAnimation,
+  'situp': mcGillCurlUpAnimation,
+
+  'fågelhunden': birdDogAnimation,
+  'fågelhund': birdDogAnimation,
+  'bird_dog': birdDogAnimation,
+  'birddog': birdDogAnimation,
+
+  'sidoplanka': sidePlankAnimation,
+  'side_plank': sidePlankAnimation,
+  'sideplank': sidePlankAnimation,
+  'planka': sidePlankAnimation,
+
+  'bäckenlyft': gluteBridgeAnimation,
+  'glute_bridge': gluteBridgeAnimation,
+  'glutebridge': gluteBridgeAnimation,
+  'höftlyft': gluteBridgeAnimation,
+
+  'cat_cow': catCowAnimation,
+  'catcow': catCowAnimation,
+  'katt_ko': catCowAnimation,
+  'kattko': catCowAnimation,
+
+  'cobra': cobraAnimation,
+  'prone_press_up': cobraAnimation,
+  'prone_pressup': cobraAnimation,
+  'rygglyft': cobraAnimation,
+  'rygg_extension': cobraAnimation,
+  'extension_rygg': cobraAnimation,
+
+  'dead_bug': birdDogAnimation,
+  'deadbug': birdDogAnimation,
+
+  'thorax_rotation': trunkRotationAnimation,
+  'thoraxrotation': trunkRotationAnimation,
+  'bålrotation': trunkRotationAnimation,
+  'bålstabilitet': trunkRotationAnimation,
+  'stabilisering': trunkRotationAnimation,
+
+  // =============================================
+  // HIP EXERCISES (Höft)
+  // =============================================
+  'musslan': clamshellAnimation,
+  'clamshells': clamshellAnimation,
+  'clamshell': clamshellAnimation,
+
+  'höftböjarstretch': hipFlexorStretchAnimation,
+  'hip_flexor_stretch': hipFlexorStretchAnimation,
+  'höftflexor': hipFlexorStretchAnimation,
+  'höftböjare': hipFlexorStretchAnimation,
+  'iliopsoas': hipFlexorStretchAnimation,
+
+  'side_lying_hip_abduction': hipAbductionAnimation,
+  'hip_abduction': hipAbductionAnimation,
+  'höftabduktion': hipAbductionAnimation,
+  'sidoliggande_benlyft': hipAbductionAnimation,
+  'benlyft': hipAbductionAnimation,
+  'adduktor': hipAbductionAnimation,
+  'abduktor': hipAbductionAnimation,
+
+  'piriformis_stretch': hipFlexorStretchAnimation,
+  'piriformis': hipFlexorStretchAnimation,
+
+  'gluteus': gluteBridgeAnimation,
+  'gluteal': gluteBridgeAnimation,
+  'sätes': gluteBridgeAnimation,
+  'rumpa': gluteBridgeAnimation,
+  'bäcken': gluteBridgeAnimation,
+  'höftrotation': hipAbductionAnimation,
+
+  // =============================================
+  // KNEE EXERCISES (Knä)
+  // =============================================
+  'knäböj': squatAnimation,
+  'squat': squatAnimation,
+  'knäböjning': squatAnimation,
+  'acl': squatAnimation,
+  'menisk': squatAnimation,
+
+  'utfall': lungeAnimation,
+  'lunge': lungeAnimation,
+
+  'knästräckning': kneeExtensionAnimation,
+  'knee_extension': kneeExtensionAnimation,
+  'terminal_knee': kneeExtensionAnimation,
+  'patella': kneeExtensionAnimation,
+  'quadriceps': kneeExtensionAnimation,
+  'quad': kneeExtensionAnimation,
+  'bensträckning': kneeExtensionAnimation,
+
+  'hälglidning': heelSlideAnimation,
+  'heel_slides': heelSlideAnimation,
+  'heelslides': heelSlideAnimation,
+
+  'straight_leg_raise': hipAbductionAnimation,
+  'slr': hipAbductionAnimation,
+  'rakt_benlyft': hipAbductionAnimation,
+
+  'step_ups': stepUpAnimation,
+  'stepups': stepUpAnimation,
+  'step_up': stepUpAnimation,
+  'trappsteg': stepUpAnimation,
+
+  'spanish_squat': spanishSquatAnimation,
+  'spanishsquat': spanishSquatAnimation,
+  'benpress': squatAnimation,
+  'lår': squatAnimation,
+  'hamstring': gluteBridgeAnimation,
+  'ischiokrurala': gluteBridgeAnimation,
+  'baksida_lår': gluteBridgeAnimation,
+
+  // =============================================
+  // ANKLE/FOOT EXERCISES (Fotled/Fot)
+  // =============================================
+  'tåhävningar': calfRaiseAnimation,
+  'calf_raises': calfRaiseAnimation,
+  'calfraises': calfRaiseAnimation,
+  'vadlyft': calfRaiseAnimation,
+  'vadmuskel': calfRaiseAnimation,
+  'häl': calfRaiseAnimation,
+  'tå_hävning': calfRaiseAnimation,
+
+  'excentrisk_vadträning': eccentricCalfRaiseAnimation,
+  'alfredson': eccentricCalfRaiseAnimation,
+  'eccentric_calf': eccentricCalfRaiseAnimation,
+  'excentrisk_vad': eccentricCalfRaiseAnimation,
+
+  'plantarfasciastretch': heelSlideAnimation,
+  'plantar_fascia': heelSlideAnimation,
+  'fotsulestretch': heelSlideAnimation,
+
+  'fotledsrotation': forearmRotationAnimation,
+  'ankle_rotation': forearmRotationAnimation,
+  'vristrotation': forearmRotationAnimation,
+
+  'towel_grab': towelGrabAnimation,
+  'towelgrab': towelGrabAnimation,
+  'handduksgrepp': towelGrabAnimation,
+  'handduk': towelGrabAnimation,
+
+  // =============================================
+  // BALANCE EXERCISES (Balans)
+  // =============================================
+  'enbensbalans': singleLegBalanceAnimation,
+  'enbensstående': singleLegBalanceAnimation,
+  'single_leg_balance': singleLegBalanceAnimation,
+  'proprioception': singleLegBalanceAnimation,
+
+  'tandemstående': singleLegBalanceAnimation,
+  'tandem': singleLegBalanceAnimation,
+
+  'bosu_balans': singleLegBalanceAnimation,
+  'bosu': singleLegBalanceAnimation,
+
+  // =============================================
+  // CARDIO EXERCISES (Kondition)
+  // =============================================
+  'promenad': singleLegBalanceAnimation,
+  'walking': singleLegBalanceAnimation,
+  'gång': singleLegBalanceAnimation,
+
+  'stationär_cykel': squatAnimation,
+  'cykel': squatAnimation,
+  'cycling': squatAnimation,
+
+  'vattengymnastik': shoulderFlexionAnimation,
+  'aqua': shoulderFlexionAnimation,
+  'simning': shoulderFlexionAnimation,
+
+  // =============================================
+  // WRIST/HAND EXERCISES (Handled/Hand)
+  // =============================================
+  'handledsböjning': wristExtensionAnimation,
+  'wrist_flexion': wristExtensionAnimation,
   'handled': wristExtensionAnimation,
-  'handflata': towelGrabAnimation,
+
+  'excentrisk_handledsextension': wristExtensionAnimation,
+  'wrist_extension': wristExtensionAnimation,
+  'handledsextension': wristExtensionAnimation,
+
+  'greppstyrka': towelGrabAnimation,
+  'handtag': towelGrabAnimation,
   'grip': towelGrabAnimation,
+  'handflata': towelGrabAnimation,
   'finger': towelGrabAnimation,
+
   'tennis': wristExtensionAnimation,
   'armbåge': forearmRotationAnimation,
   'underarm': forearmRotationAnimation,
+
+  // =============================================
+  // STRETCH EXERCISES (Stretch/Töjning)
+  // =============================================
+  'stretch': hipFlexorStretchAnimation,
+  'töjning': hipFlexorStretchAnimation,
+  'rörlighet': catCowAnimation,
+  'mobilitet': catCowAnimation,
+  'flexibilitet': catCowAnimation,
+  'stärkande': squatAnimation,
+
+  // =============================================
+  // EXERCISE GENERATOR TEMPLATE ID MAPPINGS
+  // Maps template IDs to animations (unique keys only)
+  // =============================================
+
+  // --- NECK TEMPLATES ---
+  'neck_chin_tuck': chinTuckAnimation,
+  'neck_dnf_lift': chinTuckAnimation,
+  'deep_neck_flexor_lift': chinTuckAnimation,
+  'neck_isometric_flexion': neckExtensionAnimation,
+  'neck_isometric_extension': neckExtensionAnimation,
+  'neck_isometric_sidebend': neckStretchAnimation,
+  'isometrisk_nacklateralflexion': neckStretchAnimation,
+  'neck_isometric_rotation': chinTuckAnimation,
+  'isometrisk_nackrotation': chinTuckAnimation,
+  'neck_upper_trap_stretch': neckStretchAnimation,
+  'neck_levator_stretch': neckStretchAnimation,
+  'neck_scm_stretch': neckStretchAnimation,
+  'scm_stretch': neckStretchAnimation,
+  'sternocleidomastoid_stretch': neckStretchAnimation,
+  'neck_scalene_stretch': neckStretchAnimation,
+  'scalene_stretch': neckStretchAnimation,
+  'neck_rotation_arom': chinTuckAnimation,
+  'neck_flexion_extension_arom': neckExtensionAnimation,
+  'nackflexion_extension': neckExtensionAnimation,
+  'neck_sidebend_arom': neckStretchAnimation,
+
+  // --- SHOULDER TEMPLATES ---
+  'shoulder_pendulum': shoulderFlexionAnimation,
+  'pendling_codman': shoulderFlexionAnimation,
+  'pendulum_exercise': shoulderFlexionAnimation,
+  'rodd': trunkRotationAnimation,
+  'väggänglar': wallSlidesAnimation,
+  'shoulder_er_90_abduction': shoulderExternalRotationAnimation,
+  'utåtrotation_90_abduktion': shoulderExternalRotationAnimation,
+  'shoulder_scaption': fullCanAnimation,
+  'scaption_full_can': fullCanAnimation,
+  'shoulder_serratus_pushup': serratusPushUpAnimation,
+  'serratus_push_up_plus': serratusPushUpAnimation,
+  'shoulder_rows': trunkRotationAnimation,
+  'shoulder_prone_y': shoulderFlexionAnimation,
+  'liggande_y_lyft': shoulderFlexionAnimation,
+  'prone_y_raise': shoulderFlexionAnimation,
+  'shoulder_prone_t': shoulderFlexionAnimation,
+  'liggande_t_lyft': shoulderFlexionAnimation,
+  'prone_t_raise': shoulderFlexionAnimation,
+  'shoulder_sleeper_stretch': shoulderExternalRotationAnimation,
+  'shoulder_cross_body_stretch': shoulderFlexionAnimation,
+  'cross_body_stretch': shoulderFlexionAnimation,
+  'shoulder_doorway_stretch': shoulderFlexionAnimation,
+  'dörrkarms_stretch': shoulderFlexionAnimation,
+  'doorway_pec_stretch': shoulderFlexionAnimation,
+  'shoulder_wall_slides': wallSlidesAnimation,
+  'shoulder_wall_angels': wallSlidesAnimation,
+  'wall_angels': wallSlidesAnimation,
+
+  // --- LUMBAR TEMPLATES ---
+  'lumbar_mcgill_curlup': mcGillCurlUpAnimation,
+  'mcgill curl-up': mcGillCurlUpAnimation,
+  'lumbar_birddog': birdDogAnimation,
+  'lumbar_sideplank': sidePlankAnimation,
+  'lumbar_side_bridge': sidePlankAnimation,
+  'side bridge': sidePlankAnimation,
+  'sidobrygga': sidePlankAnimation,
+  'lumbar_pelvic_tilt': gluteBridgeAnimation,
+  'lumbar_pelvic_tilts': gluteBridgeAnimation,
+  'pelvic tilts': gluteBridgeAnimation,
+  'pelvic_tilts': gluteBridgeAnimation,
+  'bäckentiltar': gluteBridgeAnimation,
+  'bäckentilt': gluteBridgeAnimation,
+  'lumbar_knees_to_chest': heelSlideAnimation,
+  'knees to chest': heelSlideAnimation,
+  'knän till bröst': heelSlideAnimation,
+  'lumbar_piriformis_stretch': hipFlexorStretchAnimation,
+  'piriformis stretch': hipFlexorStretchAnimation,
+  'piriformisstretch': hipFlexorStretchAnimation,
+  'lumbar_child_pose': catCowAnimation,
+  'child pose': catCowAnimation,
+  'childs pose': catCowAnimation,
+  'barnposition': catCowAnimation,
+  'lumbar_single_leg_extension': birdDogAnimation,
+  'supine single leg extension': birdDogAnimation,
+  'liggande enbenslyft': birdDogAnimation,
+  'lumbar_prone_hip_extension': gluteBridgeAnimation,
+  'prone hip extension': gluteBridgeAnimation,
+  'pronliggande höftextension': gluteBridgeAnimation,
+  'lumbar_quadruped_rocking': catCowAnimation,
+  'quadruped rocking': catCowAnimation,
+  'fyrfota gungning': catCowAnimation,
+  'lumbar_squat_to_stand': squatAnimation,
+  'squat to stand': squatAnimation,
+  'knäböj till stående': squatAnimation,
+  'lumbar_pallof_press': trunkRotationAnimation,
+  'pallof press lumbar': trunkRotationAnimation,
+  'lumbar_suitcase_carry': trunkRotationAnimation,
+  'suitcase carry': trunkRotationAnimation,
+  'suitcase_carry': trunkRotationAnimation,
+  'resväskebärning': trunkRotationAnimation,
+  'lumbar_deadbug': birdDogAnimation,
+  'lumbar_mckenzie': cobraAnimation,
+  'prone_press_up_mckenzie': cobraAnimation,
+  'lumbar_double_knee_chest': heelSlideAnimation,
+  'double_knee_to_chest': heelSlideAnimation,
+  'dubbla_knän_till_bröstet': heelSlideAnimation,
+  'lumbar_glute_bridge': gluteBridgeAnimation,
+  'gluteusbrygga': gluteBridgeAnimation,
+  'lumbar_nerve_glide': heelSlideAnimation,
+  'sciatic_nerve_glide': heelSlideAnimation,
+  'ischiasnerv_glid': heelSlideAnimation,
+  'lumbar_rotation_stretch': trunkRotationAnimation,
+  'lumbar_rotation': trunkRotationAnimation,
+  'ländryggsrotation_stretch': trunkRotationAnimation,
+
+  // --- HIP TEMPLATES ---
+  'hip_clamshell': clamshellAnimation,
+  'mussla': clamshellAnimation,
+  'hip_sidelying_abduction': hipAbductionAnimation,
+  'sidoliggande_höftabduktion': hipAbductionAnimation,
+  'kneeling_hip_flexor_stretch': hipFlexorStretchAnimation,
+  'knästående_höftböjarstretch': hipFlexorStretchAnimation,
+  'hip_supine_march': gluteBridgeAnimation,
+  'supine_hip_flexor_march': gluteBridgeAnimation,
+  'ryggliggande_höftflexion_marsch': gluteBridgeAnimation,
+  'hip_prone_extension': gluteBridgeAnimation,
+  'hip_internal_rotation_stretch': hipFlexorStretchAnimation,
+  'höft_inåtrotation_stretch': hipFlexorStretchAnimation,
+  'hip_figure_four': hipFlexorStretchAnimation,
+  'figure_four_stretch_piriformis': hipFlexorStretchAnimation,
+  'fyran_stretch_piriformis': hipFlexorStretchAnimation,
+  'hip_single_leg_balance': singleLegBalanceAnimation,
+  'hip_monster_walk': squatAnimation,
+  'monstergång': squatAnimation,
+  'hip_butterfly_stretch': heelSlideAnimation,
+  'seated_adductor_stretch_butterfly': heelSlideAnimation,
+  'sittande_adduktorstretch_fjäril': heelSlideAnimation,
+  'hip_copenhagen': sidePlankAnimation,
+  'copenhagen_adduction': sidePlankAnimation,
+  'köpenhamn_adduktion': sidePlankAnimation,
+
+  // --- KNEE TEMPLATES ---
+  'knee_quad_set': kneeExtensionAnimation,
+  'quad_set_isometric': kneeExtensionAnimation,
+  'quadricepskontraktion_isometrisk': kneeExtensionAnimation,
+  'knee_slr': hipAbductionAnimation,
+  'knee_terminal_extension': kneeExtensionAnimation,
+  'terminal_knee_extension': kneeExtensionAnimation,
+  'terminal_knäextension': kneeExtensionAnimation,
+  'knee_prone_hamstring_curl': gluteBridgeAnimation,
+  'prone_hamstring_curl': gluteBridgeAnimation,
+  'pronliggande_hamstringcurl': gluteBridgeAnimation,
+  'knee_nordic_curl': gluteBridgeAnimation,
+  'nordic_hamstring_curl': gluteBridgeAnimation,
+  'nordisk_hamstringcurl': gluteBridgeAnimation,
+  'knee_wall_sit': squatAnimation,
+  'väggsittning': squatAnimation,
+  'knee_step_up': stepUpAnimation,
+  'uppsteg': stepUpAnimation,
+  'knee_mini_squat': squatAnimation,
+  'mini_knäböj': squatAnimation,
+  'knee_heel_slides': heelSlideAnimation,
+  'hälglid': heelSlideAnimation,
+  'knee_prone_quad_stretch': heelSlideAnimation,
+  'prone_quadriceps_stretch': heelSlideAnimation,
+  'pronliggande_quadricepsstretch': heelSlideAnimation,
+  'knee_supine_hamstring_stretch': heelSlideAnimation,
+  'supine_hamstring_stretch': heelSlideAnimation,
+  'ryggliggande_hamstringstretch': heelSlideAnimation,
+
+  // --- ANKLE TEMPLATES ---
+  'ankle_bilateral_calf_raise': calfRaiseAnimation,
+  'bilateral_calf_raise': calfRaiseAnimation,
+  'bilateral_tåhävning': calfRaiseAnimation,
+  'ankle_single_leg_calf_raise': calfRaiseAnimation,
+  'single_leg_calf_raise': calfRaiseAnimation,
+  'enbens_tåhävning': calfRaiseAnimation,
+  'ankle_alfredson': eccentricCalfRaiseAnimation,
+  'alfredson_eccentric_heel_drop': eccentricCalfRaiseAnimation,
+  'alfredson_excentrisk_häldropp': eccentricCalfRaiseAnimation,
+  'ankle_balance': singleLegBalanceAnimation,
+  'single_leg_balance_ankle_focus': singleLegBalanceAnimation,
+  'enbensstående_balans_fotledsfokus': singleLegBalanceAnimation,
+  'ankle_theraband': forearmRotationAnimation,
+  '4_way_ankle_theraband': forearmRotationAnimation,
+  '4_vägs_fotled_theraband': forearmRotationAnimation,
+  'ankle_calf_stretch': calfRaiseAnimation,
+  'standing_calf_stretch_wall': calfRaiseAnimation,
+  'stående_vadstretch_vägg': calfRaiseAnimation,
+  'ankle_soleus_stretch': squatAnimation,
+  'soleus_stretch_bent_knee': squatAnimation,
+  'soleusstretch_böjt_knä': squatAnimation,
+  'ankle_alphabet': forearmRotationAnimation,
+  'fotledsalfabet': forearmRotationAnimation,
+  'ankle_short_foot': towelGrabAnimation,
+  'short_foot_exercise': towelGrabAnimation,
+  'kort_fot_övning': towelGrabAnimation,
+  'ankle_towel_curl': towelGrabAnimation,
+  'handdukskurl': towelGrabAnimation,
+
+  // --- CORE TEMPLATES ---
+  'core_ta_activation': gluteBridgeAnimation,
+  'transverse_abdominis_activation': gluteBridgeAnimation,
+  'transversus_abdominis_aktivering': gluteBridgeAnimation,
+  'core_breathing': idleAnimation,
+  'diaphragmatic_breathing': idleAnimation,
+  'diafragmaandning': idleAnimation,
+  'diaphragmatic breathing': idleAnimation,
+  'Diaphragmatic Breathing': idleAnimation,
+  'core_dead_bug': birdDogAnimation,
+  'core_front_plank': sidePlankAnimation,
+  'front_plank': sidePlankAnimation,
+  'frontplanka': sidePlankAnimation,
+  'core_pallof_press': trunkRotationAnimation,
+  'pallof_press': trunkRotationAnimation,
+  'core_side_plank': sidePlankAnimation,
+  'core_bird_dog': birdDogAnimation,
+  'core_mcgill_curlup': mcGillCurlUpAnimation,
+  'core_woodchop': trunkRotationAnimation,
+  'cable_band_woodchop': trunkRotationAnimation,
+  'kabel_band_vedhuggar': trunkRotationAnimation,
+
+  // =============================================
+  // NEW REHABILITATION EXERCISES (FAS 8)
+  // =============================================
+
+  // --- PENDULUM / CODMAN (Post-op axel) ---
+  'pendulum': pendulumSwingAnimation,
+  'pendulum_rörelse': pendulumSwingAnimation,
+  'codman_övning': pendulumSwingAnimation,
+  'codman övning': pendulumSwingAnimation,
+  'passiv_axelrörelse': pendulumSwingAnimation,
+  'pendulum_axel': pendulumSwingAnimation,
+
+  // --- STRAIGHT LEG RAISE (Post-op knä/höft) ---
+  'straight_leg': straightLegRaiseAnimation,
+  'rakt_ben': straightLegRaiseAnimation,
+  'benlyft_liggande': straightLegRaiseAnimation,
+  'höftflexion_liggande': straightLegRaiseAnimation,
+  'hip_flexion_supine': straightLegRaiseAnimation,
+  'slr_övning': straightLegRaiseAnimation,
+
+  // --- DEAD BUG (Core stabilisering) ---
+  'dead_bug_övning': deadBugAnimation,
+  'döda_insekten_övning': deadBugAnimation,
+  'core_dead_bug_progression': deadBugAnimation,
+  'stabilisering_core': deadBugAnimation,
+  'supine_core': deadBugAnimation,
+
+  // --- TERMINAL KNEE EXTENSION (ACL post-op) ---
+  'terminal_extension': terminalKneeExtensionAnimation,
+  'slutfas_extension': terminalKneeExtensionAnimation,
+  'knä_extension_slutfas': terminalKneeExtensionAnimation,
+  'tke_övning': terminalKneeExtensionAnimation,
+  'quad_activation_sitting': terminalKneeExtensionAnimation,
+  'acl_knä_övning': terminalKneeExtensionAnimation,
+
+  // --- ANKLE PUMPS (DVT prevention) ---
+  'fotpump_övning': anklePumpsAnimation,
+  'ankle_pump': anklePumpsAnimation,
+  'cirkulation_övning': anklePumpsAnimation,
+  'dvt_prevention': anklePumpsAnimation,
+  'post_op_fot': anklePumpsAnimation,
+  'fotled_pump': anklePumpsAnimation,
+  'dorsal_plantar_flexion': anklePumpsAnimation,
+
+  // --- QUAD SETS (Post-op knä fas 1) ---
+  'quad_activation': quadSetsAnimation,
+  'quadriceps_set': quadSetsAnimation,
+  'isometrisk_quadriceps': quadSetsAnimation,
+  'lår_aktivering': quadSetsAnimation,
+  'knä_fas1': quadSetsAnimation,
+  'vmq_aktivering': quadSetsAnimation,
+  'vastus_medialis_aktivering': quadSetsAnimation,
 };
 
 /**

@@ -1,18 +1,27 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { GeneratedProgram, Exercise, WeeklyAnalysis, Milestone } from '../types';
+import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
+import { GeneratedProgram, Exercise, WeeklyAnalysis, Milestone, BaselineROM, UserAssessment } from '../types';
 import ExerciseCard from './ExerciseCard';
 import PatientEducationModule from './PatientEducationModule';
 import DailyCheckIn from './DailyCheckIn';
+import ROMSuggestionBanner, { useROMSuggestion } from './ROMSuggestionBanner';
+import ROMProgressCard from './ROMProgressCard';
+import ROMTrendChart from './ROMTrendChart';
+import Toast from './Toast';
+import useToast from '../hooks/useToast';
 import { storageService } from '../services/storageService';
 import { generateWeeklyAnalysis } from '../services/geminiService';
 import { supabase, getUserId } from '../services/supabaseClient';
 import { exportProgramToPDF } from '../services/pdfExport';
 import { Calendar, ChevronRight, Activity, Info, BarChart, Printer, Sparkles, ThumbsUp, ShieldAlert, ArrowUpCircle, Zap, BrainCircuit, Star, Target, Crown, ClipboardCheck, X, Flame, TrendingUp, Lock, Unlock, Heart, PartyPopper, Download, Loader2 } from 'lucide-react';
+import { logger } from '../utils/logger';
 import Spinner from './ui/Spinner';
 
-// Get Stripe Link from Environment Variable or fallback to a placeholder
-const STRIPE_CHECKOUT_URL = (import.meta as any).env?.VITE_STRIPE_LINK || "https://stripe.com"; 
+// Lazy load ROM Assessment
+const ROMAssessment = lazy(() => import('./ROMAssessment'));
+
+// Get Stripe Link from Environment Variable (null if not configured)
+const STRIPE_CHECKOUT_URL = (import.meta as any).env?.VITE_STRIPE_LINK || null; 
 
 interface ProgramViewProps {
   program: GeneratedProgram;
@@ -42,7 +51,29 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
   const [hasCompletedPreCheckIn, setHasCompletedPreCheckIn] = useState(false);
   const [hasCompletedPostCheckIn, setHasCompletedPostCheckIn] = useState(false);
   const [newMilestones, setNewMilestones] = useState<Milestone[]>([]);
-  const [showMilestoneModal, setShowMilestoneModal] = useState(false); 
+  const [showMilestoneModal, setShowMilestoneModal] = useState(false);
+
+  // ROM Assessment State (AI-triggered suggestions)
+  const [showROMAssessment, setShowROMAssessment] = useState(false);
+  const [romDismissed, setRomDismissed] = useState(false);
+  const [userAssessment, setUserAssessment] = useState<UserAssessment | null>(null);
+
+  // Toast notifications
+  const { toasts, removeToast, warning } = useToast();
+
+  // Load user assessment for ROM tracking
+  useEffect(() => {
+    const assessment = storageService.getAssessmentDraft();
+    if (assessment) {
+      setUserAssessment(assessment);
+    }
+  }, []);
+
+  // Check if ROM suggestion should be shown
+  const romSuggestion = useROMSuggestion(
+    userAssessment?.baselineROM || null,
+    false // recentProgressChange - could be derived from check-in data
+  ); 
 
   const activePhase = program.phases[activePhaseIndex];
   // Calculate total exercises in the representative daily routine for the active phase
@@ -73,8 +104,8 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
         
         if (supabase) {
              const userId = getUserId();
-             const { data } = await supabase.from('users').select('subscription_status').eq('id', userId).single();
-             if (data && (data.subscription_status === 'active' || data.subscription_status === 'trial')) {
+             const { data, error } = await supabase.from('users').select('subscription_status').eq('id', userId).single();
+             if (!error && data && (data.subscription_status === 'active' || data.subscription_status === 'trial')) {
                  premiumStatus = true;
                  localStorage.setItem('rehabflow_is_premium', 'true');
              }
@@ -155,7 +186,7 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
         const result = await generateWeeklyAnalysis(historyData, activePhase.phaseName);
         setAnalysis(result);
     } catch (e) {
-        console.error("Analysis Error", e);
+        logger.error("Analysis Error", e);
     } finally {
         setIsAnalyzing(false);
     }
@@ -170,19 +201,11 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
   };
 
   const handleUpgradeClick = () => {
-      if (STRIPE_CHECKOUT_URL === "https://stripe.com") {
-          alert("Betalningslänk är inte konfigurerad än. Kontakta support.");
+      if (!STRIPE_CHECKOUT_URL) {
+          warning("Ej tillgängligt", "Betalningslänk är inte konfigurerad än. Kontakta support.");
           return;
       }
       window.open(STRIPE_CHECKOUT_URL, '_blank');
-  };
-
-  // Demo: Allow user to simulate unlocking premium
-  const simulateUnlock = () => {
-      localStorage.setItem('rehabflow_is_premium', 'true');
-      setIsPremium(true);
-      setShowPremiumModal(false);
-      alert("Pro-läge aktiverat (Demo). I produktion skulle detta ske automatiskt efter betalning.");
   };
 
   const progress = useMemo(() => {
@@ -370,7 +393,7 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
       const assessment = storageService.getAssessmentDraft();
       await exportProgramToPDF(program, assessment);
     } catch (error) {
-      console.error('PDF export failed:', error);
+      logger.error('PDF export failed', error);
     } finally {
       setIsExporting(false);
     }
@@ -378,7 +401,10 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
 
   return (
     <div className="max-w-6xl mx-auto py-8 pb-24 print:p-0 print:max-w-none overflow-hidden relative">
-      
+
+      {/* Toast Notifications */}
+      <Toast toasts={toasts} removeToast={removeToast} />
+
       {/* PRE-WORKOUT CHECK-IN MODAL (Fas 6) */}
       {showPreCheckIn && (
         <DailyCheckIn
@@ -401,6 +427,36 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
           }}
           onSkip={() => setShowPostCheckIn(false)}
         />
+      )}
+
+      {/* ROM ASSESSMENT MODAL */}
+      {showROMAssessment && (
+        <Suspense fallback={
+          <div className="fixed inset-0 bg-white z-50 flex items-center justify-center">
+            <div className="text-center">
+              <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+              <p className="text-slate-600">Laddar rörlighetsmätning...</p>
+            </div>
+          </div>
+        }>
+          <ROMAssessment
+            patientAge={userAssessment?.age}
+            injuryLocation={userAssessment?.injuryLocation}
+            onComplete={(baseline) => {
+              // Save ROM baseline to assessment
+              if (userAssessment) {
+                const updated = { ...userAssessment, baselineROM: baseline };
+                storageService.saveAssessmentDraft(updated);
+                setUserAssessment(updated);
+              }
+              setShowROMAssessment(false);
+            }}
+            onSkip={() => {
+              setShowROMAssessment(false);
+              setRomDismissed(true);
+            }}
+          />
+        </Suspense>
       )}
 
       {/* MILESTONE CELEBRATION MODAL (Fas 6) */}
@@ -469,10 +525,6 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
 
                       <button onClick={handleUpgradeClick} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-lg shadow-xl hover:bg-slate-800 transition-all hover:scale-[1.02] flex items-center justify-center gap-2">
                           <Crown size={20} className="text-yellow-400" /> Skaffa Premium
-                      </button>
-                      
-                      <button onClick={simulateUnlock} className="mt-4 text-xs font-bold text-slate-300 hover:text-primary-600 uppercase tracking-widest border-b border-transparent hover:border-primary-200">
-                          (Simulera köp - Demo)
                       </button>
 
                       <button onClick={() => setShowPremiumModal(false)} className="mt-4 w-full text-xs font-bold text-slate-400 hover:text-slate-600">
@@ -599,6 +651,39 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
                     {program.conditionAnalysis}
                 </p>
             </div>
+        )}
+
+        {/* SAFETY ADJUSTMENTS BANNER - Shows when exercises were filtered for safety */}
+        {(program as any).safetyAdjustments?.length > 0 && (
+          <div className="mt-6 bg-amber-50 border border-amber-200 rounded-2xl p-4 print:hidden">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-amber-100 rounded-lg shrink-0">
+                <ShieldAlert size={20} className="text-amber-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-amber-800 mb-1">
+                  Programmet har justerats för din säkerhet
+                </h3>
+                <p className="text-amber-700 text-sm mb-3">
+                  Baserat på ditt postoperativa protokoll har följande övningar tagits bort för att skydda din läkning:
+                </p>
+                <ul className="space-y-1">
+                  {(program as any).safetyAdjustments.slice(0, 5).map((adj: { original: string; reason: string }, idx: number) => (
+                    <li key={idx} className="text-sm text-amber-600 flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-amber-400 rounded-full shrink-0" />
+                      <span className="font-medium">{adj.original}</span>
+                      <span className="text-amber-500">- {adj.reason}</span>
+                    </li>
+                  ))}
+                  {(program as any).safetyAdjustments.length > 5 && (
+                    <li className="text-sm text-amber-500 italic">
+                      ...och {(program as any).safetyAdjustments.length - 5} till
+                    </li>
+                  )}
+                </ul>
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
@@ -791,6 +876,32 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
                         ))}
                     </ul>
                 </div>
+
+                {/* ROM Progress & Trend Cards - Show existing measurements */}
+                {userAssessment?.baselineROM && userAssessment.age && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <ROMProgressCard
+                      baseline={userAssessment.baselineROM}
+                      patientAge={userAssessment.age}
+                      showDetails={true}
+                    />
+                    <ROMTrendChart
+                      patientAge={userAssessment.age}
+                      showDetailedView={true}
+                    />
+                  </div>
+                )}
+
+                {/* ROM Suggestion Banner - AI-triggered */}
+                {romSuggestion.shouldShow && !romDismissed && !showROMAssessment && (
+                  <ROMSuggestionBanner
+                    onAccept={() => setShowROMAssessment(true)}
+                    onDecline={() => setRomDismissed(true)}
+                    reason={romSuggestion.reason}
+                    lastMeasurementDate={userAssessment?.baselineROM?.assessmentDate}
+                    suggestedTests={romSuggestion.suggestedTests}
+                  />
+                )}
 
                 {/* Daily Routine */}
                 {activePhase.dailyRoutine.map((dayPlan, dayIdx) => (

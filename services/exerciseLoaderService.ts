@@ -13,6 +13,7 @@ import {
   ExtendedExerciseCategory,
   BodyArea
 } from '../types';
+import { logger } from '../utils/logger';
 
 // Configuration
 const INDEX_URL = '/data/exercises/index.json';
@@ -54,7 +55,7 @@ export async function initializeExerciseLoader(): Promise<ExerciseIndex> {
 
     return exerciseIndex!;
   } catch (error) {
-    console.error('Failed to initialize exercise loader:', error);
+    logger.error('Failed to initialize exercise loader', error);
     // Return empty index as fallback
     exerciseIndex = {
       version: '0.0.0',
@@ -100,7 +101,7 @@ export async function loadChunk(chunkId: number): Promise<ExtendedExercise[]> {
   const chunkMeta = index.chunks.find(c => c.id === chunkId);
 
   if (!chunkMeta) {
-    console.warn(`Chunk ${chunkId} not found in index`);
+    logger.warn(`Chunk ${chunkId} not found in index`);
     return [];
   }
 
@@ -124,7 +125,7 @@ export async function loadChunk(chunkId: number): Promise<ExtendedExercise[]> {
 
     return exercises;
   } catch (error) {
-    console.error(`Failed to load chunk ${chunkId}:`, error);
+    logger.error(`Failed to load chunk ${chunkId}`, error);
     return [];
   }
 }
@@ -402,7 +403,7 @@ async function cacheIndex(index: ExerciseIndex): Promise<void> {
       request.onerror = () => reject(request.error);
     });
   } catch (error) {
-    console.warn('Failed to cache index:', error);
+    logger.warn('Failed to cache index: ' + error);
   }
 }
 
@@ -437,7 +438,7 @@ async function cacheChunk(chunkId: number, exercises: ExtendedExercise[]): Promi
       request.onerror = () => reject(request.error);
     });
   } catch (error) {
-    console.warn('Failed to cache chunk:', error);
+    logger.warn('Failed to cache chunk: ' + error);
   }
 }
 
@@ -459,7 +460,7 @@ async function clearIndexedDBCache(): Promise<void> {
       })
     ]);
   } catch (error) {
-    console.warn('Failed to clear IndexedDB cache:', error);
+    logger.warn('Failed to clear IndexedDB cache: ' + error);
   }
 }
 

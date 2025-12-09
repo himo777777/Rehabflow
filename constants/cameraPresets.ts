@@ -3,7 +3,7 @@
  * Ensures the full avatar is visible in all exercise modes
  */
 
-export type BodyPosition = 'standing' | 'lying' | 'sitting' | 'kneeling' | 'sidelying';
+export type BodyPosition = 'standing' | 'lying' | 'sitting' | 'kneeling' | 'sidelying' | 'quadruped';
 export type ExerciseMode = 'LEGS' | 'PRESS' | 'PULL' | 'LUNGE' | 'CORE' | 'STRETCH' | 'BALANCE' | 'PUSH' | 'GENERAL';
 
 export interface CameraPreset {
@@ -38,6 +38,11 @@ export const CAMERA_PRESETS: Record<BodyPosition, CameraPreset> = {
   sidelying: {
     position: [3, 1.5, 3],      // Från sidan för sidoläge
     target: [0, 0.3, 0],
+    fov: 60,
+  },
+  quadruped: {
+    position: [2, 2.0, 4],      // Snedvinkel för fyrfota position (cat-cow, bird dog)
+    target: [0, 0.4, 0],
     fov: 60,
   },
 };

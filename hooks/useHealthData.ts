@@ -16,6 +16,7 @@ import {
   HealthDataSyncResult
 } from '../services/healthDataService';
 import { supabase } from '../services/supabaseClient';
+import { logger } from '../utils/logger';
 
 // ============================================================================
 // TYPES
@@ -110,7 +111,7 @@ export const useHealthData = (): UseHealthDataReturn => {
           await loadDashboardData(user.id);
         }
       } catch (error) {
-        console.error('❌ Failed to initialize health data:', error);
+        logger.error('❌ Failed to initialize health data:', error);
         setState(prev => ({
           ...prev,
           isLoading: false,
@@ -140,7 +141,7 @@ export const useHealthData = (): UseHealthDataReturn => {
         recoveryScore: score
       }));
     } catch (error) {
-      console.error('❌ Failed to load dashboard data:', error);
+      logger.error('❌ Failed to load dashboard data:', error);
     }
   };
 
@@ -190,7 +191,7 @@ export const useHealthData = (): UseHealthDataReturn => {
 
       return granted;
     } catch (error) {
-      console.error('❌ Authorization failed:', error);
+      logger.error('❌ Authorization failed:', error);
       setState(prev => ({
         ...prev,
         isLoading: false,
@@ -250,7 +251,7 @@ export const useHealthData = (): UseHealthDataReturn => {
 
       return result;
     } catch (error) {
-      console.error('❌ Sync failed:', error);
+      logger.error('❌ Sync failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Sync failed';
       setState(prev => ({
         ...prev,
@@ -280,7 +281,7 @@ export const useHealthData = (): UseHealthDataReturn => {
       const summary = await healthDataService.getDailyActivitySummary(user.id, date);
       return summary;
     } catch (error) {
-      console.error('❌ Failed to get daily summary:', error);
+      logger.error('❌ Failed to get daily summary:', error);
       return {
         steps: 0,
         distance: 0,
@@ -305,7 +306,7 @@ export const useHealthData = (): UseHealthDataReturn => {
       setState(prev => ({ ...prev, recoveryScore: score }));
       return score;
     } catch (error) {
-      console.error('❌ Failed to get recovery score:', error);
+      logger.error('❌ Failed to get recovery score:', error);
       return 0;
     }
   }, []);
@@ -322,7 +323,7 @@ export const useHealthData = (): UseHealthDataReturn => {
 
       return await healthDataService.getWeeklyTrend(user.id, dataType);
     } catch (error) {
-      console.error('❌ Failed to get weekly trend:', error);
+      logger.error('❌ Failed to get weekly trend:', error);
       return [0, 0, 0, 0, 0, 0, 0];
     }
   }, []);
@@ -354,7 +355,7 @@ export const useHealthData = (): UseHealthDataReturn => {
       setState(prev => ({ ...prev, isLoading: false }));
       return success;
     } catch (error) {
-      console.error('❌ Failed to add manual data:', error);
+      logger.error('❌ Failed to add manual data:', error);
       setState(prev => ({
         ...prev,
         isLoading: false,
@@ -374,7 +375,7 @@ export const useHealthData = (): UseHealthDataReturn => {
 
       await loadDashboardData(user.id);
     } catch (error) {
-      console.error('❌ Failed to refresh data:', error);
+      logger.error('❌ Failed to refresh data:', error);
     }
   }, []);
 

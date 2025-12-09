@@ -85,21 +85,32 @@ const ScoreBar: React.FC<{ label: string; value: number; icon: React.ReactNode }
   </div>
 );
 
-// Issue badge component
-const IssueBadge: React.FC<{ issue: FormIssue }> = ({ issue }) => (
+// FAS 9: Förbättrad IssueBadge med prioriterad styling
+// High severity får större och mer prominent visning
+const IssueBadge: React.FC<{ issue: FormIssue; isPrimary?: boolean }> = ({ issue, isPrimary = false }) => (
   <div
-    className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium ${
+    className={`flex items-center gap-1.5 rounded-lg font-medium transition-all ${
       issue.severity === 'high'
-        ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+        ? isPrimary
+          ? 'px-4 py-2 text-base bg-red-600 text-white border-2 border-red-400 animate-pulse shadow-lg shadow-red-500/30'
+          : 'px-3 py-1.5 text-sm bg-red-500/30 text-red-300 border border-red-500/50'
         : issue.severity === 'medium'
-        ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
-        : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+        ? 'px-2 py-1 text-xs bg-orange-500/20 text-orange-400 border border-orange-500/30'
+        : 'px-2 py-1 text-xs bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
     }`}
   >
-    <AlertCircle size={12} />
+    <AlertCircle size={issue.severity === 'high' && isPrimary ? 18 : 12} />
     <span>{issue.message}</span>
   </div>
 );
+
+// FAS 9: Prioritera och filtrera issues
+const severityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+const prioritizeIssues = (issues: FormIssue[]): FormIssue[] => {
+  return [...issues]
+    .sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity])
+    .slice(0, 2); // Max 2 issues för att inte överväldiga
+};
 
 const MovementFeedbackOverlay: React.FC<MovementFeedbackOverlayProps> = ({
   repCount,
@@ -269,11 +280,16 @@ const MovementFeedbackOverlay: React.FC<MovementFeedbackOverlayProps> = ({
         </div>
       )}
 
-      {/* Bottom: Issue Alerts */}
+      {/* Bottom: Issue Alerts - FAS 9: Förenklad visuell hierarki */}
+      {/* Max 2 prioriterade issues, med high severity mest framträdande */}
       {activeIssues.length > 0 && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex flex-wrap justify-center gap-2 max-w-md">
-          {activeIssues.slice(0, 3).map((issue, idx) => (
-            <IssueBadge key={`${issue.joint}-${issue.issue}-${idx}`} issue={issue} />
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 max-w-md">
+          {prioritizeIssues(activeIssues).map((issue, idx) => (
+            <IssueBadge
+              key={`${issue.joint}-${issue.issue}-${idx}`}
+              issue={issue}
+              isPrimary={idx === 0 && issue.severity === 'high'}
+            />
           ))}
         </div>
       )}

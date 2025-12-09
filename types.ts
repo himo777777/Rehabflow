@@ -111,6 +111,10 @@ export interface UserAssessment {
     completedAt: string;
   };
 
+  // AI-kamera ROM-mätning (valfritt)
+  baselineROM?: BaselineROM;
+  romHistory?: ROMHistoryEntry[];
+
   lifestyle: {
     sleep: 'Dålig' | 'Okej' | 'Bra';
     stress: 'Låg' | 'Medel' | 'Hög';
@@ -136,6 +140,40 @@ export interface ExerciseSource {
   url?: string;         // Direct link if available
 }
 
+/**
+ * Post-operative phase restrictions for exercise safety
+ */
+export interface PostOpPhaseRestriction {
+  phase: 1 | 2 | 3 | 4;  // Rehabilitation phase (1 = earliest, 4 = return to sport)
+  weeksPostOp: { min: number; max: number };  // Week range when this applies
+  allowed: boolean;  // Whether exercise is allowed in this phase
+  modifications?: string[];  // Required modifications if partially allowed
+  maxLoad?: 'none' | 'bodyweight' | 'light' | 'moderate' | 'full';
+  maxROM?: number;  // Maximum ROM percentage allowed (e.g., 90 = 90% of normal)
+}
+
+/**
+ * Progression criteria that must be met before advancing
+ */
+export interface ProgressionCriteria {
+  minPainFreeReps: number;  // Must complete X reps without pain
+  minConsecutiveDays: number;  // Must complete on X consecutive days
+  maxPainDuring: number;  // Max pain level (0-10) during exercise
+  maxPainAfter: number;  // Max pain level 24h after
+  formScore?: number;  // Minimum form score if using AI coach (0-100)
+  prerequisiteExercises?: string[];  // Must master these first
+}
+
+/**
+ * Regression triggers - conditions that indicate exercise should be modified
+ */
+export interface RegressionTriggers {
+  painIncrease: number;  // If pain increases by this amount, regress
+  swellingPresent: boolean;  // Regress if swelling noted
+  formBreakdown: boolean;  // Regress if form deteriorates
+  compensationPatterns?: string[];  // Specific compensations to watch for
+}
+
 export interface Exercise {
   name: string;
   description: string;
@@ -152,6 +190,50 @@ export interface Exercise {
   videoUrl?: string; // Main demonstration video (YouTube embed URL)
   sources?: ExerciseSource[]; // Evidence-based references
   evidenceLevel?: 'A' | 'B' | 'C' | 'D' | 'expert'; // Strength of evidence
+
+  // ========== SAFETY FEATURES ==========
+
+  /** Absolute contraindications - NEVER perform if any of these apply */
+  contraindications?: string[];
+
+  /** Relative contraindications - use caution, may need modification */
+  precautions?: string[];
+
+  /** Red flags - stop immediately and seek medical attention */
+  redFlags?: string[];
+
+  /** Post-operative phase restrictions */
+  postOpRestrictions?: PostOpPhaseRestriction[];
+
+  /** Surgery types this exercise is appropriate for */
+  appropriateForSurgeries?: string[];
+
+  /** Surgery types this exercise should NEVER be used for */
+  contraindicatedSurgeries?: string[];
+
+  /** Maximum acceptable pain level during exercise (0-10) */
+  maxPainDuring?: number;
+
+  /** Maximum acceptable pain increase 24h after (0-10 increase) */
+  maxPainAfter24h?: number;
+
+  /** Progression criteria - when is patient ready for harder version */
+  progressionCriteria?: ProgressionCriteria;
+
+  /** Regression triggers - when should we make it easier */
+  regressionTriggers?: RegressionTriggers;
+
+  /** ID of easier variant */
+  regressionExercise?: string;
+
+  /** ID of harder variant */
+  progressionExercise?: string;
+
+  /** Specific joint/tissue being targeted */
+  targetStructure?: string;
+
+  /** Healing tissue type (affects load progression) */
+  healingTissue?: 'muscle' | 'tendon' | 'ligament' | 'bone' | 'cartilage' | 'nerve';
 }
 
 export interface DailyPlan {
@@ -581,7 +663,8 @@ export type FormIssueType =
   | 'ASYMMETRY'   // Left/right imbalance
   | 'SPEED'       // Moving too fast/slow
   | 'DEPTH'       // Not reaching full ROM
-  | 'ALIGNMENT';  // Poor body alignment
+  | 'ALIGNMENT'   // Poor body alignment
+  | 'INCOMPLETE'; // FAS 9: Rep did not meet quality thresholds
 
 /**
  * Single form issue detected
@@ -1020,4 +1103,117 @@ export interface AIAssessmentSession {
   shouldShowTSK11: boolean;
   sessionStartedAt: string;
   sessionCompletedAt?: string;
+}
+
+// ============================================
+// AI-KAMERA ROM MÄTNING TYPES
+// ============================================
+
+/**
+ * Single joint ROM measurement from camera
+ */
+export interface JointROMData {
+  left: number;       // Degrees
+  right: number;      // Degrees
+  symmetry: number;   // Percentage (0-100, where 100 = perfect symmetry)
+}
+
+/**
+ * ROM test definition for camera-guided measurement
+ */
+export interface ROMTestDefinition {
+  id: string;
+  name: string;              // "Knäböjning"
+  joint: string;             // "knee"
+  instruction: string;       // User-facing instruction
+  normalRange: {
+    min: number;             // Minimum normal ROM in degrees
+    max: number;             // Maximum normal ROM in degrees
+  };
+  ageAdjustment?: {          // Optional age-based adjustments
+    '18-40': number;
+    '41-60': number;
+    '60+': number;
+  };
+}
+
+/**
+ * Single ROM test result
+ */
+export interface ROMTestResult {
+  testId: string;
+  testName: string;
+  measuredValue: JointROMData;
+  normalRange: { min: number; max: number };
+  percentOfNormal: number;   // How much of normal ROM achieved
+  painReported: boolean;
+  timestamp: string;
+}
+
+/**
+ * Baseline ROM measurement from AI camera
+ * Stores initial ROM values for comparison over time
+ */
+export interface BaselineROM {
+  // Core joint measurements
+  kneeFlexion?: JointROMData;
+  hipFlexion?: JointROMData;
+  hipAbduction?: JointROMData;
+  shoulderFlexion?: JointROMData;
+  shoulderAbduction?: JointROMData;
+  shoulderRotation?: JointROMData;
+  elbowFlexion?: JointROMData;
+  ankleFlexion?: JointROMData;
+  spineFlexion?: JointROMData;
+  neckRotation?: JointROMData;
+
+  // Metadata
+  assessmentDate: string;            // ISO date string
+  painDuringTest: boolean;
+  testsCompleted: string[];          // List of test IDs completed
+  skippedTests?: string[];           // Tests patient declined
+
+  // Quality indicators
+  measurementQuality: 'good' | 'fair' | 'poor';
+  calibrationUsed: boolean;
+
+  // AI analysis
+  aiObservations?: string[];         // AI-noted patterns (e.g., "asymmetry in hip flexion")
+  recommendedFocus?: string[];       // Suggested areas to work on
+}
+
+/**
+ * ROM comparison between current and baseline
+ */
+export interface ROMComparison {
+  joint: string;
+  baseline: JointROMData;
+  current: JointROMData;
+  changeLeft: number;                // Degrees changed
+  changeRight: number;
+  changePercent: number;             // Average percentage change
+  status: 'improved' | 'maintained' | 'decreased';
+  comparisonDate: string;
+}
+
+/**
+ * ROM history entry for trend tracking
+ */
+export interface ROMHistoryEntry {
+  date: string;
+  measurements: Partial<BaselineROM>;
+  source: 'onboarding' | 'suggested' | 'manual';
+  notes?: string;
+}
+
+/**
+ * AI ROM suggestion state
+ */
+export interface ROMSuggestion {
+  shouldShow: boolean;
+  reason: string;                    // Why AI is suggesting this
+  suggestedTests: string[];          // Which tests to perform
+  lastSuggestionDate?: string;
+  declinedCount: number;             // How many times user declined
+  lastDeclinedDate?: string;
 }

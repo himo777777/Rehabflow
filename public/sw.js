@@ -543,3 +543,253 @@ self.addEventListener('notificationclick', (event) => {
 });
 
 console.log('[SW] Service Worker loaded');
+
+// ============================================
+// PERIODIC BACKGROUND SYNC (Sprint 5.6)
+// ============================================
+
+self.addEventListener('periodicsync', (event) => {
+  if (event.tag === 'sync-daily-progress') {
+    event.waitUntil(syncDailyProgress());
+  } else if (event.tag === 'prefetch-exercises') {
+    event.waitUntil(prefetchExerciseData());
+  }
+});
+
+/**
+ * Sync daily progress in background
+ */
+async function syncDailyProgress() {
+  console.log('[SW] Running periodic daily progress sync');
+  await syncProgress();
+  await syncMovementSessions();
+}
+
+/**
+ * Prefetch exercise data for offline use
+ */
+async function prefetchExerciseData() {
+  console.log('[SW] Prefetching exercise data');
+  const cache = await caches.open(DYNAMIC_CACHE);
+
+  // Prefetch common exercise assets
+  const exerciseAssets = [
+    '/api/exercises/list',
+    '/api/exercises/categories',
+  ];
+
+  for (const url of exerciseAssets) {
+    try {
+      const response = await fetch(url);
+      if (response.ok) {
+        await cache.put(url, response);
+        console.log('[SW] Prefetched:', url);
+      }
+    } catch (error) {
+      console.log('[SW] Failed to prefetch:', url);
+    }
+  }
+}
+
+// ============================================
+// OFFLINE FALLBACK PAGE (Sprint 5.6)
+// ============================================
+
+const OFFLINE_PAGE = '/offline.html';
+
+// Add offline page to static cache
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(STATIC_CACHE).then((cache) => {
+      return cache.add(OFFLINE_PAGE).catch(() => {
+        console.log('[SW] Offline page not available');
+      });
+    })
+  );
+});
+
+/**
+ * Return offline page when navigation fails
+ */
+async function handleNavigationOffline(request) {
+  try {
+    return await CACHE_STRATEGIES.networkFirst(request);
+  } catch (error) {
+    // For navigation requests, return offline page
+    if (request.mode === 'navigate') {
+      const offlinePage = await caches.match(OFFLINE_PAGE);
+      if (offlinePage) {
+        return offlinePage;
+      }
+    }
+    throw error;
+  }
+}
+
+// ============================================
+// CACHE SIZE MANAGEMENT (Sprint 5.6)
+// ============================================
+
+const MAX_CACHE_SIZE = 100; // Max items in dynamic cache
+const MAX_CACHE_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+/**
+ * Clean up old cache entries
+ */
+async function cleanupCache() {
+  const cache = await caches.open(DYNAMIC_CACHE);
+  const keys = await cache.keys();
+
+  if (keys.length > MAX_CACHE_SIZE) {
+    // Delete oldest entries
+    const toDelete = keys.slice(0, keys.length - MAX_CACHE_SIZE);
+    for (const key of toDelete) {
+      await cache.delete(key);
+    }
+    console.log('[SW] Cleaned up', toDelete.length, 'old cache entries');
+  }
+}
+
+// Run cleanup on activate
+self.addEventListener('activate', (event) => {
+  event.waitUntil(cleanupCache());
+});
+
+// ============================================
+// SHARE TARGET API (Sprint 5.6)
+// ============================================
+
+self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+
+  // Handle share target
+  if (url.pathname === '/share-target' && event.request.method === 'POST') {
+    event.respondWith(handleShareTarget(event.request));
+    return;
+  }
+});
+
+async function handleShareTarget(request) {
+  const formData = await request.formData();
+  const title = formData.get('title');
+  const text = formData.get('text');
+  const url = formData.get('url');
+
+  // Store shared content for the app to process
+  const clients = await self.clients.matchAll({ type: 'window' });
+  clients.forEach(client => {
+    client.postMessage({
+      type: 'SHARE_RECEIVED',
+      data: { title, text, url }
+    });
+  });
+
+  // Redirect to app
+  return Response.redirect('/?shared=true', 303);
+}
+
+// ============================================
+// WORKBOX-LIKE ROUTE MATCHING (Sprint 5.6)
+// ============================================
+
+const routes = [
+  {
+    match: /\/api\/exercises\/.*/,
+    strategy: 'staleWhileRevalidate',
+    cacheName: 'exercises-cache'
+  },
+  {
+    match: /\/api\/user\/.*/,
+    strategy: 'networkFirst',
+    cacheName: 'user-cache'
+  },
+  {
+    match: /\.(glb|gltf|fbx)$/,
+    strategy: 'cacheFirst',
+    cacheName: 'models-cache'
+  },
+  {
+    match: /\.(mp4|webm|ogg)$/,
+    strategy: 'cacheFirst',
+    cacheName: 'videos-cache'
+  }
+];
+
+/**
+ * Match request against routes
+ */
+function matchRoute(request) {
+  const url = new URL(request.url);
+
+  for (const route of routes) {
+    if (route.match.test(url.pathname)) {
+      return route;
+    }
+  }
+  return null;
+}
+
+// ============================================
+// NOTIFICATION SCHEDULING (Sprint 5.6)
+// ============================================
+
+/**
+ * Schedule a local notification
+ */
+async function scheduleNotification(title, options, delay) {
+  setTimeout(async () => {
+    await self.registration.showNotification(title, options);
+  }, delay);
+}
+
+// Listen for notification scheduling requests
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SCHEDULE_NOTIFICATION') {
+    const { title, options, delay } = event.data;
+    scheduleNotification(title, options, delay);
+  }
+
+  if (event.data?.type === 'CLEAR_CACHE') {
+    event.waitUntil(
+      caches.keys().then((names) => {
+        return Promise.all(names.map((name) => caches.delete(name)));
+      }).then(() => {
+        console.log('[SW] All caches cleared');
+      })
+    );
+  }
+
+  if (event.data?.type === 'GET_CACHE_SIZE') {
+    event.waitUntil(
+      getCacheSize().then((size) => {
+        event.source.postMessage({
+          type: 'CACHE_SIZE',
+          size
+        });
+      })
+    );
+  }
+});
+
+/**
+ * Get total cache size
+ */
+async function getCacheSize() {
+  let totalSize = 0;
+  const cacheNames = await caches.keys();
+
+  for (const name of cacheNames) {
+    const cache = await caches.open(name);
+    const keys = await cache.keys();
+
+    for (const request of keys) {
+      const response = await cache.match(request);
+      if (response) {
+        const blob = await response.clone().blob();
+        totalSize += blob.size;
+      }
+    }
+  }
+
+  return totalSize;
+}

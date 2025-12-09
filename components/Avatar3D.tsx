@@ -1,13 +1,61 @@
 
-import React, { useRef, useState, useEffect, Suspense, useMemo, useCallback } from 'react';
+import React, { useRef, useState, useEffect, Suspense, useMemo, useCallback, lazy } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Environment, Html, RoundedBox, Sphere, Cylinder } from '@react-three/drei';
 import * as THREE from 'three';
 import { speechService } from '../services/speechService';
-import { Volume2, VolumeX, Play, Pause, RotateCcw, X, ChevronRight, ChevronLeft, Loader2, Gauge, Eye, Info } from 'lucide-react';
+import { Volume2, VolumeX, Play, Pause, RotateCcw, X, ChevronRight, ChevronLeft, Loader2, Gauge, Eye, Info, ArrowUp, ArrowDown, Clock } from 'lucide-react';
 import SkeletalAvatar from './SkeletalAvatar';
 import { getExerciseAnimation, idleAnimation } from '../data/exerciseAnimations';
 import { ExerciseAnimationData, AnimationPhase } from '../services/avatarAnimationService';
+import SectionErrorBoundary from './SectionErrorBoundary';
+import VisualCues, { VisualCue, generateCuesForExercise, generateWarningCues, ExerciseMode } from './VisualCues';
+import { eventBus, emitPhaseChange, emitAnimationStart, emitAnimationProgress, emitTempoChange } from '../services/eventBus';
+import { useSync } from '../hooks/useSync';
+
+// Lazy load RealisticAvatar3D - same avatar used in AI analysis
+const RealisticAvatar3D = lazy(() => import('./RealisticAvatar3D'));
+
+
+// Exercise mode type - imported from VisualCues
+
+/**
+ * Detect exercise mode from exercise name
+ * Same logic as AIMovementCoach for consistency
+ */
+function getExerciseMode(exerciseName: string): ExerciseMode {
+  const name = exerciseName.toLowerCase();
+
+  // LUNGE - utfall och varianter
+  if (name.match(/utfall|lunge|split.?squat|bulgarian|step.?up/)) return 'LUNGE';
+
+  // CORE - mage, rygg, bål
+  if (name.match(/planka|plank|core|mage|bål|crunch|sit.?up|dead.?bug|bird.?dog|cat.?cow|kattko/)) return 'CORE';
+
+  // STRETCH - töjning, rörlighet
+  if (name.match(/stretch|töj|mjukgör|böj.*fram|nacke.*stretch|hip.*flexor|piriformis|hamstring.*stretch/)) return 'STRETCH';
+
+  // PUSH - tryckövningar
+  if (name.match(/armhävning|push.?up|dipp|chest.*press|bänkpress/)) return 'PUSH';
+
+  // BALANCE - balansövningar
+  if (name.match(/balans|balance|enben|stå.*på.*ett|tandem|single.*leg.*stand/)) return 'BALANCE';
+
+  // SHOULDER - axelövningar och rörlighet
+  if (name.match(/axel|shoulder|skulder|rotator|rotations?cuff|abduktion|abduction|elevation|flexion.*axel|pendel|codman/)) return 'SHOULDER';
+
+  // LEGS - benövningar (efter shoulder för att undvika falska positiver)
+  if (name.match(/knäböj|squat|knä.*extension|leg.*press|hopp|wadlyft|calf|häl|hip.*thrust|glute.*bridge|höft.*lyft|höftbrygga/)) return 'LEGS';
+
+  // PRESS - övriga tryckövningar för överkropp
+  if (name.match(/press|lyft.*hantel|overhead|military|triceps.*ext/)) return 'PRESS';
+
+  // PULL - dragövningar
+  if (name.match(/rodd|row|curl|biceps|drag|pulldown|pull.?up|lat|latissimus/)) return 'PULL';
+
+  // GENERAL som fallback
+  return 'GENERAL';
+}
 
 interface Avatar3DProps {
   exerciseName: string;
@@ -303,12 +351,12 @@ const LoadingFallback = () => (
   </Html>
 );
 
-// Camera angle presets
+// Camera angle presets - adjusted to show full avatar body
 type CameraAngle = 'front' | 'side' | 'top';
 const CAMERA_ANGLES: Record<CameraAngle, [number, number, number]> = {
-  front: [0, 1, 3],
-  side: [3, 1, 0],
-  top: [0, 3.5, 1],
+  front: [0, 1.0, 4.5],    // Further back, centered on body
+  side: [4.5, 1.0, 0],     // Side view, same distance
+  top: [0, 4.0, 2],        // Higher, looking down at angle
 };
 
 // Tempo options
@@ -328,6 +376,7 @@ const Avatar3D: React.FC<Avatar3DProps> = ({ exerciseName, steps, onClose }) => 
   const [currentPhase, setCurrentPhase] = useState<string>('');
   const [currentPhaseDescription, setCurrentPhaseDescription] = useState<string>('');
   const [useNewAvatar, setUseNewAvatar] = useState(true);
+  const [useRealisticAvatar, setUseRealisticAvatar] = useState(true); // Use same avatar as AI analysis
   const [showAnimationInfo, setShowAnimationInfo] = useState(true);
 
   // NEW: Tempo and camera controls
@@ -335,6 +384,15 @@ const Avatar3D: React.FC<Avatar3DProps> = ({ exerciseName, steps, onClose }) => 
   const [cameraAngle, setCameraAngle] = useState<CameraAngle>('front');
   const controlsRef = useRef<any>(null);
   const previousPhaseRef = useRef<string>('');
+
+  // Sprint 4: Phase-synchronized instruction state
+  const [phaseProgress, setPhaseProgress] = useState(0);
+  const [nextPhase, setNextPhase] = useState<AnimationPhase | null>(null);
+  const [showUpcomingPhase, setShowUpcomingPhase] = useState(false);
+  const [visualCues, setVisualCues] = useState<VisualCue[]>([]);
+  const [showVisualCues, setShowVisualCues] = useState(true);
+  const phaseStartTimeRef = useRef<number>(0);
+  const lastPhaseAnnouncedRef = useRef<string>('');
 
   // Get exercise animation data
   const exerciseAnimation = useMemo<ExerciseAnimationData | null>(() => {
@@ -361,17 +419,80 @@ const Avatar3D: React.FC<Avatar3DProps> = ({ exerciseName, steps, onClose }) => 
   // Handle phase changes from skeletal avatar with voice guidance
   const handlePhaseChange = useCallback((phaseName: string) => {
     setCurrentPhase(phaseName);
+    phaseStartTimeRef.current = Date.now();
+    setPhaseProgress(0);
 
-    // Find phase description
+    // Find phase description and next phase
     if (exerciseAnimation?.phases) {
-      const phase = exerciseAnimation.phases.find(p => p.name === phaseName);
+      const phaseIndex = exerciseAnimation.phases.findIndex(p => p.name === phaseName);
+      const phase = exerciseAnimation.phases[phaseIndex];
+      const next = exerciseAnimation.phases[phaseIndex + 1] || exerciseAnimation.phases[0];
+
       if (phase?.description) {
         setCurrentPhaseDescription(phase.description);
       }
-    }
-  }, [exerciseAnimation]);
+      setNextPhase(next || null);
 
-  // Voice guidance for phase changes during animation
+      // Sprint 5: Generate visual cues using universal generator for ALL exercise types
+      const exerciseMode = getExerciseMode(exerciseName) as ExerciseMode;
+      const newCues = generateCuesForExercise(exerciseMode, phaseName);
+      setVisualCues(newCues);
+
+      // Emit phase change event for synchronization
+      const phaseType = phaseName.toLowerCase().includes('sänk') || phaseName.toLowerCase().includes('ner')
+        ? 'eccentric' as const
+        : phaseName.toLowerCase().includes('lyft') || phaseName.toLowerCase().includes('upp')
+          ? 'concentric' as const
+          : phaseName.toLowerCase().includes('håll')
+            ? 'hold' as const
+            : 'rest' as const;
+
+      emitPhaseChange(phaseName, phaseType, phase?.endTime ? (phase.endTime - phase.startTime) * 1000 : undefined, phase?.description);
+    }
+  }, [exerciseAnimation, exerciseName]);
+
+  // Sprint 4: Phase progress tracking with Sprint 5 EventBus integration
+  useEffect(() => {
+    if (!isPlaying || !currentPhase) return;
+
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - phaseStartTimeRef.current;
+      const phaseDuration = 2000 / tempo; // Approximate phase duration based on tempo
+      const progress = Math.min(elapsed / phaseDuration, 1);
+      setPhaseProgress(progress);
+
+      // Sprint 5: Emit animation progress for synchronization
+      emitAnimationProgress(progress, currentPhase);
+
+      // Show upcoming phase preview at 80% progress
+      if (progress > 0.8 && nextPhase && !showUpcomingPhase) {
+        setShowUpcomingPhase(true);
+      } else if (progress < 0.8 && showUpcomingPhase) {
+        setShowUpcomingPhase(false);
+      }
+    }, 50);
+
+    return () => clearInterval(interval);
+  }, [isPlaying, currentPhase, tempo, nextPhase, showUpcomingPhase]);
+
+  // Sprint 5: Emit animation start/stop and tempo changes
+  useEffect(() => {
+    if (isPlaying && exerciseAnimation) {
+      emitAnimationStart(exerciseName, exerciseAnimation.duration * 1000);
+    } else if (!isPlaying) {
+      eventBus.emit({
+        type: 'ANIMATION_COMPLETE',
+        exerciseName,
+        timestamp: Date.now(),
+      });
+    }
+  }, [isPlaying, exerciseName, exerciseAnimation]);
+
+  useEffect(() => {
+    emitTempoChange(tempo);
+  }, [tempo]);
+
+  // Voice guidance for phase changes during animation (enhanced with preAnnounce)
   useEffect(() => {
     if (!isPlaying || !voiceEnabled || !currentPhase) return;
 
@@ -382,14 +503,31 @@ const Avatar3D: React.FC<Avatar3DProps> = ({ exerciseName, steps, onClose }) => 
       // Find the phase description
       const phase = exerciseAnimation?.phases?.find(p => p.name === currentPhase);
       if (phase?.description) {
-        // Use short, encouraging guidance
+        // Use phase-aware speech with tempo sync
         setIsSpeaking(true);
-        speechService.speak(phase.description, { rate: 1.1 }) // Slightly faster
+
+        // Map phase name to PhaseType for the speech service
+        const phaseType = currentPhase.toLowerCase().includes('sänk') || currentPhase.toLowerCase().includes('ner')
+          ? 'eccentric' as const
+          : currentPhase.toLowerCase().includes('lyft') || currentPhase.toLowerCase().includes('upp')
+            ? 'concentric' as const
+            : currentPhase.toLowerCase().includes('håll')
+              ? 'hold' as const
+              : 'rest' as const;
+
+        // Pre-announce if new phase (not just continuing)
+        if (lastPhaseAnnouncedRef.current !== currentPhase) {
+          lastPhaseAnnouncedRef.current = currentPhase;
+          // Use tempo for speech timing synchronization
+          speechService.preAnnouncePhase(phaseType, tempo);
+        }
+
+        speechService.speak(phase.description, { rate: 0.9 + tempo * 0.2 }) // Tempo-adjusted rate
           .then(() => setIsSpeaking(false))
           .catch(() => setIsSpeaking(false));
       }
     }
-  }, [currentPhase, isPlaying, voiceEnabled, exerciseAnimation]);
+  }, [currentPhase, isPlaying, voiceEnabled, exerciseAnimation, tempo]);
 
   // Legacy: Determine animation based on exercise name keywords (for old avatar)
   const getAnimationType = (): string => {
@@ -434,7 +572,7 @@ const Avatar3D: React.FC<Avatar3DProps> = ({ exerciseName, steps, onClose }) => 
       const newPosition = CAMERA_ANGLES[cameraAngle];
       // Smooth camera transition would need animation, for now direct set
       controlsRef.current.object.position.set(...newPosition);
-      controlsRef.current.target.set(0, 1, 0);
+      controlsRef.current.target.set(0, 0.9, 0); // Center on body
       controlsRef.current.update();
     }
   }, [cameraAngle]);
@@ -512,53 +650,87 @@ const Avatar3D: React.FC<Avatar3DProps> = ({ exerciseName, steps, onClose }) => 
         </button>
       </div>
 
-      {/* 3D Canvas */}
-      <div className="flex-1 relative">
-        <Canvas
-          camera={{ position: [0, 1, 3], fov: 50 }}
-          className="bg-gradient-to-b from-slate-800 to-slate-900"
-        >
-          <Suspense fallback={<LoadingFallback />}>
-            <ambientLight intensity={0.5} />
-            <directionalLight position={[5, 5, 5]} intensity={1} castShadow />
-            <directionalLight position={[-5, 3, -5]} intensity={0.3} />
+      {/* 3D Canvas - explicit height like AIMovementCoach */}
+      <div className="flex-1 relative bg-slate-950 overflow-hidden">
+        {/* Background gradient like AIMovementCoach */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-950/20 via-slate-950 to-slate-950"></div>
 
-            {useNewAvatar ? (
-              <SkeletalAvatar
-                animation={isPlaying ? exerciseAnimation : idleAnimation}
-                isPlaying={isPlaying}
-                tempo={tempo}
-                onPhaseChange={handlePhaseChange}
-                emotion={emotion}
-                isSpeaking={isSpeaking}
+        {useRealisticAvatar ? (
+          /* RealisticAvatar3D - same structure as AIMovementCoach */
+          <SectionErrorBoundary sectionName="3D Avatar" fallbackHeight="h-full">
+            <Suspense fallback={
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Loader2 className="animate-spin text-cyan-400" size={48} />
+              </div>
+            }>
+              <div className="absolute inset-0">
+                <RealisticAvatar3D
+                  mode={getExerciseMode(exerciseName)}
+                  gender="male"
+                  exerciseName={exerciseName}
+                />
+              </div>
+            </Suspense>
+          </SectionErrorBoundary>
+        ) : (
+          <Canvas
+            camera={{ position: [0, 1.0, 4.5], fov: 55 }}
+            className="bg-gradient-to-b from-slate-800 to-slate-900"
+          >
+            <Suspense fallback={<LoadingFallback />}>
+              <ambientLight intensity={0.5} />
+              <directionalLight position={[5, 5, 5]} intensity={1} castShadow />
+              <directionalLight position={[-5, 3, -5]} intensity={0.3} />
+
+              {useNewAvatar ? (
+                <>
+                  <SkeletalAvatar
+                    animation={isPlaying ? exerciseAnimation : idleAnimation}
+                    isPlaying={isPlaying}
+                    tempo={tempo}
+                    onPhaseChange={handlePhaseChange}
+                    emotion={emotion}
+                    isSpeaking={isSpeaking}
+                  />
+                  {/* Sprint 4: Visual Cues overlay */}
+                  {showVisualCues && isPlaying && (
+                    <VisualCues
+                      cues={visualCues}
+                      visible={isPlaying}
+                      globalIntensity={1}
+                      currentPhase={currentPhase}
+                    />
+                  )}
+                </>
+              ) : (
+                <HumanoidAvatar
+                  animation={isPlaying ? animation : 'idle'}
+                  animationProgress={animationProgress}
+                  isSpeaking={isSpeaking}
+                  emotion={emotion}
+                />
+              )}
+
+              <OrbitControls
+                ref={controlsRef}
+                target={[0, 0.9, 0]}
+                enablePan={false}
+                minDistance={2.5}
+                maxDistance={7}
+                minPolarAngle={Math.PI / 6}
+                maxPolarAngle={Math.PI * 0.65}
               />
-            ) : (
-              <HumanoidAvatar
-                animation={isPlaying ? animation : 'idle'}
-                animationProgress={animationProgress}
-                isSpeaking={isSpeaking}
-                emotion={emotion}
-              />
-            )}
 
-            <OrbitControls
-              ref={controlsRef}
-              enablePan={false}
-              minDistance={2}
-              maxDistance={6}
-              minPolarAngle={Math.PI / 6}
-              maxPolarAngle={Math.PI * 0.6}
-            />
+              {/* Floor */}
+              <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.1, 0]} receiveShadow>
+                <circleGeometry args={[2, 64]} />
+                <meshStandardMaterial color="#1e293b" />
+              </mesh>
 
-            {/* Floor */}
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.1, 0]} receiveShadow>
-              <circleGeometry args={[2, 64]} />
-              <meshStandardMaterial color="#1e293b" />
-            </mesh>
-
-            <Environment preset="city" />
-          </Suspense>
-        </Canvas>
+              <Environment preset="city" />
+            </Suspense>
+          </Canvas>
+        )}
 
         {/* Step indicator overlay */}
         <div className="absolute top-4 left-4 right-4">
@@ -574,23 +746,56 @@ const Avatar3D: React.FC<Avatar3DProps> = ({ exerciseName, steps, onClose }) => 
           </div>
         </div>
 
-        {/* Animation Phase Indicator - Enhanced */}
+        {/* Sprint 4: Enhanced Animation Phase Indicator with Progress */}
         {isPlaying && currentPhase && (
-          <div className="absolute top-12 left-4 right-4 flex justify-between items-start">
-            {/* Current Phase */}
-            <div className="bg-gradient-to-r from-blue-500/30 to-cyan-500/20 border border-blue-500/40 rounded-xl px-4 py-2 backdrop-blur-sm max-w-xs">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse" />
-                <span className="text-cyan-300 text-xs font-bold uppercase tracking-wide">{currentPhase}</span>
+          <div className="absolute top-12 left-4 right-4 flex justify-between items-start gap-3">
+            {/* Current Phase with Progress */}
+            <div className="bg-gradient-to-r from-blue-500/30 to-cyan-500/20 border border-blue-500/40 rounded-xl px-4 py-3 backdrop-blur-sm flex-1 max-w-sm">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 bg-cyan-400 rounded-full animate-pulse" />
+                  <span className="text-cyan-300 text-xs font-bold uppercase tracking-wide">{currentPhase}</span>
+                </div>
+                {/* Phase direction icon */}
+                {currentPhase.toLowerCase().includes('lyft') || currentPhase.toLowerCase().includes('upp') ? (
+                  <ArrowUp size={16} className="text-green-400" />
+                ) : currentPhase.toLowerCase().includes('sänk') || currentPhase.toLowerCase().includes('ner') ? (
+                  <ArrowDown size={16} className="text-orange-400" />
+                ) : (
+                  <Clock size={16} className="text-yellow-400" />
+                )}
               </div>
+
               {currentPhaseDescription && (
-                <p className="text-white text-sm font-medium">{currentPhaseDescription}</p>
+                <p className="text-white text-sm font-medium mb-2">{currentPhaseDescription}</p>
               )}
+
+              {/* Phase Progress Bar */}
+              <div className="relative h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                <div
+                  className="absolute inset-y-0 left-0 bg-gradient-to-r from-cyan-500 to-blue-400 rounded-full transition-all duration-100"
+                  style={{ width: `${phaseProgress * 100}%` }}
+                />
+              </div>
             </div>
+
+            {/* Upcoming Phase Preview (shows at 80% progress) */}
+            {showUpcomingPhase && nextPhase && (
+              <div className="bg-gradient-to-r from-amber-500/20 to-orange-500/15 border border-amber-500/30 rounded-xl px-3 py-2 backdrop-blur-sm animate-pulse">
+                <div className="flex items-center gap-2 mb-1">
+                  <ChevronRight size={14} className="text-amber-400" />
+                  <span className="text-amber-300 text-xs font-semibold uppercase">Nästa</span>
+                </div>
+                <p className="text-white text-xs font-medium">{nextPhase.name}</p>
+                {nextPhase.description && (
+                  <p className="text-amber-200/70 text-xs mt-0.5">{nextPhase.description}</p>
+                )}
+              </div>
+            )}
 
             {/* Animation info */}
             {exerciseAnimation && exerciseAnimation.exerciseName !== 'Idle' && (
-              <div className="bg-slate-800/80 border border-slate-600/50 rounded-lg px-3 py-1.5 backdrop-blur-sm">
+              <div className="bg-slate-800/80 border border-slate-600/50 rounded-lg px-3 py-1.5 backdrop-blur-sm self-start">
                 <span className="text-slate-400 text-xs">
                   Animation: <span className="text-cyan-400 font-medium">{exerciseAnimation.exerciseName}</span>
                 </span>
