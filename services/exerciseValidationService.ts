@@ -435,4 +435,368 @@ Markera övningar som EJ GODKÄNDA om de bryter mot postoperativa restriktioner 
 `.trim();
 }
 
+// ============================================
+// REAL-TIME FORM VALIDATION (FAS X)
+// ============================================
+
+export type MovementPhase = 'concentric' | 'eccentric' | 'isometric' | 'rest';
+export type FormValidationSeverity = 'info' | 'warning' | 'error' | 'critical';
+
+export interface FormValidationRule {
+  id: string;
+  name: string;
+  nameSv: string;
+  severity: FormValidationSeverity;
+  validate: (context: FormValidationContext) => FormValidationResult;
+}
+
+export interface FormValidationContext {
+  exerciseId: string;
+  currentAngles: Record<string, number>;
+  targetAngles?: Record<string, number>;
+  velocities?: Record<string, number>;
+  phase: MovementPhase;
+  repCount: number;
+  setCount: number;
+  elapsedTime: number;
+  painLevel?: number;
+}
+
+export interface FormValidationResult {
+  passed: boolean;
+  ruleId: string;
+  severity: FormValidationSeverity;
+  message: string;
+  messageSv: string;
+  suggestion?: string;
+  suggestionSv?: string;
+  affectedJoints?: string[];
+  value?: number;
+  threshold?: number;
+}
+
+export interface FormValidationReport {
+  exerciseId: string;
+  timestamp: number;
+  overallScore: number;
+  passed: boolean;
+  results: FormValidationResult[];
+  summary: {
+    totalRules: number;
+    passedRules: number;
+    warnings: number;
+    errors: number;
+    criticalIssues: number;
+  };
+}
+
+// Exercise ROM definitions
+const EXERCISE_ROM_TARGETS: Record<string, Record<string, { min: number; max: number; optimal: number }>> = {
+  'shoulder_flexion': {
+    leftShoulderFlexion: { min: 0, max: 180, optimal: 170 },
+    rightShoulderFlexion: { min: 0, max: 180, optimal: 170 },
+  },
+  'shoulder_abduction': {
+    leftShoulderAbduction: { min: 0, max: 180, optimal: 170 },
+    rightShoulderAbduction: { min: 0, max: 180, optimal: 170 },
+  },
+  'elbow_flexion': {
+    leftElbow: { min: 0, max: 145, optimal: 140 },
+    rightElbow: { min: 0, max: 145, optimal: 140 },
+  },
+  'knee_extension': {
+    leftKnee: { min: 90, max: 180, optimal: 175 },
+    rightKnee: { min: 90, max: 180, optimal: 175 },
+  },
+  'squat': {
+    leftKnee: { min: 60, max: 180, optimal: 90 },
+    rightKnee: { min: 60, max: 180, optimal: 90 },
+    leftHip: { min: 45, max: 180, optimal: 90 },
+    rightHip: { min: 45, max: 180, optimal: 90 },
+    trunkLean: { min: 0, max: 45, optimal: 30 },
+  },
+};
+
+// Form validation rules
+const FORM_VALIDATION_RULES: FormValidationRule[] = [
+  // ROM validation
+  {
+    id: 'rom_minimum',
+    name: 'Minimum Range of Motion',
+    nameSv: 'Minsta rörelseomfång',
+    severity: 'warning',
+    validate: (ctx) => {
+      const targets = EXERCISE_ROM_TARGETS[ctx.exerciseId];
+      if (!targets) return { passed: true, ruleId: 'rom_minimum', severity: 'info', message: 'No ROM data', messageSv: 'Ingen ROM-data' };
+
+      for (const [joint, range] of Object.entries(targets)) {
+        const angle = ctx.currentAngles[joint];
+        if (angle !== undefined && angle < range.min) {
+          return {
+            passed: false,
+            ruleId: 'rom_minimum',
+            severity: 'warning',
+            message: `${joint} (${angle.toFixed(0)}°) below minimum (${range.min}°)`,
+            messageSv: `${joint} (${angle.toFixed(0)}°) under minimum (${range.min}°)`,
+            suggestionSv: 'Försök öka rörelseomfånget gradvis',
+            affectedJoints: [joint],
+            value: angle,
+            threshold: range.min,
+          };
+        }
+      }
+      return { passed: true, ruleId: 'rom_minimum', severity: 'info', message: 'ROM OK', messageSv: 'ROM OK' };
+    },
+  },
+  // ROM safety
+  {
+    id: 'rom_safety',
+    name: 'ROM Safety Check',
+    nameSv: 'ROM säkerhetskontroll',
+    severity: 'critical',
+    validate: (ctx) => {
+      const targets = EXERCISE_ROM_TARGETS[ctx.exerciseId];
+      if (!targets) return { passed: true, ruleId: 'rom_safety', severity: 'info', message: 'No ROM data', messageSv: 'Ingen ROM-data' };
+
+      for (const [joint, range] of Object.entries(targets)) {
+        const angle = ctx.currentAngles[joint];
+        if (angle !== undefined && angle > range.max + 10) {
+          return {
+            passed: false,
+            ruleId: 'rom_safety',
+            severity: 'critical',
+            message: `STOP! ${joint} exceeds safe range`,
+            messageSv: `STOPP! ${joint} överskrider säkert område`,
+            suggestionSv: 'Minska rörelseomfånget omedelbart',
+            affectedJoints: [joint],
+            value: angle,
+            threshold: range.max,
+          };
+        }
+      }
+      return { passed: true, ruleId: 'rom_safety', severity: 'info', message: 'Safe', messageSv: 'Säkert' };
+    },
+  },
+  // Bilateral symmetry
+  {
+    id: 'symmetry',
+    name: 'Bilateral Symmetry',
+    nameSv: 'Bilateral symmetri',
+    severity: 'warning',
+    validate: (ctx) => {
+      const pairs = [
+        ['leftShoulderFlexion', 'rightShoulderFlexion'],
+        ['leftElbow', 'rightElbow'],
+        ['leftKnee', 'rightKnee'],
+      ];
+
+      for (const [left, right] of pairs) {
+        const l = ctx.currentAngles[left];
+        const r = ctx.currentAngles[right];
+        if (l !== undefined && r !== undefined) {
+          const diff = Math.abs(l - r);
+          if (diff > 15) {
+            return {
+              passed: false,
+              ruleId: 'symmetry',
+              severity: 'warning',
+              message: `Asymmetry: ${diff.toFixed(0)}° difference`,
+              messageSv: `Asymmetri: ${diff.toFixed(0)}° skillnad`,
+              suggestionSv: 'Försök hålla lika rörelse på båda sidor',
+              value: diff,
+              threshold: 15,
+            };
+          }
+        }
+      }
+      return { passed: true, ruleId: 'symmetry', severity: 'info', message: 'Symmetric', messageSv: 'Symmetrisk' };
+    },
+  },
+  // Trunk compensation
+  {
+    id: 'trunk_compensation',
+    name: 'Trunk Compensation',
+    nameSv: 'Bålkompensation',
+    severity: 'warning',
+    validate: (ctx) => {
+      const trunk = ctx.currentAngles.trunkLean;
+      if (trunk === undefined) return { passed: true, ruleId: 'trunk_compensation', severity: 'info', message: 'No data', messageSv: 'Ingen data' };
+
+      if (trunk > 15 && !ctx.exerciseId.includes('squat')) {
+        return {
+          passed: false,
+          ruleId: 'trunk_compensation',
+          severity: 'warning',
+          message: `Trunk leaning ${trunk.toFixed(0)}°`,
+          messageSv: `Bålen lutar ${trunk.toFixed(0)}°`,
+          suggestionSv: 'Håll bålen stabil',
+          value: trunk,
+          threshold: 15,
+        };
+      }
+      return { passed: true, ruleId: 'trunk_compensation', severity: 'info', message: 'Trunk OK', messageSv: 'Bål OK' };
+    },
+  },
+  // Knee valgus
+  {
+    id: 'knee_valgus',
+    name: 'Knee Valgus',
+    nameSv: 'Knävalgus',
+    severity: 'error',
+    validate: (ctx) => {
+      const leftV = ctx.currentAngles.leftKneeValgus;
+      const rightV = ctx.currentAngles.rightKneeValgus;
+
+      if (leftV !== undefined && leftV < -10) {
+        return {
+          passed: false,
+          ruleId: 'knee_valgus',
+          severity: 'error',
+          message: 'Left knee collapsing inward',
+          messageSv: 'Vänster knä faller inåt',
+          suggestionSv: 'Skjut ut knäet över tårna',
+          affectedJoints: ['leftKneeValgus'],
+          value: leftV,
+          threshold: -10,
+        };
+      }
+      if (rightV !== undefined && rightV < -10) {
+        return {
+          passed: false,
+          ruleId: 'knee_valgus',
+          severity: 'error',
+          message: 'Right knee collapsing inward',
+          messageSv: 'Höger knä faller inåt',
+          suggestionSv: 'Skjut ut knäet över tårna',
+          affectedJoints: ['rightKneeValgus'],
+          value: rightV,
+          threshold: -10,
+        };
+      }
+      return { passed: true, ruleId: 'knee_valgus', severity: 'info', message: 'Knees OK', messageSv: 'Knän OK' };
+    },
+  },
+  // Movement tempo
+  {
+    id: 'tempo',
+    name: 'Movement Tempo',
+    nameSv: 'Rörelsetempo',
+    severity: 'info',
+    validate: (ctx) => {
+      if (!ctx.velocities) return { passed: true, ruleId: 'tempo', severity: 'info', message: 'No velocity', messageSv: 'Ingen hastighet' };
+
+      const maxVelocity = 180;
+      for (const [joint, vel] of Object.entries(ctx.velocities)) {
+        if (Math.abs(vel) > maxVelocity) {
+          return {
+            passed: false,
+            ruleId: 'tempo',
+            severity: 'warning',
+            message: 'Movement too fast - slow down',
+            messageSv: 'Rörelse för snabb - sakta ner',
+            suggestionSv: 'Kontrollera rörelsen genom hela omfånget',
+            value: Math.abs(vel),
+            threshold: maxVelocity,
+          };
+        }
+      }
+      return { passed: true, ruleId: 'tempo', severity: 'info', message: 'Tempo OK', messageSv: 'Tempo OK' };
+    },
+  },
+  // Pain awareness
+  {
+    id: 'pain_check',
+    name: 'Pain Check',
+    nameSv: 'Smärtkontroll',
+    severity: 'warning',
+    validate: (ctx) => {
+      if (ctx.painLevel === undefined) return { passed: true, ruleId: 'pain_check', severity: 'info', message: 'No pain data', messageSv: 'Ingen smärtdata' };
+
+      if (ctx.painLevel >= 7) {
+        return {
+          passed: false,
+          ruleId: 'pain_check',
+          severity: 'critical',
+          message: 'High pain - consider stopping',
+          messageSv: 'Hög smärta - överväg att sluta',
+          value: ctx.painLevel,
+          threshold: 7,
+        };
+      }
+      if (ctx.painLevel >= 5) {
+        return {
+          passed: true,
+          ruleId: 'pain_check',
+          severity: 'warning',
+          message: 'Moderate pain - reduce intensity',
+          messageSv: 'Måttlig smärta - minska intensiteten',
+          value: ctx.painLevel,
+          threshold: 5,
+        };
+      }
+      return { passed: true, ruleId: 'pain_check', severity: 'info', message: 'Pain OK', messageSv: 'Smärta OK' };
+    },
+  },
+];
+
+/**
+ * Validate exercise form in real-time
+ */
+export function validateForm(context: FormValidationContext): FormValidationReport {
+  const results: FormValidationResult[] = [];
+
+  for (const rule of FORM_VALIDATION_RULES) {
+    try {
+      results.push(rule.validate(context));
+    } catch {
+      results.push({
+        passed: true,
+        ruleId: rule.id,
+        severity: 'info',
+        message: 'Rule skipped',
+        messageSv: 'Regel överhoppad',
+      });
+    }
+  }
+
+  const passedRules = results.filter(r => r.passed).length;
+  const warnings = results.filter(r => !r.passed && r.severity === 'warning').length;
+  const errors = results.filter(r => !r.passed && r.severity === 'error').length;
+  const criticalIssues = results.filter(r => !r.passed && r.severity === 'critical').length;
+
+  const overallScore = Math.max(0, 100 - (warnings * 5) - (errors * 15) - (criticalIssues * 30));
+
+  return {
+    exerciseId: context.exerciseId,
+    timestamp: Date.now(),
+    overallScore,
+    passed: criticalIssues === 0 && errors === 0,
+    results,
+    summary: {
+      totalRules: results.length,
+      passedRules,
+      warnings,
+      errors,
+      criticalIssues,
+    },
+  };
+}
+
+/**
+ * Get ROM targets for an exercise
+ */
+export function getExerciseROMTargets(exerciseId: string): Record<string, { min: number; max: number; optimal: number }> | undefined {
+  return EXERCISE_ROM_TARGETS[exerciseId];
+}
+
+/**
+ * Add custom ROM targets
+ */
+export function addExerciseROMTargets(
+  exerciseId: string,
+  targets: Record<string, { min: number; max: number; optimal: number }>
+): void {
+  EXERCISE_ROM_TARGETS[exerciseId] = targets;
+}
+
 // All exports are inline with their declarations above
