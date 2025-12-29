@@ -339,16 +339,60 @@ export interface ExerciseLog {
  * Achievement/Milestone types
  */
 export type MilestoneType =
+  // Streak achievements
   | 'streak_3'
   | 'streak_7'
   | 'streak_14'
   | 'streak_30'
+  | 'streak_60'
+  | 'streak_90'
+  | 'streak_365'
+  // Completion achievements
   | 'phase_complete'
-  | 'pain_reduction_25'
-  | 'pain_reduction_50'
   | 'first_workout'
   | 'week_complete'
-  | 'month_complete';
+  | 'month_complete'
+  | 'first_pain_log'
+  | 'first_rom_assessment'
+  // Pain reduction
+  | 'pain_reduction_10'
+  | 'pain_reduction_25'
+  | 'pain_reduction_50'
+  | 'pain_free_day'
+  | 'pain_free_week'
+  // Form & quality
+  | 'perfect_form'
+  | 'form_master'
+  | 'technique_expert'
+  | 'flawless_session'
+  // ROM achievements
+  | 'rom_improvement_5'
+  | 'rom_improvement_10'
+  | 'rom_improvement_25'
+  | 'full_rom_restored'
+  // Volume achievements
+  | 'reps_100'
+  | 'reps_500'
+  | 'reps_1000'
+  | 'reps_5000'
+  | 'sessions_10'
+  | 'sessions_50'
+  | 'sessions_100'
+  // Time-based
+  | 'early_bird'
+  | 'night_owl'
+  | 'weekend_warrior'
+  | 'morning_routine'
+  // Social achievements
+  | 'shared_progress'
+  | 'invited_friend'
+  | 'group_challenge_complete'
+  // Special achievements
+  | 'comeback_king'
+  | 'consistency_champion'
+  | 'pain_warrior'
+  | 'dedication_diamond'
+  | 'rehabflow_master';
 
 /**
  * Milestone/Achievement tracking

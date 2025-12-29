@@ -47,6 +47,35 @@ export interface PredictionInput {
     temperature: number;
     humidity: number;
   };
+  // Enhanced factors
+  medicationTaken?: boolean[];
+  menstrualCycleDay?: number;
+  moodScores?: number[];
+  timeOfDayPatterns?: number[]; // 0-23 hour pain peaks
+}
+
+export interface PainPattern {
+  type: 'cyclical' | 'trigger-based' | 'progressive' | 'stable';
+  cycleLength?: number; // Days for cyclical patterns
+  peakDays?: number[]; // Day of week (0-6)
+  peakHours?: number[]; // Hour of day (0-23)
+  triggers: string[];
+  confidence: number;
+}
+
+export interface EnhancedPrediction extends PainPrediction {
+  patterns: PainPattern[];
+  weatherImpact: {
+    score: number;
+    description: string;
+  } | null;
+  personalizedInsights: string[];
+  suggestedPreventiveActions: {
+    action: string;
+    priority: 'high' | 'medium' | 'low';
+    timing: string;
+    effectiveness: number; // 0-1 estimated
+  }[];
 }
 
 export interface PainPrediction {
@@ -842,6 +871,476 @@ export class PainPredictionService {
     }
     this.isInitialized = false;
     logger.info('Pain prediction service disposed');
+  }
+
+  // --------------------------------------------------------------------------
+  // ENHANCED PATTERN DETECTION
+  // --------------------------------------------------------------------------
+
+  /**
+   * Detect pain patterns from historical data
+   */
+  public detectPatterns(painHistory: PainDataPoint[]): PainPattern[] {
+    const patterns: PainPattern[] = [];
+
+    if (painHistory.length < 14) {
+      return patterns;
+    }
+
+    // Detect cyclical patterns (weekly, bi-weekly, monthly)
+    const cyclicalPattern = this.detectCyclicalPattern(painHistory);
+    if (cyclicalPattern) {
+      patterns.push(cyclicalPattern);
+    }
+
+    // Detect day-of-week patterns
+    const weekdayPattern = this.detectWeekdayPattern(painHistory);
+    if (weekdayPattern) {
+      patterns.push(weekdayPattern);
+    }
+
+    // Detect time-of-day patterns
+    const timePattern = this.detectTimeOfDayPattern(painHistory);
+    if (timePattern) {
+      patterns.push(timePattern);
+    }
+
+    // Detect trigger-based patterns
+    const triggerPattern = this.detectTriggerPattern(painHistory);
+    if (triggerPattern) {
+      patterns.push(triggerPattern);
+    }
+
+    return patterns;
+  }
+
+  /**
+   * Detect cyclical patterns using autocorrelation
+   */
+  private detectCyclicalPattern(data: PainDataPoint[]): PainPattern | null {
+    const values = data.map(d => d.painLevel);
+    const correlations: { lag: number; correlation: number }[] = [];
+
+    // Check for cycles of 7, 14, 28, 30 days
+    const cycleLengths = [7, 14, 28, 30];
+
+    for (const lag of cycleLengths) {
+      if (values.length < lag * 2) continue;
+
+      const correlation = this.calculateAutocorrelation(values, lag);
+      if (correlation > 0.5) {
+        correlations.push({ lag, correlation });
+      }
+    }
+
+    if (correlations.length === 0) return null;
+
+    const strongest = correlations.sort((a, b) => b.correlation - a.correlation)[0];
+
+    return {
+      type: 'cyclical',
+      cycleLength: strongest.lag,
+      triggers: [],
+      confidence: strongest.correlation
+    };
+  }
+
+  /**
+   * Calculate autocorrelation at a given lag
+   */
+  private calculateAutocorrelation(values: number[], lag: number): number {
+    const n = values.length - lag;
+    if (n < 2) return 0;
+
+    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    let numerator = 0;
+    let denominator = 0;
+
+    for (let i = 0; i < n; i++) {
+      numerator += (values[i] - mean) * (values[i + lag] - mean);
+    }
+
+    for (let i = 0; i < values.length; i++) {
+      denominator += Math.pow(values[i] - mean, 2);
+    }
+
+    return denominator === 0 ? 0 : numerator / denominator;
+  }
+
+  /**
+   * Detect day-of-week patterns
+   */
+  private detectWeekdayPattern(data: PainDataPoint[]): PainPattern | null {
+    const dayAverages: number[][] = [[], [], [], [], [], [], []];
+
+    data.forEach(point => {
+      const day = point.timestamp.getDay();
+      dayAverages[day].push(point.painLevel);
+    });
+
+    const averages = dayAverages.map(days =>
+      days.length > 0 ? days.reduce((a, b) => a + b, 0) / days.length : 0
+    );
+
+    const overallAvg = data.reduce((sum, d) => sum + d.painLevel, 0) / data.length;
+    const peakDays = averages
+      .map((avg, idx) => ({ idx, diff: avg - overallAvg }))
+      .filter(d => d.diff > 1.5)
+      .map(d => d.idx);
+
+    if (peakDays.length === 0) return null;
+
+    const maxDiff = Math.max(...averages.map(a => Math.abs(a - overallAvg)));
+    const confidence = Math.min(1, maxDiff / 3);
+
+    return {
+      type: 'cyclical',
+      peakDays,
+      triggers: [],
+      confidence
+    };
+  }
+
+  /**
+   * Detect time-of-day patterns
+   */
+  private detectTimeOfDayPattern(data: PainDataPoint[]): PainPattern | null {
+    const hourAverages: number[][] = Array(24).fill(null).map(() => []);
+
+    data.forEach(point => {
+      const hour = point.timestamp.getHours();
+      hourAverages[hour].push(point.painLevel);
+    });
+
+    const averages = hourAverages.map(hours =>
+      hours.length > 0 ? hours.reduce((a, b) => a + b, 0) / hours.length : 0
+    );
+
+    const overallAvg = data.reduce((sum, d) => sum + d.painLevel, 0) / data.length;
+    const peakHours = averages
+      .map((avg, idx) => ({ idx, diff: avg - overallAvg }))
+      .filter(d => d.diff > 1.5)
+      .map(d => d.idx);
+
+    if (peakHours.length === 0) return null;
+
+    return {
+      type: 'cyclical',
+      peakHours,
+      triggers: [],
+      confidence: 0.7
+    };
+  }
+
+  /**
+   * Detect trigger-based patterns
+   */
+  private detectTriggerPattern(data: PainDataPoint[]): PainPattern | null {
+    const triggerCounts: Map<string, { total: number; highPain: number }> = new Map();
+
+    data.forEach(point => {
+      point.triggers?.forEach(trigger => {
+        const current = triggerCounts.get(trigger) || { total: 0, highPain: 0 };
+        current.total++;
+        if (point.painLevel >= 6) {
+          current.highPain++;
+        }
+        triggerCounts.set(trigger, current);
+      });
+    });
+
+    const significantTriggers = Array.from(triggerCounts.entries())
+      .filter(([_, counts]) => counts.total >= 3 && counts.highPain / counts.total > 0.5)
+      .map(([trigger]) => trigger);
+
+    if (significantTriggers.length === 0) return null;
+
+    return {
+      type: 'trigger-based',
+      triggers: significantTriggers,
+      confidence: 0.75
+    };
+  }
+
+  // --------------------------------------------------------------------------
+  // WEATHER IMPACT ANALYSIS
+  // --------------------------------------------------------------------------
+
+  /**
+   * Analyze weather impact on pain
+   */
+  public async analyzeWeatherImpact(
+    userId: string,
+    currentWeather?: { pressure: number; humidity: number; temperature: number }
+  ): Promise<{ score: number; description: string } | null> {
+    if (!currentWeather) return null;
+
+    try {
+      // Fetch historical pain-weather correlations
+      const { data: correlations } = await supabase
+        .from('pain_weather_correlations')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (!correlations) {
+        return this.estimateWeatherImpact(currentWeather);
+      }
+
+      let score = 0;
+      const factors: string[] = [];
+
+      // Barometric pressure (most significant for many patients)
+      if (correlations.pressure_sensitive && currentWeather.pressure < 1010) {
+        score -= 0.3;
+        factors.push('lågt lufttryck');
+      }
+
+      // Humidity
+      if (correlations.humidity_sensitive && currentWeather.humidity > 80) {
+        score -= 0.2;
+        factors.push('hög luftfuktighet');
+      }
+
+      // Temperature (cold can aggravate joint pain)
+      if (correlations.temperature_sensitive && currentWeather.temperature < 5) {
+        score -= 0.2;
+        factors.push('kall väderlek');
+      }
+
+      const description = factors.length > 0
+        ? `Vädret kan påverka din smärta idag (${factors.join(', ')})`
+        : 'Vädret förväntas inte påverka din smärtnivå nämnvärt';
+
+      return { score, description };
+    } catch {
+      return this.estimateWeatherImpact(currentWeather);
+    }
+  }
+
+  /**
+   * Estimate weather impact for new users
+   */
+  private estimateWeatherImpact(
+    weather: { pressure: number; humidity: number; temperature: number }
+  ): { score: number; description: string } {
+    let score = 0;
+    const factors: string[] = [];
+
+    if (weather.pressure < 1005) {
+      score -= 0.25;
+      factors.push('lågt lufttryck');
+    }
+
+    if (weather.humidity > 85) {
+      score -= 0.15;
+      factors.push('hög luftfuktighet');
+    }
+
+    if (weather.temperature < 3) {
+      score -= 0.15;
+      factors.push('kallt väder');
+    }
+
+    const description = factors.length > 0
+      ? `Potentiell väderpåverkan: ${factors.join(', ')}`
+      : 'Normala väderförhållanden';
+
+    return { score, description };
+  }
+
+  // --------------------------------------------------------------------------
+  // PREVENTIVE ACTIONS
+  // --------------------------------------------------------------------------
+
+  /**
+   * Generate preventive actions based on prediction
+   */
+  public generatePreventiveActions(
+    prediction: PainPrediction,
+    patterns: PainPattern[]
+  ): EnhancedPrediction['suggestedPreventiveActions'] {
+    const actions: EnhancedPrediction['suggestedPreventiveActions'] = [];
+
+    // Based on risk level
+    if (prediction.riskLevel === 'critical' || prediction.riskLevel === 'high') {
+      actions.push({
+        action: 'Ta smärtstillande medicin i förebyggande syfte',
+        priority: 'high',
+        timing: 'Inom de närmaste 2 timmarna',
+        effectiveness: 0.7
+      });
+
+      actions.push({
+        action: 'Boka en lättare träningssession istället för planerad intensiv träning',
+        priority: 'high',
+        timing: 'Idag',
+        effectiveness: 0.6
+      });
+    }
+
+    // Based on patterns
+    patterns.forEach(pattern => {
+      if (pattern.type === 'cyclical' && pattern.peakDays) {
+        const today = new Date().getDay();
+        if (pattern.peakDays.includes(today) || pattern.peakDays.includes((today + 1) % 7)) {
+          actions.push({
+            action: 'Historiskt har du mer smärta denna dag i veckan - planera lättare aktiviteter',
+            priority: 'medium',
+            timing: 'Idag och imorgon',
+            effectiveness: 0.5
+          });
+        }
+      }
+
+      if (pattern.triggers.length > 0) {
+        actions.push({
+          action: `Undvik kända triggers: ${pattern.triggers.slice(0, 3).join(', ')}`,
+          priority: 'medium',
+          timing: 'Närmaste 48 timmarna',
+          effectiveness: 0.65
+        });
+      }
+    });
+
+    // General preventive actions
+    if (prediction.predictedPain >= 5) {
+      actions.push({
+        action: 'Utför avslappningsövningar (andning, meditation)',
+        priority: 'medium',
+        timing: 'Kväll',
+        effectiveness: 0.45
+      });
+
+      actions.push({
+        action: 'Förbered is- eller värmeomslag',
+        priority: 'low',
+        timing: 'Ha redo',
+        effectiveness: 0.4
+      });
+    }
+
+    // Contributing factor based actions
+    prediction.contributingFactors
+      .filter(f => f.impact < -0.4)
+      .forEach(factor => {
+        if (factor.factor.includes('sleep') || factor.factor.includes('sömn')) {
+          actions.push({
+            action: 'Prioritera sömn ikväll - sikta på 8+ timmar',
+            priority: 'high',
+            timing: 'Ikväll',
+            effectiveness: 0.55
+          });
+        }
+      });
+
+    return actions.slice(0, 6); // Max 6 actions
+  }
+
+  // --------------------------------------------------------------------------
+  // ENHANCED PREDICTION API
+  // --------------------------------------------------------------------------
+
+  /**
+   * Get enhanced prediction with patterns and insights
+   */
+  public async getEnhancedPrediction(userId: string): Promise<{
+    prediction24h: EnhancedPrediction;
+    prediction48h: EnhancedPrediction;
+    trendAnalysis: PainTrendAnalysis;
+  } | null> {
+    const basePrediction = await this.predict(userId);
+    if (!basePrediction) return null;
+
+    // Fetch historical pain data for pattern detection
+    const { data: painData } = await supabase
+      .from('pain_tracking')
+      .select('pain_level, location, triggers, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(90); // 3 months
+
+    const painHistory: PainDataPoint[] = (painData || []).map(p => ({
+      timestamp: new Date(p.created_at),
+      painLevel: p.pain_level,
+      location: p.location,
+      triggers: p.triggers
+    }));
+
+    // Detect patterns
+    const patterns = this.detectPatterns(painHistory);
+
+    // Generate preventive actions
+    const actions24 = this.generatePreventiveActions(basePrediction.prediction24h, patterns);
+    const actions48 = this.generatePreventiveActions(basePrediction.prediction48h, patterns);
+
+    // Generate personalized insights
+    const insights = this.generatePersonalizedInsights(
+      basePrediction.trendAnalysis,
+      patterns,
+      basePrediction.prediction24h
+    );
+
+    // Analyze weather impact (mock data for now)
+    const weatherImpact = await this.analyzeWeatherImpact(userId);
+
+    const enhance = (pred: PainPrediction, actions: typeof actions24): EnhancedPrediction => ({
+      ...pred,
+      patterns,
+      weatherImpact,
+      personalizedInsights: insights,
+      suggestedPreventiveActions: actions
+    });
+
+    return {
+      prediction24h: enhance(basePrediction.prediction24h, actions24),
+      prediction48h: enhance(basePrediction.prediction48h, actions48),
+      trendAnalysis: basePrediction.trendAnalysis
+    };
+  }
+
+  /**
+   * Generate personalized insights based on user data
+   */
+  private generatePersonalizedInsights(
+    trend: PainTrendAnalysis,
+    patterns: PainPattern[],
+    prediction: PainPrediction
+  ): string[] {
+    const insights: string[] = [];
+
+    // Trend insights
+    if (trend.trend === 'improving') {
+      insights.push(`Din smärtnivå har förbättrats. Genomsnittlig smärta: ${trend.averagePain.toFixed(1)}/10`);
+    } else if (trend.trend === 'worsening') {
+      insights.push(`Din smärtnivå har ökat den senaste tiden. Överväg att kontakta din vårdgivare.`);
+    }
+
+    // Pattern insights
+    patterns.forEach(pattern => {
+      if (pattern.type === 'cyclical' && pattern.cycleLength) {
+        insights.push(`Vi har identifierat ett ${pattern.cycleLength}-dagars cykliskt mönster i din smärta.`);
+      }
+      if (pattern.peakDays && pattern.peakDays.length > 0) {
+        const dayNames = ['söndag', 'måndag', 'tisdag', 'onsdag', 'torsdag', 'fredag', 'lördag'];
+        const peakDayNames = pattern.peakDays.map(d => dayNames[d]);
+        insights.push(`Du upplever ofta mer smärta på ${peakDayNames.join(' och ')}.`);
+      }
+    });
+
+    // Volatility insights
+    if (trend.volatility > 2.5) {
+      insights.push('Din smärtnivå varierar mycket. Försök identifiera vad som triggar förändringarna.');
+    }
+
+    // Prediction confidence
+    if (prediction.confidence > 0.8) {
+      insights.push('Prediktionen är baserad på tillräcklig data och har hög tillförlitlighet.');
+    } else if (prediction.confidence < 0.5) {
+      insights.push('Fortsätt logga din smärta regelbundet för bättre prediktioner.');
+    }
+
+    return insights.slice(0, 5);
   }
 }
 

@@ -1,437 +1,296 @@
 /**
- * errorRecoveryService - Sprint 5.2: Error Recovery System
+ * Error Recovery Service
  *
- * Provides:
- * - Retry logic with exponential backoff
- * - Circuit breaker pattern for API calls
- * - Error logging and stats
- * - Graceful degradation support
+ * Comprehensive error handling and recovery system:
+ * - User-friendly error messages
+ * - Automatic retry with exponential backoff
+ * - Error categorization and prioritization
+ * - Recovery suggestions
  */
+
+import { logger } from '../utils/logger';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-export interface ErrorRecoveryConfig {
-  maxRetries: number;
-  retryDelay: number;           // Initial delay in ms
-  maxRetryDelay: number;        // Max delay cap
-  backoffMultiplier: number;    // Exponential backoff factor
-  circuitBreakerThreshold: number;  // Errors before circuit opens
-  circuitResetTimeout: number;  // Time before circuit resets (ms)
-}
+export type ErrorCategory =
+  | 'network'
+  | 'authentication'
+  | 'permission'
+  | 'validation'
+  | 'camera'
+  | 'storage'
+  | 'ml_model'
+  | 'api'
+  | 'unknown';
 
-export interface ErrorStats {
-  totalErrors: number;
-  errorsByType: Map<string, number>;
-  lastError: Error | null;
-  lastErrorTime: number | null;
-  circuitStates: Map<string, CircuitInfo>;
-}
+export type ErrorSeverity = 'low' | 'medium' | 'high' | 'critical';
 
-export type CircuitState = 'closed' | 'open' | 'half-open';
-
-export interface CircuitInfo {
-  state: CircuitState;
-  errorCount: number;
-  lastErrorTime: number | null;
-  nextRetryTime: number | null;
-}
-
-export interface ErrorLogEntry {
+export interface AppError {
+  id: string;
+  category: ErrorCategory;
+  severity: ErrorSeverity;
+  code: string;
+  message: string;
+  userMessage: string;
+  technicalDetails?: string;
   timestamp: number;
-  error: Error;
-  context?: Record<string, unknown>;
-  component?: string;
   recovered: boolean;
+  retryCount: number;
+  recoveryAction?: RecoveryAction;
+}
+
+export interface RecoveryAction {
+  type: 'retry' | 'refresh' | 'redirect' | 'manual' | 'ignore';
+  label: string;
+  action: () => Promise<boolean>;
+}
+
+export interface RetryConfig {
+  maxRetries: number;
+  initialDelay: number;
+  maxDelay: number;
+  backoffFactor: number;
+  retryableErrors: ErrorCategory[];
 }
 
 // ============================================================================
-// DEFAULT CONFIG
+// CONSTANTS
 // ============================================================================
 
-export const DEFAULT_ERROR_CONFIG: ErrorRecoveryConfig = {
+const DEFAULT_RETRY_CONFIG: RetryConfig = {
   maxRetries: 3,
-  retryDelay: 1000,
-  maxRetryDelay: 10000,
-  backoffMultiplier: 2,
-  circuitBreakerThreshold: 5,
-  circuitResetTimeout: 30000,
+  initialDelay: 1000,
+  maxDelay: 30000,
+  backoffFactor: 2,
+  retryableErrors: ['network', 'api', 'ml_model'],
+};
+
+const ERROR_MESSAGES: Record<string, { sv: string; en: string }> = {
+  'NETWORK_OFFLINE': {
+    sv: 'Du verkar vara offline. Kontrollera din internetanslutning.',
+    en: 'You appear to be offline. Check your internet connection.',
+  },
+  'NETWORK_TIMEOUT': {
+    sv: 'Anslutningen tog för lång tid. Försök igen.',
+    en: 'Connection timed out. Please try again.',
+  },
+  'NETWORK_ERROR': {
+    sv: 'Ett nätverksfel uppstod. Försök igen om en stund.',
+    en: 'A network error occurred. Please try again shortly.',
+  },
+  'AUTH_EXPIRED': {
+    sv: 'Din session har gått ut. Logga in igen.',
+    en: 'Your session has expired. Please log in again.',
+  },
+  'CAMERA_DENIED': {
+    sv: 'Kameraåtkomst nekad. Aktivera kameran i inställningarna.',
+    en: 'Camera access denied. Enable camera in settings.',
+  },
+  'CAMERA_NOT_FOUND': {
+    sv: 'Ingen kamera hittades.',
+    en: 'No camera found.',
+  },
+  'CAMERA_IN_USE': {
+    sv: 'Kameran används av en annan app.',
+    en: 'Camera is in use by another app.',
+  },
+  'STORAGE_FULL': {
+    sv: 'Lagringsutrymmet är fullt.',
+    en: 'Storage is full.',
+  },
+  'MODEL_LOAD_FAILED': {
+    sv: 'Kunde inte ladda AI-modellen.',
+    en: 'Could not load AI model.',
+  },
+  'API_ERROR': {
+    sv: 'Ett serverfel uppstod.',
+    en: 'A server error occurred.',
+  },
+  'UNKNOWN_ERROR': {
+    sv: 'Något gick fel. Försök igen.',
+    en: 'Something went wrong. Please try again.',
+  },
 };
 
 // ============================================================================
-// ERROR RECOVERY SERVICE
+// SERVICE
 // ============================================================================
 
 class ErrorRecoveryService {
-  private config: ErrorRecoveryConfig;
-  private errorCount: Map<string, number> = new Map();
-  private circuitStates: Map<string, CircuitInfo> = new Map();
-  private errorLog: ErrorLogEntry[] = [];
-  private totalErrors: number = 0;
-  private lastError: Error | null = null;
-  private lastErrorTime: number | null = null;
+  private errors: Map<string, AppError> = new Map();
+  private listeners: Set<(error: AppError) => void> = new Set();
+  private language: 'sv' | 'en' = 'sv';
 
-  constructor(config: Partial<ErrorRecoveryConfig> = {}) {
-    this.config = { ...DEFAULT_ERROR_CONFIG, ...config };
-  }
+  async handleError(
+    error: Error | unknown,
+    context?: { category?: ErrorCategory; code?: string; retry?: boolean }
+  ): Promise<{ handled: boolean; recovered: boolean; userMessage: string }> {
+    const appError = this.createAppError(error, context);
+    this.errors.set(appError.id, appError);
 
-  // --------------------------------------------------------------------------
-  // RETRY LOGIC
-  // --------------------------------------------------------------------------
+    logger.error('[ErrorRecovery] Error caught:', {
+      id: appError.id,
+      code: appError.code,
+      message: appError.message,
+    });
 
-  /**
-   * Execute a function with automatic retry logic
-   */
-  async withRetry<T>(
-    fn: () => Promise<T>,
-    key: string,
-    options?: Partial<ErrorRecoveryConfig>
-  ): Promise<T> {
-    const config = { ...this.config, ...options };
-    let lastError: Error | null = null;
-    let delay = config.retryDelay;
-
-    // Check circuit breaker first
-    if (this.isCircuitOpen(key)) {
-      const circuitInfo = this.circuitStates.get(key);
-      throw new Error(
-        `Circuit breaker open for "${key}". Next retry at ${new Date(circuitInfo?.nextRetryTime || 0).toLocaleTimeString()}`
-      );
-    }
-
-    for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
-      try {
-        const result = await fn();
-        // Success - reset error count
-        this.resetErrorCount(key);
-        return result;
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        this.recordError(key, lastError);
-
-        // If this was the last attempt, don't wait
-        if (attempt === config.maxRetries) {
-          break;
-        }
-
-        // Wait before retry with exponential backoff
-        await this.sleep(delay);
-        delay = Math.min(delay * config.backoffMultiplier, config.maxRetryDelay);
+    if (context?.retry !== false && this.isRetryable(appError)) {
+      const recovered = await this.attemptRecovery(appError);
+      if (recovered) {
+        return { handled: true, recovered: true, userMessage: 'Problemet har lösts.' };
       }
     }
 
-    // All retries failed
-    this.logError(lastError!, { key, retries: config.maxRetries }, key);
-    throw lastError;
+    this.notifyListeners(appError);
+
+    return {
+      handled: true,
+      recovered: false,
+      userMessage: appError.userMessage,
+    };
   }
 
-  /**
-   * Wrap a synchronous function with try/catch and optional fallback
-   */
-  withFallback<T>(fn: () => T, fallback: T, key?: string): T {
-    try {
-      return fn();
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      if (key) {
-        this.recordError(key, err);
-        this.logError(err, { fallbackUsed: true }, key);
-      }
-      return fallback;
+  private createAppError(
+    error: Error | unknown,
+    context?: { category?: ErrorCategory; code?: string }
+  ): AppError {
+    const category = context?.category || this.categorizeError(error);
+    const code = context?.code || this.getErrorCode(error, category);
+    const message = error instanceof Error ? error.message : String(error);
+
+    return {
+      id: 'error_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+      category,
+      severity: this.getSeverity(category),
+      code,
+      message,
+      userMessage: this.getUserMessage(code),
+      technicalDetails: error instanceof Error ? error.stack : undefined,
+      timestamp: Date.now(),
+      recovered: false,
+      retryCount: 0,
+    };
+  }
+
+  private categorizeError(error: unknown): ErrorCategory {
+    if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+      return 'network';
     }
-  }
-
-  /**
-   * Wrap an async function with fallback
-   */
-  async withAsyncFallback<T>(
-    fn: () => Promise<T>,
-    fallback: T,
-    key?: string
-  ): Promise<T> {
-    try {
-      return await fn();
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      if (key) {
-        this.recordError(key, err);
-        this.logError(err, { fallbackUsed: true }, key);
-      }
-      return fallback;
+    if (error instanceof DOMException) {
+      if (error.name === 'NotAllowedError') return 'permission';
+      if (error.name === 'NotFoundError') return 'camera';
+      if (error.name === 'QuotaExceededError') return 'storage';
     }
+    return 'unknown';
   }
 
-  // --------------------------------------------------------------------------
-  // CIRCUIT BREAKER
-  // --------------------------------------------------------------------------
+  private getErrorCode(error: unknown, category: ErrorCategory): string {
+    if (!navigator.onLine && category === 'network') return 'NETWORK_OFFLINE';
+    const defaults: Record<ErrorCategory, string> = {
+      network: 'NETWORK_ERROR',
+      authentication: 'AUTH_EXPIRED',
+      permission: 'PERMISSION_DENIED',
+      validation: 'VALIDATION_FAILED',
+      camera: 'CAMERA_ERROR',
+      storage: 'STORAGE_FULL',
+      ml_model: 'MODEL_LOAD_FAILED',
+      api: 'API_ERROR',
+      unknown: 'UNKNOWN_ERROR',
+    };
+    return defaults[category];
+  }
 
-  /**
-   * Check if circuit breaker is open for a given key
-   */
-  isCircuitOpen(key: string): boolean {
-    const circuit = this.circuitStates.get(key);
-    if (!circuit) return false;
+  private getSeverity(category: ErrorCategory): ErrorSeverity {
+    if (category === 'authentication') return 'high';
+    if (category === 'camera') return 'high';
+    return 'medium';
+  }
 
-    if (circuit.state === 'open') {
-      // Check if we should transition to half-open
-      if (circuit.nextRetryTime && Date.now() >= circuit.nextRetryTime) {
-        this.setCircuitState(key, 'half-open');
-        return false;
-      }
+  private getUserMessage(code: string): string {
+    const messages = ERROR_MESSAGES[code] || ERROR_MESSAGES['UNKNOWN_ERROR'];
+    return messages[this.language];
+  }
+
+  private isRetryable(error: AppError): boolean {
+    return DEFAULT_RETRY_CONFIG.retryableErrors.includes(error.category);
+  }
+
+  private async attemptRecovery(error: AppError): Promise<boolean> {
+    if (error.retryCount >= DEFAULT_RETRY_CONFIG.maxRetries) return false;
+
+    const delay = Math.min(
+      DEFAULT_RETRY_CONFIG.initialDelay *
+        Math.pow(DEFAULT_RETRY_CONFIG.backoffFactor, error.retryCount),
+      DEFAULT_RETRY_CONFIG.maxDelay
+    );
+
+    await new Promise(resolve => setTimeout(resolve, delay));
+    error.retryCount++;
+
+    // Check if condition resolved (e.g., back online)
+    if (error.code === 'NETWORK_OFFLINE' && navigator.onLine) {
+      error.recovered = true;
       return true;
     }
 
     return false;
   }
 
-  /**
-   * Get circuit state for a key
-   */
-  getCircuitState(key: string): CircuitInfo {
-    return this.circuitStates.get(key) || {
-      state: 'closed',
-      errorCount: 0,
-      lastErrorTime: null,
-      nextRetryTime: null,
-    };
+  async withRetry<T>(
+    operation: () => Promise<T>,
+    config: Partial<RetryConfig> = {}
+  ): Promise<T> {
+    const finalConfig = { ...DEFAULT_RETRY_CONFIG, ...config };
+    let lastError: Error | unknown;
+
+    for (let attempt = 0; attempt <= finalConfig.maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error;
+        if (attempt < finalConfig.maxRetries) {
+          const delay = Math.min(
+            finalConfig.initialDelay * Math.pow(finalConfig.backoffFactor, attempt),
+            finalConfig.maxDelay
+          );
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+    throw lastError;
   }
 
-  private setCircuitState(key: string, state: CircuitState): void {
-    const current = this.circuitStates.get(key) || {
-      state: 'closed',
-      errorCount: 0,
-      lastErrorTime: null,
-      nextRetryTime: null,
-    };
+  setLanguage(lang: 'sv' | 'en'): void {
+    this.language = lang;
+  }
 
-    this.circuitStates.set(key, {
-      ...current,
-      state,
-      nextRetryTime: state === 'open'
-        ? Date.now() + this.config.circuitResetTimeout
-        : null,
+  subscribe(listener: (error: AppError) => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  private notifyListeners(error: AppError): void {
+    this.listeners.forEach(listener => {
+      try {
+        listener(error);
+      } catch (e) {
+        logger.error('[ErrorRecovery] Listener error:', e);
+      }
     });
   }
 
-  private recordError(key: string, error: Error): void {
-    const count = (this.errorCount.get(key) || 0) + 1;
-    this.errorCount.set(key, count);
-    this.totalErrors++;
-    this.lastError = error;
-    this.lastErrorTime = Date.now();
-
-    // Update circuit info
-    const circuit = this.circuitStates.get(key) || {
-      state: 'closed' as CircuitState,
-      errorCount: 0,
-      lastErrorTime: null,
-      nextRetryTime: null,
-    };
-
-    circuit.errorCount = count;
-    circuit.lastErrorTime = Date.now();
-
-    // Check if we should open the circuit
-    if (count >= this.config.circuitBreakerThreshold && circuit.state === 'closed') {
-      circuit.state = 'open';
-      circuit.nextRetryTime = Date.now() + this.config.circuitResetTimeout;
-      console.warn(`[ErrorRecovery] Circuit breaker opened for "${key}" after ${count} errors`);
-    }
-
-    this.circuitStates.set(key, circuit);
+  getRecentErrors(count: number = 10): AppError[] {
+    return Array.from(this.errors.values())
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, count);
   }
 
-  private resetErrorCount(key: string): void {
-    this.errorCount.set(key, 0);
-    const circuit = this.circuitStates.get(key);
-    if (circuit) {
-      this.circuitStates.set(key, {
-        ...circuit,
-        state: 'closed',
-        errorCount: 0,
-        nextRetryTime: null,
-      });
-    }
-  }
-
-  // --------------------------------------------------------------------------
-  // ERROR LOGGING
-  // --------------------------------------------------------------------------
-
-  /**
-   * Log an error with context
-   */
-  logError(error: Error, context?: Record<string, unknown>, component?: string): void {
-    const entry: ErrorLogEntry = {
-      timestamp: Date.now(),
-      error,
-      context,
-      component,
-      recovered: false,
-    };
-
-    this.errorLog.push(entry);
-
-    // Keep log size manageable
-    if (this.errorLog.length > 100) {
-      this.errorLog = this.errorLog.slice(-50);
-    }
-
-    // Log to console in development
-    if (process.env.NODE_ENV === 'development') {
-      console.error(`[ErrorRecovery] ${component || 'Unknown'}:`, error.message, context);
-    }
-  }
-
-  /**
-   * Mark an error as recovered
-   */
-  markRecovered(timestamp: number): void {
-    const entry = this.errorLog.find(e => e.timestamp === timestamp);
-    if (entry) {
-      entry.recovered = true;
-    }
-  }
-
-  /**
-   * Get error statistics
-   */
-  getErrorStats(): ErrorStats {
-    const errorsByType = new Map<string, number>();
-    this.errorLog.forEach(entry => {
-      const type = entry.error.name || 'UnknownError';
-      errorsByType.set(type, (errorsByType.get(type) || 0) + 1);
-    });
-
-    return {
-      totalErrors: this.totalErrors,
-      errorsByType,
-      lastError: this.lastError,
-      lastErrorTime: this.lastErrorTime,
-      circuitStates: new Map(this.circuitStates),
-    };
-  }
-
-  /**
-   * Get recent errors
-   */
-  getRecentErrors(count: number = 10): ErrorLogEntry[] {
-    return this.errorLog.slice(-count);
-  }
-
-  /**
-   * Clear all error history
-   */
   clearErrors(): void {
-    this.errorCount.clear();
-    this.circuitStates.clear();
-    this.errorLog = [];
-    this.totalErrors = 0;
-    this.lastError = null;
-    this.lastErrorTime = null;
-  }
-
-  // --------------------------------------------------------------------------
-  // DEGRADATION SUPPORT
-  // --------------------------------------------------------------------------
-
-  /**
-   * Get recommended degradation level based on error history
-   */
-  getDegradationLevel(key: string): 'full' | 'simple' | 'minimal' {
-    const count = this.errorCount.get(key) || 0;
-
-    if (count === 0) return 'full';
-    if (count < 3) return 'simple';
-    return 'minimal';
-  }
-
-  /**
-   * Check if a feature should be disabled due to errors
-   */
-  shouldDisableFeature(key: string): boolean {
-    return this.isCircuitOpen(key) || (this.errorCount.get(key) || 0) >= this.config.circuitBreakerThreshold;
-  }
-
-  // --------------------------------------------------------------------------
-  // UTILITIES
-  // --------------------------------------------------------------------------
-
-  private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  /**
-   * Update configuration
-   */
-  updateConfig(config: Partial<ErrorRecoveryConfig>): void {
-    this.config = { ...this.config, ...config };
-  }
-
-  /**
-   * Get current configuration
-   */
-  getConfig(): ErrorRecoveryConfig {
-    return { ...this.config };
+    this.errors.clear();
   }
 }
-
-// ============================================================================
-// SINGLETON EXPORT
-// ============================================================================
 
 export const errorRecoveryService = new ErrorRecoveryService();
-
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-
-/**
- * Sanitize error message for user display (remove sensitive info)
- */
-export function sanitizeErrorMessage(error: Error): string {
-  const message = error.message || 'Ett oväntat fel uppstod';
-
-  // Remove potential sensitive information
-  const sanitized = message
-    .replace(/api[_-]?key[=:]\s*\S+/gi, 'api_key=[HIDDEN]')
-    .replace(/token[=:]\s*\S+/gi, 'token=[HIDDEN]')
-    .replace(/password[=:]\s*\S+/gi, 'password=[HIDDEN]')
-    .replace(/secret[=:]\s*\S+/gi, 'secret=[HIDDEN]')
-    .replace(/https?:\/\/[^\s]+/g, '[URL]')
-    .replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, '[EMAIL]');
-
-  return sanitized;
-}
-
-/**
- * Get user-friendly error message in Swedish
- */
-export function getUserFriendlyMessage(error: Error): string {
-  const errorMap: Record<string, string> = {
-    'NetworkError': 'Nätverksfel. Kontrollera din internetanslutning.',
-    'TimeoutError': 'Förfrågan tog för lång tid. Försök igen.',
-    'TypeError': 'Ett tekniskt fel uppstod. Försök igen.',
-    'SyntaxError': 'Ett datafel uppstod. Försök igen.',
-    'RangeError': 'Ett beräkningsfel uppstod. Försök igen.',
-  };
-
-  return errorMap[error.name] || 'Ett oväntat fel uppstod. Försök igen senare.';
-}
-
-/**
- * Check if error is retryable
- */
-export function isRetryableError(error: Error): boolean {
-  const nonRetryableErrors = [
-    'AuthenticationError',
-    'AuthorizationError',
-    'ValidationError',
-    'NotFoundError',
-  ];
-
-  return !nonRetryableErrors.includes(error.name);
-}
-
 export default errorRecoveryService;
