@@ -322,7 +322,7 @@ class BiometricService {
   // --------------------------------------------------------------------------
 
   private handleHeartRateChange(event: Event): void {
-    const characteristic = event.target as BluetoothRemoteGATTCharacteristic;
+    const characteristic = event.target as unknown as BluetoothRemoteGATTCharacteristic;
     const value = characteristic.value;
 
     if (!value) return;

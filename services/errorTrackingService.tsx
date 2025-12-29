@@ -280,7 +280,7 @@ class ErrorTrackingService {
     const self = this;
 
     window.fetch = async function(...args) {
-      const url = typeof args[0] === 'string' ? args[0] : args[0].url;
+      const url = typeof args[0] === 'string' ? args[0] : (args[0] instanceof URL ? args[0].href : args[0].url);
       const method = (args[1]?.method || 'GET').toUpperCase();
       const startTime = Date.now();
 

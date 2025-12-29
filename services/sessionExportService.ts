@@ -132,15 +132,15 @@ class SessionExportService {
         exerciseName: session.exerciseName,
         date: session.sessionDate,
         duration: session.duration,
-        completionRate: session.completionRate || 0,
+        completionRate: session.repsCompleted > 0 ? 100 : 0,
       };
 
-      if (options.includeMetrics && session.metrics) {
-        exported.averageFormScore = session.metrics.averageFormScore;
+      if (options.includeMetrics) {
+        exported.averageFormScore = session.averageScore;
         exported.metrics = {
-          formScore: session.metrics.averageFormScore || 0,
-          rangeOfMotion: session.metrics.rangeOfMotion || 0,
-          movementQuality: session.metrics.movementQuality || 0,
+          formScore: session.averageScore || 0,
+          rangeOfMotion: session.romAchieved || 0,
+          movementQuality: session.averageScore || 0,
         };
       }
 
@@ -471,8 +471,12 @@ class SessionExportService {
         exerciseName: session.exerciseName,
         date: session.sessionDate,
         duration: session.duration,
-        completionRate: session.completionRate,
-        metrics: session.metrics,
+        completionRate: session.repsCompleted > 0 ? 100 : 0,
+        metrics: {
+          formScore: session.averageScore || 0,
+          rangeOfMotion: session.romAchieved || 0,
+          repsCompleted: session.repsCompleted,
+        },
       },
     };
 

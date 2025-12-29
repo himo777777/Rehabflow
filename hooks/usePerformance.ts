@@ -301,3 +301,171 @@ export function useMemoizedExercises<T extends Exercise>(
     exercises.length,
   ]);
 }
+
+// ============================================
+// RENDER COUNT HOOK (Dev only)
+// ============================================
+
+/**
+ * Track component render count - useful for debugging
+ * Only logs in development mode
+ */
+export function useRenderCount(componentName: string): number {
+  const renderCount = useRef(0);
+  renderCount.current += 1;
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      // eslint-disable-next-line no-console
+      console.log(`[RenderCount] ${componentName}: ${renderCount.current}`);
+    }
+  });
+
+  return renderCount.current;
+}
+
+// ============================================
+// IDLE CALLBACK HOOK
+// ============================================
+
+/**
+ * Execute callback during browser idle time
+ * Falls back to setTimeout for Safari
+ */
+export function useIdleCallback(
+  callback: () => void,
+  options: { timeout?: number } = {}
+): void {
+  const { timeout = 1000 } = options;
+  const callbackRef = useRef(callback);
+
+  useEffect(() => {
+    callbackRef.current = callback;
+  }, [callback]);
+
+  useEffect(() => {
+    if ('requestIdleCallback' in window) {
+      const id = (window as typeof window & { requestIdleCallback: (cb: IdleRequestCallback, opts?: IdleRequestOptions) => number }).requestIdleCallback(
+        () => callbackRef.current(),
+        { timeout }
+      );
+      return () => (window as typeof window & { cancelIdleCallback: (id: number) => void }).cancelIdleCallback(id);
+    } else {
+      // Fallback for Safari
+      const id = setTimeout(() => callbackRef.current(), 1);
+      return () => clearTimeout(id);
+    }
+  }, [timeout]);
+}
+
+// ============================================
+// FRAME TIME HOOK
+// ============================================
+
+/**
+ * Track frame time for animations
+ * Returns current frame time in ms
+ */
+export function useFrameTime(): number {
+  const [frameTime, setFrameTime] = useState(0);
+  const lastTimeRef = useRef(performance.now());
+  const rafRef = useRef<number>();
+
+  useEffect(() => {
+    const measure = () => {
+      const now = performance.now();
+      setFrameTime(now - lastTimeRef.current);
+      lastTimeRef.current = now;
+      rafRef.current = requestAnimationFrame(measure);
+    };
+
+    rafRef.current = requestAnimationFrame(measure);
+
+    return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    };
+  }, []);
+
+  return frameTime;
+}
+
+// ============================================
+// MEMORY USAGE HOOK
+// ============================================
+
+interface MemoryInfo {
+  usedJSHeapSize: number | null;
+  totalJSHeapSize: number | null;
+  jsHeapSizeLimit: number | null;
+}
+
+/**
+ * Track memory usage (Chrome only)
+ * Returns null for browsers that don't support memory API
+ */
+export function useMemoryUsage(intervalMs = 5000): MemoryInfo {
+  const [memory, setMemory] = useState<MemoryInfo>({
+    usedJSHeapSize: null,
+    totalJSHeapSize: null,
+    jsHeapSizeLimit: null,
+  });
+
+  useEffect(() => {
+    const performance = window.performance as Performance & {
+      memory?: {
+        usedJSHeapSize: number;
+        totalJSHeapSize: number;
+        jsHeapSizeLimit: number;
+      };
+    };
+
+    if (!performance.memory) {
+      return;
+    }
+
+    const updateMemory = () => {
+      if (performance.memory) {
+        setMemory({
+          usedJSHeapSize: performance.memory.usedJSHeapSize,
+          totalJSHeapSize: performance.memory.totalJSHeapSize,
+          jsHeapSizeLimit: performance.memory.jsHeapSizeLimit,
+        });
+      }
+    };
+
+    updateMemory();
+    const interval = setInterval(updateMemory, intervalMs);
+
+    return () => clearInterval(interval);
+  }, [intervalMs]);
+
+  return memory;
+}
+
+// ============================================
+// PERFORMANCE MARK HOOK
+// ============================================
+
+/**
+ * Create performance marks for component lifecycle
+ * Useful for tracking mount/unmount timing
+ */
+export function usePerformanceMark(markName: string): void {
+  useEffect(() => {
+    const mountMark = `${markName}-mount`;
+    const unmountMark = `${markName}-unmount`;
+
+    performance.mark(mountMark);
+
+    return () => {
+      performance.mark(unmountMark);
+      try {
+        performance.measure(markName, mountMark, unmountMark);
+      } catch {
+        // Marks may have been cleared
+      }
+    };
+  }, [markName]);
+}

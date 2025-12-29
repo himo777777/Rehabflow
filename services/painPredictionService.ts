@@ -18,6 +18,10 @@ import * as tf from '@tensorflow/tfjs';
 import { supabase } from './supabaseClient';
 import { healthDataService, HealthDataType } from './healthDataService';
 import { logger } from '../utils/logger';
+import { cachingService } from './cachingService';
+
+// Cache TTL for predictions (12 hours - predictions change slowly)
+const PREDICTION_CACHE_TTL = 12 * 60 * 60 * 1000;
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -269,6 +273,7 @@ export class PainPredictionService {
 
   /**
    * Predict pain for next 24h and 48h
+   * Results are cached for 12 hours to reduce TensorFlow computation
    */
   public async predict(userId: string): Promise<{
     prediction24h: PainPrediction;
@@ -278,6 +283,23 @@ export class PainPredictionService {
     if (!this.isInitialized || !this.model) {
       logger.warn('Pain prediction model not initialized');
       return null;
+    }
+
+    // Check cache first
+    const cacheKey = `pain-prediction:${userId}:${new Date().toISOString().split('T')[0]}`; // Cache per day
+    try {
+      const cached = await cachingService.get<{
+        prediction24h: PainPrediction;
+        prediction48h: PainPrediction;
+        trendAnalysis: PainTrendAnalysis;
+      }>(cacheKey);
+
+      if (cached) {
+        logger.info('[PainPrediction] Using cached prediction for user:', userId);
+        return cached;
+      }
+    } catch {
+      // Continue with fresh prediction if cache fails
     }
 
     try {
@@ -322,11 +344,24 @@ export class PainPredictionService {
       // Store predictions for future model improvement
       await this.storePrediction(userId, prediction24, prediction48);
 
-      return {
+      const result = {
         prediction24h: prediction24,
         prediction48h: prediction48,
         trendAnalysis
       };
+
+      // Cache the result for 12 hours
+      try {
+        await cachingService.set(cacheKey, result, {
+          ttl: PREDICTION_CACHE_TTL,
+          tags: ['prediction', 'pain', userId],
+        });
+        logger.info('[PainPrediction] Cached prediction for user:', userId);
+      } catch {
+        // Non-critical - continue even if cache fails
+      }
+
+      return result;
     } catch (error) {
       logger.error('❌ Pain prediction failed:', error);
       return null;

@@ -446,13 +446,12 @@ class PluginService {
     return {
       pluginId,
       settings: this.settings.get(pluginId) || {},
-      logger: {
-        ...logger,
+      logger: Object.assign(Object.create(Object.getPrototypeOf(logger)), logger, {
         info: (...args: unknown[]) => logger.info(`[Plugin:${pluginId}]`, ...args),
         warn: (...args: unknown[]) => logger.warn(`[Plugin:${pluginId}]`, ...args),
         error: (...args: unknown[]) => logger.error(`[Plugin:${pluginId}]`, ...args),
         debug: (...args: unknown[]) => logger.debug(`[Plugin:${pluginId}]`, ...args),
-      },
+      }) as typeof logger,
       registerHook: (hook, handler, priority = 'normal') => {
         self.registerHook(pluginId, hook, handler, priority);
       },

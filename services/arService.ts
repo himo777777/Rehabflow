@@ -540,11 +540,12 @@ class ARService {
   public updateLightEstimate(frame: XRFrame): void {
     if (!frame.lightEstimate) return;
 
+    const intensity = frame.lightEstimate.primaryLightIntensity;
     this.lightEstimate = {
       primaryLightDirection: frame.lightEstimate.primaryLightDirection
         ? this.transformToVector3(frame.lightEstimate.primaryLightDirection)
         : { x: 0, y: -1, z: 0 },
-      primaryLightIntensity: frame.lightEstimate.primaryLightIntensity || 1,
+      primaryLightIntensity: typeof intensity === 'number' ? intensity : (intensity?.w ?? 1),
       sphericalHarmonicsCoefficients: frame.lightEstimate.sphericalHarmonicsCoefficients || null
     };
 

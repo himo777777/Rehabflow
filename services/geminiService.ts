@@ -81,6 +81,8 @@ import {
   aiCompletionStream,
   withRetry as aiWithRetry
 } from "../lib/aiClient";
+import { cachingService, CacheOptions } from "./cachingService";
+import { aiTelemetry, estimateTokens } from "./aiTelemetry";
 import { PatientPainHistory, SMARTGoal, BaselineAssessmentScore, ExerciseLog, DailyPainLog, FollowUpQuestion, AIQuestionAnswer } from "../types";
 
 // Model to use - llama-3.3-70b-versatile is fast and capable
@@ -203,38 +205,116 @@ function safeZodParse<T>(
   }
 }
 
-// --- CACHE SYSTEM ---
-interface CacheEntry<T> {
-  data: T;
-  timestamp: number;
-  ttl: number;
-}
+// --- ADVANCED CACHE SYSTEM ---
+// Uses the centralized cachingService with LRU eviction, IndexedDB persistence, and compression
 
-const cache = new Map<string, CacheEntry<unknown>>();
-
-const getCached = <T>(key: string): T | null => {
-  const entry = cache.get(key) as CacheEntry<T> | undefined;
-  if (!entry) return null;
-  if (Date.now() - entry.timestamp > entry.ttl) {
-    cache.delete(key);
-    return null;
+// Initialize caching service on first use
+let cacheInitialized = false;
+const ensureCacheInitialized = async (): Promise<void> => {
+  if (!cacheInitialized) {
+    await cachingService.init({
+      defaultTTL: 10 * 60 * 1000, // 10 minutes default for AI responses
+      evictionPolicy: 'lru',
+      enablePersistence: true,
+    });
+    cacheInitialized = true;
   }
-  return entry.data;
 };
 
-const setCache = <T>(key: string, data: T, ttlMs: number = 5 * 60 * 1000): void => {
-  cache.set(key, { data, timestamp: Date.now(), ttl: ttlMs });
-  // Cleanup old entries if cache gets too large
-  if (cache.size > 100) {
-    const now = Date.now();
-    cache.forEach((entry, k) => {
-      if (now - entry.timestamp > entry.ttl) cache.delete(k);
-    });
+// Cache tags for different AI response types
+const AI_CACHE_TAGS = {
+  PROGRAM: ['ai', 'program'],
+  EXERCISE: ['ai', 'exercise'],
+  CHAT: ['ai', 'chat'],
+  ANALYSIS: ['ai', 'analysis'],
+  RECOMMENDATION: ['ai', 'recommendation'],
+};
+
+/**
+ * Get cached AI response with automatic initialization
+ */
+const getCached = async <T>(key: string): Promise<T | null> => {
+  try {
+    await ensureCacheInitialized();
+    return await cachingService.get<T>(key);
+  } catch (error) {
+    logger.warn('[AI Cache] Get failed, returning null:', error);
+    return null;
   }
+};
+
+/**
+ * Set cached AI response with TTL and tags
+ */
+const setCache = async <T>(
+  key: string,
+  data: T,
+  ttlMs: number = 5 * 60 * 1000,
+  tags: string[] = ['ai']
+): Promise<void> => {
+  try {
+    await ensureCacheInitialized();
+    await cachingService.set(key, data, { ttl: ttlMs, tags });
+  } catch (error) {
+    logger.warn('[AI Cache] Set failed:', error);
+  }
+};
+
+/**
+ * Invalidate all AI caches (useful after user data changes)
+ */
+export const invalidateAICache = async (tags?: string[]): Promise<void> => {
+  try {
+    await ensureCacheInitialized();
+    await cachingService.invalidateByTag(tags?.[0] || 'ai');
+    logger.info('[AI Cache] Invalidated caches with tags:', { tags });
+  } catch (error) {
+    logger.warn('[AI Cache] Invalidation failed:', error);
+  }
+};
+
+/**
+ * Get AI cache statistics
+ */
+export const getAICacheStats = async () => {
+  try {
+    await ensureCacheInitialized();
+    return cachingService.getStats();
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Get AI telemetry statistics (latency, success rate, tokens)
+ */
+export const getAITelemetryStats = () => {
+  return aiTelemetry.getStats();
+};
+
+/**
+ * Get combined AI performance metrics
+ */
+export const getAIPerformanceMetrics = async () => {
+  const cacheStats = await getAICacheStats();
+  const telemetryStats = getAITelemetryStats();
+
+  return {
+    cache: cacheStats,
+    telemetry: telemetryStats,
+    summary: {
+      cacheHitRate: telemetryStats.cacheHitRate,
+      successRate: telemetryStats.successRate,
+      avgLatencyMs: Math.round(telemetryStats.avgLatencyMs),
+      p95LatencyMs: Math.round(telemetryStats.p95LatencyMs),
+      totalCalls: telemetryStats.totalCalls,
+      estimatedTokensUsed: telemetryStats.totalInputTokens + telemetryStats.totalOutputTokens,
+    },
+  };
 };
 
 const generateCacheKey = (prefix: string, data: unknown): string => {
-  return `${prefix}:${JSON.stringify(data).slice(0, 200)}`;
+  return `ai:${prefix}:${JSON.stringify(data).slice(0, 200)}`;
 };
 
 // ============================================
@@ -1257,23 +1337,48 @@ const safeJSONParse = <T>(text: string, fallback: T): T => {
   }
 };
 
-// Helper function to generate content using AI proxy
-const generateContent = async (prompt: string, temperature: number = 0.3): Promise<string> => {
-  return await aiCompletion({
-    messages: [
-      {
-        role: "system",
-        content: "Du är en expert-fysioterapeut som alltid svarar på svenska. Returnera alltid valid JSON när det efterfrågas."
-      },
-      {
-        role: "user",
-        content: prompt
-      }
-    ],
-    model: MODEL,
-    temperature,
-    max_tokens: 8000,
-  });
+// Helper function to generate content using AI proxy with telemetry
+const generateContent = async (
+  prompt: string,
+  temperature: number = 0.3,
+  operationName: string = 'generic'
+): Promise<string> => {
+  // Start telemetry tracking
+  const callId = aiTelemetry.startCall(operationName, MODEL, { temperature });
+  const inputTokens = estimateTokens(prompt);
+
+  try {
+    const result = await aiCompletion({
+      messages: [
+        {
+          role: "system",
+          content: "Du är en expert-fysioterapeut som alltid svarar på svenska. Returnera alltid valid JSON när det efterfrågas."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      model: MODEL,
+      temperature,
+      max_tokens: 8000,
+    });
+
+    // End telemetry with success
+    const outputTokens = estimateTokens(result);
+    aiTelemetry.endCall(callId, {
+      cached: false,
+      inputTokens,
+      outputTokens,
+    });
+
+    return result;
+  } catch (error) {
+    // Record failure
+    const errorType = error instanceof Error ? error.name : 'UnknownError';
+    aiTelemetry.failCall(callId, errorType);
+    throw error;
+  }
 };
 
 export const generateRehabProgram = async (assessment: UserAssessment): Promise<GeneratedProgram> => {
@@ -1743,9 +1848,9 @@ VIKTIGT: Anpassa övningarna efter patientens FAKTISKA rörelseomfång, inte teo
     baselineTSK: assessment.baselineAssessments?.tsk11?.score
   });
 
-  const cached = getCached<GeneratedProgram>(cacheKey);
+  const cached = await getCached<GeneratedProgram>(cacheKey);
   if (cached) {
-    logger.info('Using cached program');
+    logger.info('[AI] Using cached program');
     return cached;
   }
 
@@ -1985,8 +2090,8 @@ VIKTIGT: Anpassa övningarna efter patientens FAKTISKA rörelseomfång, inte teo
       });
     }
 
-    // Cache the result for 10 minutes
-    setCache(cacheKey, program, 10 * 60 * 1000);
+    // Cache the result for 10 minutes with program tags
+    await setCache(cacheKey, program, 10 * 60 * 1000, AI_CACHE_TAGS.PROGRAM);
 
     return program;
   } catch (error) {
@@ -2009,7 +2114,7 @@ export const searchExercises = async (query: string): Promise<Exercise[]> => {
 
   // Check cache for this search query (5 minute TTL)
   const cacheKey = generateCacheKey('search', normalizedQuery);
-  const cached = getCached<Exercise[]>(cacheKey);
+  const cached = await getCached<Exercise[]>(cacheKey);
   if (cached) {
     return [...localMatches, ...cached];
   }
@@ -2041,7 +2146,7 @@ export const searchExercises = async (query: string): Promise<Exercise[]> => {
     if (!text) return localMatches;
     const aiExercises = JSON.parse(cleanJson(text)) as Exercise[];
     // Cache AI-generated exercises
-    setCache(cacheKey, aiExercises, 5 * 60 * 1000);
+    await setCache(cacheKey, aiExercises, 5 * 60 * 1000, AI_CACHE_TAGS.EXERCISE);
     return [...localMatches, ...aiExercises];
   } catch (error) {
     logger.error("Error searching exercises", error);
@@ -3677,8 +3782,8 @@ export const summarizeConversation = async (
 /**
  * Clear cache (useful for testing or when data changes)
  */
-export const clearCache = (): void => {
-  cache.clear();
+export const clearCache = async (): Promise<void> => {
+  await invalidateAICache(['ai']);
 };
 
 /**
@@ -3699,7 +3804,7 @@ export const generateExerciseRecommendations = async (
 ): Promise<ExerciseRecommendation[]> => {
   // Check cache first
   const cacheKey = generateCacheKey('recommendations', { injuryLocation, painLevel });
-  const cached = getCached<ExerciseRecommendation[]>(cacheKey);
+  const cached = await getCached<ExerciseRecommendation[]>(cacheKey);
   if (cached) return cached;
 
   const prompt = `
@@ -3734,7 +3839,7 @@ export const generateExerciseRecommendations = async (
     const text = await withRetry(() => generateContent(prompt, 0.4));
     if (!text) return [];
     const recommendations = JSON.parse(cleanJson(text)) as ExerciseRecommendation[];
-    setCache(cacheKey, recommendations, 10 * 60 * 1000); // 10 min cache
+    await setCache(cacheKey, recommendations, 10 * 60 * 1000, AI_CACHE_TAGS.RECOMMENDATION);
     return recommendations;
   } catch (e) {
     logger.error("Failed to generate recommendations", e);
@@ -3947,7 +4052,7 @@ export const generateFollowUpQuestions = async (
     isPostOp: assessment.injuryType === InjuryType.POST_OP
   });
 
-  const cached = getCached<FollowUpQuestion[]>(cacheKey);
+  const cached = await getCached<FollowUpQuestion[]>(cacheKey);
   if (cached) return cached;
 
   const bodyPart = mapBodyPartToSwedish(assessment.injuryLocation || 'okänd');
@@ -4081,7 +4186,7 @@ KATEGORIER:
       return getDefaultFollowUpQuestions(assessment);
     }
 
-    setCache(cacheKey, validatedQuestions, 5 * 60 * 1000); // 5 min cache
+    await setCache(cacheKey, validatedQuestions, 5 * 60 * 1000, AI_CACHE_TAGS.ANALYSIS);
     return validatedQuestions;
   } catch (e) {
     logger.error("Failed to generate follow-up questions", e);

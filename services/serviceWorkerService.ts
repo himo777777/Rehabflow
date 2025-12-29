@@ -559,7 +559,7 @@ class ServiceWorkerService {
 
       const subscription = await this.registration.pushManager.subscribe({
         userVisibleOnly: config.userVisibleOnly ?? true,
-        applicationServerKey
+        applicationServerKey: applicationServerKey.buffer as ArrayBuffer
       });
 
       return subscription;

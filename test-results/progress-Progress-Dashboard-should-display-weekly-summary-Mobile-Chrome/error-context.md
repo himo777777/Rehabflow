@@ -1,0 +1,139 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - link "Hoppa till huvudinnehåll" [ref=e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - generic [ref=e3]:
+    - link "Hoppa till huvudinnehåll" [ref=e4] [cursor=pointer]:
+      - /url: "#main-content"
+    - generic [ref=e5]:
+      - navigation "Huvudnavigation" [ref=e6]:
+        - generic [ref=e8]:
+          - link "RehabFlow - Gå till startsidan" [ref=e9] [cursor=pointer]:
+            - /url: /
+            - img [ref=e13]
+          - button "Meny" [ref=e18] [cursor=pointer]:
+            - img [ref=e19]
+      - main "Huvudinnehåll" [ref=e20]:
+        - generic [ref=e21]:
+          - generic [ref=e22]:
+            - generic [ref=e23]:
+              - img [ref=e25]
+              - text: AI-Powered Fysioterapi
+            - heading "Rehabilitering på din kropps villkor." [level=1] [ref=e31]:
+              - text: Rehabilitering på
+              - generic [ref=e32]:
+                - text: din kropps villkor.
+                - img [ref=e33]
+            - paragraph [ref=e35]: Få ett skräddarsytt återhämtningsprogram baserat på klinisk evidens, din skadehistorik och den senaste medicinska forskningen.
+            - generic [ref=e36]:
+              - generic [ref=e37]:
+                - img [ref=e39]
+                - text: Evidensbaserat
+              - generic [ref=e41]:
+                - img [ref=e43]
+                - text: AI-analys
+              - generic [ref=e53]:
+                - img [ref=e55]
+                - text: GDPR-säkert
+          - generic [ref=e57]:
+            - generic [ref=e58]:
+              - generic [ref=e60]:
+                - generic [ref=e61]: Steg 1 av 5
+                - heading "Profil" [level=2] [ref=e62]
+              - generic [ref=e65]: Steg 1 av 5
+            - generic [ref=e67]:
+              - generic [ref=e68]:
+                - heading "Din Profil" [level=2] [ref=e69]
+                - paragraph [ref=e70]: Vi börjar med grunderna för att anpassa din belastning.
+              - generic [ref=e71]:
+                - generic [ref=e72]:
+                  - generic [ref=e73]: Namn
+                  - textbox "Vad heter du?" [ref=e74]
+                - generic [ref=e75]:
+                  - generic [ref=e76]:
+                    - generic [ref=e77]: Ålder
+                    - spinbutton [ref=e78]: "30"
+                  - generic [ref=e79]:
+                    - generic [ref=e80]: Aktivitetsnivå
+                    - combobox [ref=e81] [cursor=pointer]:
+                      - option "Stillasittande (Kontor/Lite rörelse)"
+                      - option "Motionär (1-3 pass/vecka)" [selected]
+                      - option "Aktiv (3-5 pass/vecka)"
+                      - option "Elit/Atlet (Daglig träning)"
+                - generic [ref=e82]:
+                  - generic [ref=e83]: Arbetssituation
+                  - generic [ref=e84]:
+                    - button "Stillasittande" [ref=e85] [cursor=pointer]
+                    - button "Fysiskt lätt" [ref=e86] [cursor=pointer]
+                    - button "Fysiskt tungt" [ref=e87] [cursor=pointer]
+            - generic [ref=e88]:
+              - button [disabled] [ref=e89]:
+                - img [ref=e90]
+              - button "Nästa" [disabled] [ref=e92]:
+                - text: Nästa
+                - img [ref=e93]
+      - contentinfo [ref=e95]:
+        - generic [ref=e99]:
+          - generic [ref=e100]:
+            - img [ref=e102]
+            - generic [ref=e107]:
+              - text: RehabFlow
+              - generic [ref=e108]:
+                - img [ref=e109]
+                - generic [ref=e111]: AI-Powered Rehab
+          - generic [ref=e114]:
+            - img [ref=e116]
+            - generic [ref=e118]:
+              - heading "Medicinsk Friskrivning" [level=4] [ref=e119]
+              - paragraph [ref=e120]: RehabFlow är ett verktyg för egenvård och ersätter inte professionell medicinsk rådgivning, diagnos eller behandling. Sök alltid råd från läkare eller annan kvalificerad vårdgivare vid frågor om ett medicinskt tillstånd.
+          - generic [ref=e121]:
+            - link "Integritetspolicy" [ref=e122] [cursor=pointer]:
+              - /url: "#"
+            - link "Användarvillkor" [ref=e123] [cursor=pointer]:
+              - /url: "#"
+            - link "Cookie-policy" [ref=e124] [cursor=pointer]:
+              - /url: "#"
+            - link "Support" [ref=e125] [cursor=pointer]:
+              - /url: "#"
+          - generic [ref=e126]:
+            - paragraph [ref=e127]: © 2025 RehabFlow. Alla rättigheter förbehållna.
+            - generic [ref=e128]:
+              - generic [ref=e130]: Local Mode
+              - img [ref=e131]
+    - generic [ref=e133]:
+      - generic [ref=e134] [cursor=pointer]:
+        - generic [ref=e135]:
+          - img [ref=e136]
+          - generic [ref=e138]: Performance
+        - generic [ref=e139]:
+          - generic [ref=e140]: 60 FPS
+          - button [ref=e141]:
+            - img [ref=e142]
+          - img [ref=e145]
+      - generic [ref=e147]:
+        - generic [ref=e149]: Frame Time
+        - generic [ref=e151]:
+          - generic [ref=e152]:
+            - generic [ref=e153]:
+              - img [ref=e154]
+              - generic [ref=e157]: Frame
+            - generic [ref=e158]: 16.9ms
+            - generic [ref=e159]: 9.0 - 28.8
+          - generic [ref=e160]:
+            - generic [ref=e161]:
+              - img [ref=e162]
+              - generic [ref=e165]: FPS
+            - generic [ref=e166]: "60"
+            - generic [ref=e167]: "Target: 60"
+        - generic [ref=e168]:
+          - generic [ref=e169]:
+            - img [ref=e170]
+            - generic [ref=e174]: Memory
+          - generic [ref=e175]: 29.8 MB
+          - generic [ref=e176]: / 51.0 MB
+        - generic [ref=e177]: Ctrl+Shift+P to toggle
+    - status [ref=e178]
+    - alert [ref=e179]
+```

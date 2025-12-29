@@ -145,7 +145,7 @@ class ChartService {
 
     // Render legend
     if (opts.showLegend && type !== 'donut') {
-      this.renderLegend(ctx, data, chartArea, opts);
+      this.drawLegend(ctx, data, chartArea, opts);
     }
   }
 

@@ -367,7 +367,7 @@ class PerformanceService {
 
     window.fetch = async function(...args) {
       const startTime = performance.now();
-      const url = typeof args[0] === 'string' ? args[0] : args[0].url;
+      const url = typeof args[0] === 'string' ? args[0] : (args[0] instanceof URL ? args[0].href : args[0].url);
       const method = (args[1]?.method || 'GET').toUpperCase();
 
       try {
@@ -470,7 +470,7 @@ class PerformanceService {
    */
   public onRenderCallback(
     id: string,
-    phase: 'mount' | 'update',
+    phase: 'mount' | 'update' | 'nested-update',
     actualDuration: number,
     baseDuration: number,
     startTime: number,

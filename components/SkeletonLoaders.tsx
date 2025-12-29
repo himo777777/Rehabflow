@@ -1,17 +1,62 @@
 /**
- * Skeleton Loaders - Sprint 5.5
+ * Skeleton Loaders - Premium Edition
  *
- * Comprehensive skeleton loading states for improved UX.
+ * World-class skeleton loading states for exceptional UX.
  * Shows content placeholders while data/components load.
  *
  * Features:
+ * - Premium shimmer effects with gradient animations
  * - Multiple preset skeletons for common UI patterns
- * - Animated shimmer effect
- * - Customizable sizing and colors
- * - Accessible with aria-busy
+ * - GPU-accelerated animations
+ * - Customizable sizing, colors, and variants
+ * - Accessible with aria-busy and reduced motion support
  */
 
-import React, { memo, FC } from 'react';
+import React, { memo, FC, useMemo } from 'react';
+
+// ============================================================================
+// CSS KEYFRAMES (injected once)
+// ============================================================================
+
+const shimmerKeyframes = `
+@keyframes premium-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes skeleton-wave {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+`;
+
+// Inject keyframes into document head (once)
+if (typeof document !== 'undefined') {
+  const styleId = 'skeleton-keyframes';
+  if (!document.getElementById(styleId)) {
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = shimmerKeyframes;
+    document.head.appendChild(style);
+  }
+}
 
 // ============================================================================
 // BASE SKELETON
@@ -26,7 +71,13 @@ interface SkeletonProps {
   /** Border radius */
   rounded?: 'none' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full';
   /** Animation style */
-  animation?: 'pulse' | 'shimmer' | 'none';
+  animation?: 'pulse' | 'shimmer' | 'wave' | 'none';
+  /** Visual variant */
+  variant?: 'default' | 'premium' | 'glass' | 'dark';
+  /** Custom inline styles */
+  style?: React.CSSProperties;
+  /** Delay before animation starts (stagger effect) */
+  delay?: number;
 }
 
 const roundedMap = {
@@ -39,31 +90,176 @@ const roundedMap = {
   full: 'rounded-full',
 };
 
+/**
+ * Get animation styles based on type
+ */
+const getAnimationStyles = (
+  animation: 'pulse' | 'shimmer' | 'wave' | 'none',
+  variant: 'default' | 'premium' | 'glass' | 'dark',
+  delay: number
+): React.CSSProperties => {
+  const baseDelay = delay > 0 ? `${delay}ms` : '0ms';
+
+  switch (animation) {
+    case 'shimmer':
+      return {
+        background: variant === 'premium'
+          ? 'linear-gradient(90deg, #e2e8f0 0%, #f1f5f9 20%, #e2e8f0 40%, #e2e8f0 100%)'
+          : variant === 'glass'
+          ? 'linear-gradient(90deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.3) 20%, rgba(255,255,255,0.1) 40%, rgba(255,255,255,0.1) 100%)'
+          : variant === 'dark'
+          ? 'linear-gradient(90deg, #374151 0%, #4b5563 20%, #374151 40%, #374151 100%)'
+          : 'linear-gradient(90deg, #e2e8f0 0%, #f8fafc 20%, #e2e8f0 40%, #e2e8f0 100%)',
+        backgroundSize: '200% 100%',
+        animation: `premium-shimmer 1.5s ease-in-out infinite`,
+        animationDelay: baseDelay,
+      };
+    case 'wave':
+      return {
+        position: 'relative',
+        overflow: 'hidden',
+        animationDelay: baseDelay,
+      };
+    case 'pulse':
+      return {
+        animation: `skeleton-pulse 2s ease-in-out infinite`,
+        animationDelay: baseDelay,
+      };
+    default:
+      return {};
+  }
+};
+
+/**
+ * Get background color based on variant
+ */
+const getVariantClasses = (variant: 'default' | 'premium' | 'glass' | 'dark'): string => {
+  switch (variant) {
+    case 'premium':
+      return 'bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200';
+    case 'glass':
+      return 'bg-white/20 backdrop-blur-sm';
+    case 'dark':
+      return 'bg-slate-700';
+    default:
+      return 'bg-slate-200';
+  }
+};
+
 export const Skeleton: FC<SkeletonProps> = memo(({
   className = '',
   width = 'w-full',
   height = 'h-4',
   rounded = 'md',
-  animation = 'pulse',
+  animation = 'shimmer',
+  variant = 'default',
+  style,
+  delay = 0,
 }) => {
-  const animationClass = animation === 'pulse' ? 'animate-pulse' : animation === 'shimmer' ? 'animate-shimmer' : '';
+  const animationStyles = useMemo(
+    () => getAnimationStyles(animation, variant, delay),
+    [animation, variant, delay]
+  );
+
+  const variantClasses = useMemo(
+    () => getVariantClasses(variant),
+    [variant]
+  );
 
   return (
     <div
       className={`
-        bg-slate-200
+        ${variantClasses}
         ${roundedMap[rounded]}
-        ${animationClass}
         ${width}
         ${height}
         ${className}
+        transform-gpu
       `}
+      style={{
+        ...animationStyles,
+        ...style,
+      }}
       aria-hidden="true"
-    />
+    >
+      {animation === 'wave' && (
+        <div
+          className="absolute inset-0 -translate-x-full"
+          style={{
+            background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)',
+            animation: 'skeleton-wave 1.5s ease-in-out infinite',
+            animationDelay: `${delay}ms`,
+          }}
+        />
+      )}
+    </div>
   );
 });
 
 Skeleton.displayName = 'Skeleton';
+
+// ============================================================================
+// PREMIUM SKELETON VARIANT
+// ============================================================================
+
+interface PremiumSkeletonProps extends Omit<SkeletonProps, 'variant' | 'animation'> {
+  /** Glow effect intensity */
+  glow?: boolean;
+}
+
+export const PremiumSkeleton: FC<PremiumSkeletonProps> = memo(({
+  className = '',
+  width = 'w-full',
+  height = 'h-4',
+  rounded = 'lg',
+  style,
+  delay = 0,
+  glow = false,
+}) => {
+  return (
+    <div className={`relative ${glow ? 'group' : ''}`}>
+      {glow && (
+        <div
+          className={`
+            absolute inset-0
+            bg-gradient-to-r from-primary-400/20 via-cyan-400/20 to-primary-400/20
+            ${roundedMap[rounded]}
+            blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500
+          `}
+        />
+      )}
+      <div
+        className={`
+          relative
+          bg-gradient-to-r from-slate-200 via-white to-slate-200
+          ${roundedMap[rounded]}
+          ${width}
+          ${height}
+          ${className}
+          transform-gpu
+          overflow-hidden
+        `}
+        style={{
+          backgroundSize: '200% 100%',
+          animation: 'premium-shimmer 2s ease-in-out infinite',
+          animationDelay: `${delay}ms`,
+          ...style,
+        }}
+        aria-hidden="true"
+      >
+        <div
+          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent"
+          style={{
+            animation: 'skeleton-wave 2s ease-in-out infinite',
+            animationDelay: `${delay + 200}ms`,
+          }}
+        />
+      </div>
+    </div>
+  );
+});
+
+PremiumSkeleton.displayName = 'PremiumSkeleton';
 
 // ============================================================================
 // EXERCISE CARD SKELETON
@@ -426,6 +622,7 @@ TextSkeleton.displayName = 'TextSkeleton';
 
 export default {
   Skeleton,
+  PremiumSkeleton,
   ExerciseCardSkeleton,
   AvatarSkeleton,
   ChartSkeleton,

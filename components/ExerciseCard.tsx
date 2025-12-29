@@ -1,11 +1,13 @@
 
 import React, { useState, useEffect, useMemo, Suspense, lazy, useRef, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Exercise, ExerciseAdjustmentType, ExerciseLog } from '../types';
-import { Play, Clock, Repeat, Check, AlertTriangle, Lightbulb, X, Activity, SlidersHorizontal, Loader2, TrendingUp, TrendingDown, PackageX, Trophy, Timer, Zap, Scan, FileText, Minus, Plus, MessageSquare, Heart, BookOpen, GraduationCap, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
+import { Play, Clock, Repeat, Check, AlertTriangle, Lightbulb, X, Activity, SlidersHorizontal, Loader2, TrendingUp, TrendingDown, PackageX, Trophy, Timer, Zap, Scan, FileText, Minus, Plus, MessageSquare, Heart, BookOpen, GraduationCap, ChevronDown, ChevronUp, ExternalLink, Sparkles, Target, BarChart3 } from 'lucide-react';
 import { generateAlternativeExercise } from '../services/geminiService';
 import { storageService } from '../services/storageService';
 import { User } from 'lucide-react';
 import PainSlider from './ui/PainSlider';
+import { GlassCard, Badge, Button } from './ui';
 
 // Focus trap hook for accessibility
 const useFocusTrap = (isActive: boolean, containerRef: React.RefObject<HTMLElement | null>) => {
@@ -77,11 +79,27 @@ const categoryMap: Record<string, string> = {
   endurance: 'Uthållighet'
 };
 
-const categoryColorMap: Record<string, string> = {
-  mobility: 'bg-sky-50 text-sky-700 border-sky-100',
-  strength: 'bg-rose-50 text-rose-700 border-rose-100',
-  balance: 'bg-violet-50 text-violet-700 border-violet-100',
-  endurance: 'bg-emerald-50 text-emerald-700 border-emerald-100'
+const categoryColorMap: Record<string, { bg: string; gradient: string; icon: string }> = {
+  mobility: {
+    bg: 'bg-gradient-to-r from-sky-500 to-cyan-500',
+    gradient: 'from-sky-100 to-cyan-100',
+    icon: 'text-sky-600'
+  },
+  strength: {
+    bg: 'bg-gradient-to-r from-rose-500 to-pink-500',
+    gradient: 'from-rose-100 to-pink-100',
+    icon: 'text-rose-600'
+  },
+  balance: {
+    bg: 'bg-gradient-to-r from-violet-500 to-purple-500',
+    gradient: 'from-violet-100 to-purple-100',
+    icon: 'text-violet-600'
+  },
+  endurance: {
+    bg: 'bg-gradient-to-r from-emerald-500 to-teal-500',
+    gradient: 'from-emerald-100 to-teal-100',
+    icon: 'text-emerald-600'
+  }
 };
 
 // Difficulty indicator with dots
@@ -334,11 +352,59 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({ exercise, onComple
 
   if (isSwapping) {
       return (
-          <div className="border rounded-3xl p-8 bg-slate-50/50 flex flex-col items-center justify-center min-h-[240px] border-dashed border-slate-300">
-              <Loader2 className="animate-spin text-primary-600 mb-4" size={32} />
-              <p className="text-slate-600 font-medium">AI anpassar din träning...</p>
-              <p className="text-slate-400 mt-1">Söker evidensbaserat alternativ</p>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative rounded-3xl p-10 bg-gradient-to-br from-slate-50 via-white to-primary-50/30 flex flex-col items-center justify-center min-h-[280px] border border-slate-200/50 shadow-xl overflow-hidden"
+          >
+            {/* Background animation */}
+            <div className="absolute inset-0 overflow-hidden">
+              <motion.div
+                className="absolute w-40 h-40 bg-gradient-to-br from-primary-200/50 to-cyan-200/50 rounded-full blur-3xl"
+                animate={{
+                  x: [0, 50, 0],
+                  y: [0, -30, 0],
+                }}
+                transition={{ duration: 4, repeat: Infinity }}
+                style={{ top: '-20%', right: '-10%' }}
+              />
+              <motion.div
+                className="absolute w-32 h-32 bg-gradient-to-br from-purple-200/50 to-primary-200/50 rounded-full blur-3xl"
+                animate={{
+                  x: [0, -30, 0],
+                  y: [0, 20, 0],
+                }}
+                transition={{ duration: 3, repeat: Infinity }}
+                style={{ bottom: '-10%', left: '-5%' }}
+              />
+            </div>
+
+            <div className="relative z-10 flex flex-col items-center">
+              <motion.div
+                className="relative mb-6"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+              >
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-primary-500/30">
+                  <Sparkles className="w-8 h-8 text-white" />
+                </div>
+              </motion.div>
+              <p className="text-slate-800 font-bold text-lg mb-1">AI anpassar din träning</p>
+              <p className="text-slate-500 text-sm">Söker evidensbaserat alternativ...</p>
+
+              {/* Progress dots */}
+              <div className="flex gap-1.5 mt-4">
+                {[0, 1, 2].map((i) => (
+                  <motion.div
+                    key={i}
+                    className="w-2 h-2 bg-primary-500 rounded-full"
+                    animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }}
+                    transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+                  />
+                ))}
+              </div>
+            </div>
+          </motion.div>
       );
   }
 
@@ -366,15 +432,24 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({ exercise, onComple
         </Suspense>
     )}
 
-    <article
-      className={`border-2 rounded-3xl p-6 transition-all duration-500 ease-out transform relative overflow-hidden group
+    <motion.article
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      whileHover={!completed ? { y: -4, scale: 1.005 } : undefined}
+      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+      className={`relative rounded-3xl p-6 overflow-hidden group
       ${completed
-        ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-400 shadow-sm ring-2 ring-green-100'
-        : 'bg-white border-slate-100 shadow-[0_4px_20px_-12px_rgba(0,0,0,0.1)] hover:shadow-[0_8px_30px_-12px_rgba(0,0,0,0.15)] hover:-translate-y-1 hover:border-slate-200'
+        ? 'bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 border-2 border-emerald-300/50 shadow-lg shadow-emerald-100/50'
+        : 'bg-white/80 backdrop-blur-sm border border-slate-200/50 shadow-xl shadow-slate-200/40 hover:shadow-2xl hover:border-slate-300/50'
       }`}
       aria-label={`Övning: ${exercise.name}${completed ? ' - Slutförd' : ''}`}
       aria-describedby={`exercise-desc-${exercise.name.replace(/\s+/g, '-')}`}
     >
+      {/* Premium gradient overlay */}
+      {!completed && (
+        <div className="absolute inset-0 bg-gradient-to-br from-white/50 via-transparent to-primary-50/20 pointer-events-none" />
+      )}
       {/* Swap Error Banner */}
       {swapError && (
         <div className="absolute top-0 left-0 right-0 z-40 bg-red-500 text-white text-sm font-medium px-4 py-2 flex items-center justify-between rounded-t-3xl animate-in slide-in-from-top duration-300">
@@ -385,13 +460,28 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({ exercise, onComple
         </div>
       )}
 
-      {/* Completed Badge */}
-      {completed && (
-        <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5 px-3 py-1.5 bg-green-500 text-white text-xs font-bold rounded-full shadow-lg shadow-green-500/30 animate-in zoom-in duration-300">
-          <Check size={14} className="stroke-[3px]" />
-          Slutförd
-        </div>
-      )}
+      {/* Premium Completed Badge */}
+      <AnimatePresence>
+        {completed && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.5, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.5 }}
+            className="absolute top-4 right-4 z-20"
+          >
+            <div className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-bold rounded-full shadow-lg shadow-emerald-500/30">
+              <motion.div
+                initial={{ rotate: -90 }}
+                animate={{ rotate: 0 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+              >
+                <Check size={14} className="stroke-[3px]" />
+              </motion.div>
+              Slutförd
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       
       {/* SWAP / DIFFICULTY OVERLAY */}
       {showSwapOptions && (
@@ -558,15 +648,24 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({ exercise, onComple
           </div>
       )}
 
-      <div className="flex justify-between items-start mb-4 relative z-10">
+      <div className="flex justify-between items-start mb-5 relative z-10">
         <div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider transition-opacity duration-500 border ${completed ? 'opacity-70 grayscale' : 'opacity-100'} ${categoryColorMap[exercise.category] || 'bg-slate-100 text-slate-700 border-slate-200'}`}>
+          {/* Category & Difficulty Badges */}
+          <div className="flex items-center gap-2 flex-wrap mb-3">
+            {/* Premium Category Badge */}
+            <motion.span
+              whileHover={{ scale: 1.05 }}
+              className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-full uppercase tracking-wider text-white shadow-sm ${
+                completed ? 'opacity-70 grayscale' : 'opacity-100'
+              } ${categoryColorMap[exercise.category]?.bg || 'bg-gradient-to-r from-slate-500 to-slate-600'}`}
+            >
+              <Target size={10} />
               {categoryMap[exercise.category] || exercise.category}
-            </span>
-            {/* Difficulty Indicator */}
+            </motion.span>
+
+            {/* Premium Difficulty Badge */}
             {exercise.difficulty && (
-              <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-50 border border-slate-200 ${completed ? 'opacity-70' : 'opacity-100'}`}>
+              <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-full bg-white/80 backdrop-blur-sm border border-slate-200/50 shadow-sm ${completed ? 'opacity-70' : 'opacity-100'}`}>
                 <span className={`tracking-wider ${getDifficultyIndicator(exercise.difficulty).color}`}>
                   {getDifficultyIndicator(exercise.difficulty).dots}
                 </span>
@@ -576,24 +675,43 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({ exercise, onComple
               </span>
             )}
           </div>
-          <h3 className={`text-xl font-bold mt-3 transition-all duration-300 tracking-tight ${completed ? 'text-slate-400 line-through decoration-slate-300 decoration-2' : 'text-slate-900'}`}>
+
+          {/* Exercise Title */}
+          <h3 className={`text-xl font-bold tracking-tight transition-all duration-300 ${
+            completed
+              ? 'text-slate-400 line-through decoration-slate-300/50 decoration-2'
+              : 'text-slate-900'
+          }`}>
             {exercise.name}
           </h3>
         </div>
+
+        {/* Premium Completion Button */}
         {!readOnly && onComplete && (
-          <button 
+          <motion.button
+            whileHover={!completed ? { scale: 1.1 } : undefined}
+            whileTap={{ scale: 0.95 }}
             onClick={handleToggleComplete}
-            className={`p-3 rounded-2xl transition-all duration-500 flex items-center justify-center shadow-sm
-                ${completed 
-                  ? 'bg-green-500 text-white shadow-green-200 scale-100' 
-                  : 'bg-slate-50 text-slate-400 border border-slate-100 hover:bg-white hover:text-green-500 hover:border-green-200 hover:shadow-md hover:-translate-y-0.5'
+            className={`relative w-12 h-12 rounded-2xl transition-all duration-300 flex items-center justify-center shadow-lg
+                ${completed
+                  ? 'bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-emerald-200'
+                  : 'bg-white text-slate-400 border border-slate-200 hover:text-emerald-500 hover:border-emerald-300 hover:shadow-emerald-100/50'
                 }`}
+            aria-label={completed ? 'Markera som ej slutförd' : 'Markera som slutförd'}
           >
-            <Check 
-              size={22} 
-              className={`transition-all duration-500 ${completed ? 'scale-110 stroke-[3px] rotate-0' : 'scale-100 -rotate-90 opacity-50'}`} 
+            {/* Ring animation when not completed */}
+            {!completed && (
+              <motion.div
+                className="absolute inset-0 rounded-2xl border-2 border-dashed border-slate-200"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+              />
+            )}
+            <Check
+              size={20}
+              className={`transition-all duration-300 ${completed ? 'stroke-[3px]' : ''}`}
             />
-          </button>
+          </motion.button>
         )}
       </div>
 
@@ -614,19 +732,28 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({ exercise, onComple
         {exercise.description}
       </p>
 
-      {/* Metrics Row - Responsive */}
-      <div className={`grid grid-cols-2 ${exercise.calories ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-3 mb-6 transition-all duration-300 ${completed ? 'opacity-40 grayscale' : 'opacity-100'}`}>
+      {/* Premium Metrics Row */}
+      <div className={`grid grid-cols-2 ${exercise.calories ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-3 mb-6 transition-all duration-300 ${completed ? 'opacity-50 grayscale' : 'opacity-100'}`}>
         {[
-            { label: 'Set', val: exercise.sets, icon: Repeat },
-            { label: 'Reps', val: exercise.reps, icon: Clock },
-            { label: 'Frekvens', val: exercise.frequency.split(' ')[0], icon: Play },
-            ...(exercise.calories ? [{ label: 'Kalorier', val: `~${exercise.calories}`, icon: Zap }] : [])
+            { label: 'Set', val: exercise.sets, icon: Repeat, color: 'from-blue-500 to-indigo-500' },
+            { label: 'Reps', val: exercise.reps, icon: Clock, color: 'from-purple-500 to-pink-500' },
+            { label: 'Frekvens', val: exercise.frequency.split(' ')[0], icon: BarChart3, color: 'from-amber-500 to-orange-500' },
+            ...(exercise.calories ? [{ label: 'Kalorier', val: `~${exercise.calories}`, icon: Zap, color: 'from-emerald-500 to-teal-500' }] : [])
         ].map((stat, i) => (
-            <div key={i} className="flex flex-col items-center p-3 bg-slate-50 border border-slate-100 rounded-2xl group-hover:border-slate-200 transition-colors">
-                <stat.icon className="w-4 h-4 text-slate-400 mb-1.5" />
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{stat.label}</span>
-                <span className="font-bold text-slate-700">{stat.val}</span>
-            </div>
+            <motion.div
+              key={i}
+              whileHover={{ scale: 1.03, y: -2 }}
+              className="relative flex flex-col items-center p-4 bg-white/60 backdrop-blur-sm border border-slate-100 rounded-2xl shadow-sm overflow-hidden group/stat"
+            >
+              {/* Hover gradient */}
+              <div className={`absolute inset-0 bg-gradient-to-br ${stat.color} opacity-0 group-hover/stat:opacity-5 transition-opacity duration-300`} />
+
+              <div className={`relative w-8 h-8 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center mb-2 shadow-sm`}>
+                <stat.icon className="w-4 h-4 text-white" />
+              </div>
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{stat.label}</span>
+              <span className="font-bold text-slate-800 text-lg">{stat.val}</span>
+            </motion.div>
         ))}
       </div>
 
@@ -812,7 +939,7 @@ const ExerciseCardComponent: React.FC<ExerciseCardProps> = ({ exercise, onComple
             </button>
          )}
       </div>
-    </article>
+    </motion.article>
     </>
   );
 };

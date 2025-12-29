@@ -4,6 +4,8 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ mode }) => ({
   plugins: [react()],
   build: {
+    // Enable CSS code splitting
+    cssCodeSplit: true,
     outDir: 'dist',
     // Disable sourcemaps in production to prevent source code exposure
     sourcemap: mode === 'development',
@@ -65,16 +67,37 @@ export default defineConfig(({ mode }) => ({
         },
       },
     },
-    // Minify in production
+    // Minify in production with aggressive settings
     minify: mode === 'production' ? 'esbuild' : false,
     // Increase chunk size warning limit (Three.js is inherently large)
     chunkSizeWarningLimit: 600,
     // Target modern browsers for smaller bundle
     target: 'es2020',
+    // Aggressive tree shaking
+    modulePreload: {
+      polyfill: true,
+    },
+    // Report compressed size
+    reportCompressedSize: true,
+  },
+  // Esbuild options for faster builds and smaller output
+  esbuild: {
+    // Remove console.log in production
+    drop: mode === 'production' ? ['console', 'debugger'] : [],
+    // Minify identifiers
+    minifyIdentifiers: mode === 'production',
+    minifySyntax: mode === 'production',
+    minifyWhitespace: mode === 'production',
+    // Target modern browsers
+    target: 'es2020',
+    // Enable tree shaking
+    treeShaking: true,
   },
   // Only expose specific environment variables, not all of process.env
   define: {
     'process.env.NODE_ENV': JSON.stringify(mode),
+    // Enable React production optimizations
+    __DEV__: mode === 'development',
   },
   // Optimizations
   optimizeDeps: {
@@ -90,12 +113,22 @@ export default defineConfig(({ mode }) => ({
     exclude: [
       '@mediapipe/pose',
       '@mediapipe/camera_utils',
+      'three',
+      '@tensorflow/tfjs',
     ],
+    // Use esbuild for dependency pre-bundling
+    esbuildOptions: {
+      target: 'es2020',
+    },
   },
   // Faster HMR in development
   server: {
     hmr: {
       overlay: true,
     },
+  },
+  // Preview server for testing production builds
+  preview: {
+    port: 4173,
   },
 }));

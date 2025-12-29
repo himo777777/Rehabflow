@@ -117,7 +117,7 @@ const TIP_TEMPLATES = {
       condition: (ctx: UserContext) => ctx.streak >= 7,
       tip: {
         title: 'Fantastisk streak!',
-        message: `${ctx => ctx.streak} dagar i rad! Du bygger verkligen goda vanor. Håll uppe tempot!`,
+        message: ((ctx: UserContext) => `${ctx.streak} dagar i rad! Du bygger verkligen goda vanor. Håll uppe tempot!`) as string | ((ctx: UserContext) => string),
         priority: 'medium' as const,
         actionable: false,
       },
@@ -363,9 +363,17 @@ class AICoachService {
    * Build user context from stored data
    */
   private async getUserContext(): Promise<UserContext> {
-    const progress = storageService.getProgress();
     const history = storageService.getHistorySync();
-    const painHistory = storageService.getPainHistory?.() || [];
+    const painHistoryRecord = storageService.getPainHistory?.() || {};
+    // Convert pain history record to sorted array with pain levels
+    const painHistory = Object.entries(painHistoryRecord)
+      .map(([date, log]) => ({
+        date,
+        level: log.postWorkout?.painLevel ?? log.preWorkout?.painLevel ?? 5,
+      }))
+      .filter(entry => entry.level !== undefined)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const program = await storageService.getProgram();
 
     // Calculate streak
     let streak = 0;
@@ -422,9 +430,20 @@ class AICoachService {
       ? Math.floor((Date.now() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24))
       : 0;
 
+    // Calculate average pain from recent history
+    const recentPain = painHistory.slice(-7);
+    const avgPain = recentPain.length > 0
+      ? recentPain.reduce((sum, log) => sum + log.level, 0) / recentPain.length
+      : 5;
+
+    // Determine current phase from program phases or default to 1
+    const currentPhase = program?.phases?.length
+      ? Math.min(program.phases.length, 1) // Use first phase as default
+      : 1;
+
     return {
-      currentPhase: progress.currentPhase || 1,
-      painLevel: progress.averagePain || 5,
+      currentPhase,
+      painLevel: avgPain,
       streak,
       recentExercises,
       adherenceRate,
@@ -456,8 +475,9 @@ class AICoachService {
 
     // Go through each focus area
     for (const area of this.config.focusAreas) {
-      const templates = TIP_TEMPLATES[area as keyof typeof TIP_TEMPLATES];
-      if (!templates) continue;
+      const areaKey = area as keyof typeof TIP_TEMPLATES;
+      if (!(areaKey in TIP_TEMPLATES)) continue;
+      const templates = TIP_TEMPLATES[areaKey];
 
       for (const template of templates) {
         if (tips.length >= this.config.tipsPerDay) break;

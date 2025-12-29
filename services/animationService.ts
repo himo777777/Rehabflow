@@ -1173,8 +1173,8 @@ class WebAnimationWrapper implements Animation {
   public getProgress(): number {
     if (!this.webAnimation.effect) return 0;
     const timing = this.webAnimation.effect.getTiming();
-    const duration = timing.duration as number;
-    const currentTime = this.webAnimation.currentTime ?? 0;
+    const duration = Number(timing.duration) || 1;
+    const currentTime = Number(this.webAnimation.currentTime) || 0;
     return currentTime / duration;
   }
 
@@ -1239,7 +1239,7 @@ class InterpolatedValue implements AnimatedValue {
   }
 
   public get(): number {
-    return this.interpolate(this.source.get()) as number;
+    return this.computeInterpolation(this.source.get()) as number;
   }
 
   public set(_value: number): void {
@@ -1253,11 +1253,11 @@ class InterpolatedValue implements AnimatedValue {
 
   public addListener(callback: (value: number) => void): () => void {
     return this.source.addListener((value) => {
-      callback(this.interpolate(value) as number);
+      callback(this.computeInterpolation(value) as number);
     });
   }
 
-  private interpolate(inputValue: number): number | string {
+  private computeInterpolation(inputValue: number): number | string {
     const { inputRange, outputRange, extrapolate = 'extend' } = this.config;
 
     // Hitta segment

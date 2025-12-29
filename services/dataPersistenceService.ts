@@ -385,7 +385,7 @@ class DataPersistenceService {
         const results = await Promise.all(
           request.result.map(item => this.processDataFromStorage<T>(item))
         );
-        resolve(results.filter((r): r is T => r !== undefined));
+        resolve(results.filter((r): r is Awaited<T> => r !== undefined) as T[]);
       };
     });
   }

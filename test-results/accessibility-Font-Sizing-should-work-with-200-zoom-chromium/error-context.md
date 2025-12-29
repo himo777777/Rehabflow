@@ -1,0 +1,156 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - link "Hoppa till huvudinnehåll" [ref=e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - generic [ref=e3]:
+    - link "Hoppa till huvudinnehåll" [ref=e4] [cursor=pointer]:
+      - /url: "#main-content"
+    - generic [ref=e5]:
+      - navigation "Huvudnavigation" [ref=e6]:
+        - generic [ref=e8]:
+          - link "RehabFlow - Gå till startsidan" [ref=e9] [cursor=pointer]:
+            - /url: /
+            - img [ref=e13]
+            - generic [ref=e18]:
+              - text: RehabFlow
+              - generic [ref=e19]:
+                - img [ref=e20]
+                - generic [ref=e22]: AI-Powered
+          - generic [ref=e23]:
+            - menubar [ref=e24]:
+              - link "Hem" [ref=e25] [cursor=pointer]:
+                - /url: /program
+                - img [ref=e26]
+                - generic [ref=e29]: Hem
+              - link "Bibliotek" [ref=e30] [cursor=pointer]:
+                - /url: /library
+                - img [ref=e31]
+                - generic [ref=e34]: Bibliotek
+            - button "Logga in" [ref=e35] [cursor=pointer]:
+              - img [ref=e36]
+              - text: Logga in
+      - main "Huvudinnehåll" [ref=e39]:
+        - generic [ref=e40]:
+          - generic [ref=e41]:
+            - generic [ref=e42]:
+              - img [ref=e44]
+              - text: AI-Powered Fysioterapi
+            - heading "Rehabilitering på din kropps villkor." [level=1] [ref=e50]:
+              - text: Rehabilitering på
+              - generic [ref=e51]:
+                - text: din kropps villkor.
+                - img [ref=e52]
+            - paragraph [ref=e54]: Få ett skräddarsytt återhämtningsprogram baserat på klinisk evidens, din skadehistorik och den senaste medicinska forskningen.
+            - generic [ref=e55]:
+              - generic [ref=e56]:
+                - img [ref=e58]
+                - text: Evidensbaserat
+              - generic [ref=e60]:
+                - img [ref=e62]
+                - text: AI-analys
+              - generic [ref=e72]:
+                - img [ref=e74]
+                - text: GDPR-säkert
+          - generic [ref=e76]:
+            - generic [ref=e77]:
+              - generic [ref=e79]:
+                - generic [ref=e80]: Steg 1 av 5
+                - heading "Profil" [level=2] [ref=e81]
+              - generic [ref=e90]: Steg 1 av 5
+            - generic [ref=e92]:
+              - generic [ref=e93]:
+                - heading "Din Profil" [level=2] [ref=e94]
+                - paragraph [ref=e95]: Vi börjar med grunderna för att anpassa din belastning.
+              - generic [ref=e96]:
+                - generic [ref=e97]:
+                  - generic [ref=e98]: Namn
+                  - textbox "Vad heter du?" [ref=e99]
+                - generic [ref=e100]:
+                  - generic [ref=e101]:
+                    - generic [ref=e102]: Ålder
+                    - spinbutton [ref=e103]: "30"
+                  - generic [ref=e104]:
+                    - generic [ref=e105]: Aktivitetsnivå
+                    - combobox [ref=e106] [cursor=pointer]:
+                      - option "Stillasittande (Kontor/Lite rörelse)"
+                      - option "Motionär (1-3 pass/vecka)" [selected]
+                      - option "Aktiv (3-5 pass/vecka)"
+                      - option "Elit/Atlet (Daglig träning)"
+                - generic [ref=e107]:
+                  - generic [ref=e108]: Arbetssituation
+                  - generic [ref=e109]:
+                    - button "Stillasittande" [ref=e110] [cursor=pointer]
+                    - button "Fysiskt lätt" [ref=e111] [cursor=pointer]
+                    - button "Fysiskt tungt" [ref=e112] [cursor=pointer]
+            - generic [ref=e113]:
+              - button "Tillbaka" [disabled] [ref=e114]:
+                - img [ref=e115]
+                - generic [ref=e117]: Tillbaka
+              - button "Nästa" [disabled] [ref=e118]:
+                - text: Nästa
+                - img [ref=e119]
+      - contentinfo [ref=e121]:
+        - generic [ref=e125]:
+          - generic [ref=e126]:
+            - img [ref=e128]
+            - generic [ref=e133]:
+              - text: RehabFlow
+              - generic [ref=e134]:
+                - img [ref=e135]
+                - generic [ref=e137]: AI-Powered Rehab
+          - generic [ref=e140]:
+            - img [ref=e142]
+            - generic [ref=e144]:
+              - heading "Medicinsk Friskrivning" [level=4] [ref=e145]
+              - paragraph [ref=e146]: RehabFlow är ett verktyg för egenvård och ersätter inte professionell medicinsk rådgivning, diagnos eller behandling. Sök alltid råd från läkare eller annan kvalificerad vårdgivare vid frågor om ett medicinskt tillstånd.
+          - generic [ref=e147]:
+            - link "Integritetspolicy" [ref=e148] [cursor=pointer]:
+              - /url: "#"
+            - link "Användarvillkor" [ref=e149] [cursor=pointer]:
+              - /url: "#"
+            - link "Cookie-policy" [ref=e150] [cursor=pointer]:
+              - /url: "#"
+            - link "Support" [ref=e151] [cursor=pointer]:
+              - /url: "#"
+          - generic [ref=e152]:
+            - paragraph [ref=e153]: © 2025 RehabFlow. Alla rättigheter förbehållna.
+            - generic [ref=e154]:
+              - generic [ref=e156]: Local Mode
+              - img [ref=e157]
+    - generic [ref=e159]:
+      - generic [ref=e160] [cursor=pointer]:
+        - generic [ref=e161]:
+          - img [ref=e162]
+          - generic [ref=e164]: Performance
+        - generic [ref=e165]:
+          - generic [ref=e166]: 22 FPS
+          - button [ref=e167]:
+            - img [ref=e168]
+          - img [ref=e171]
+      - generic [ref=e173]:
+        - generic [ref=e175]: Frame Time
+        - generic [ref=e177]:
+          - generic [ref=e178]:
+            - generic [ref=e179]:
+              - img [ref=e180]
+              - generic [ref=e183]: Frame
+            - generic [ref=e184]: 45.1ms
+            - generic [ref=e185]: 0.0 - 167.2
+          - generic [ref=e186]:
+            - generic [ref=e187]:
+              - img [ref=e188]
+              - generic [ref=e191]: FPS
+            - generic [ref=e192]: "22"
+            - generic [ref=e193]: "Target: 60"
+        - generic [ref=e194]:
+          - generic [ref=e195]:
+            - img [ref=e196]
+            - generic [ref=e200]: Memory
+          - generic [ref=e201]: 29.8 MB
+          - generic [ref=e202]: / 51.0 MB
+        - generic [ref=e203]: Ctrl+Shift+P to toggle
+    - status [ref=e204]
+    - alert [ref=e205]
+```

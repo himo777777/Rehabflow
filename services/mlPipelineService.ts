@@ -469,7 +469,8 @@ class MLPipelineService {
   }
 
   private preprocessImage(imageData: ImageData, config: PreprocessConfig): TensorData {
-    let { width, height, data } = imageData;
+    let { width, height } = imageData;
+    let data: Uint8ClampedArray = new Uint8ClampedArray(imageData.data);
     let processedData: Float32Array;
 
     // Resize
@@ -477,7 +478,7 @@ class MLPipelineService {
       const resized = this.resizeImageData(imageData, config.resize.width, config.resize.height);
       width = config.resize.width;
       height = config.resize.height;
-      data = resized;
+      data = new Uint8ClampedArray(resized);
     }
 
     // Grayscale

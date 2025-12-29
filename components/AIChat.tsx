@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { MessageSquare, X, Send, Bot, Loader2, RefreshCw, AlertCircle, Sparkles, History, Mic, MicOff } from 'lucide-react';
+import { MessageSquare, X, Send, Bot, Loader2, RefreshCw, AlertCircle, Sparkles, History, Mic, MicOff, Clock } from 'lucide-react';
 import { logger } from '../utils/logger';
+import { useDebouncedCallback } from '../hooks';
+import { sanitizeChatMessage, sanitizeAIResponse, detectMaliciousPatterns } from '../utils/sanitize';
+import { rateLimitService, RATE_LIMIT_CONFIGS, formatRetryAfter, RateLimitError } from '../services/rateLimitService';
 
 // TypeScript declarations for Web Speech API
 interface SpeechRecognitionEvent extends Event {
@@ -86,6 +89,7 @@ const AIChat: React.FC<AIChatProps> = ({ program }) => {
   const streamingTextRef = useRef('');
   const [isListening, setIsListening] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
+  const [rateLimitError, setRateLimitError] = useState<string | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   const scrollToBottom = useCallback(() => {
@@ -215,9 +219,38 @@ const AIChat: React.FC<AIChatProps> = ({ program }) => {
   const sendMessage = async (messageText: string) => {
     if (!messageText.trim() || isLoading || isStreaming) return;
 
-    setInput('');
+    // Sanitize user input
+    const sanitizedMessage = sanitizeChatMessage(messageText);
+    if (!sanitizedMessage.trim()) {
+      logger.warn('[AIChat] Empty message after sanitization');
+      return;
+    }
+
+    // Check for malicious patterns
+    if (detectMaliciousPatterns(messageText)) {
+      logger.warn('[AIChat] Blocked potentially malicious input');
+      setMessages(prev => [...prev, {
+        role: 'model',
+        text: 'Ditt meddelande innehöll ogiltiga tecken och kunde inte skickas.',
+        isError: true,
+        timestamp: Date.now()
+      }]);
+      return;
+    }
+
+    // Check rate limit
+    const rateLimitResult = rateLimitService.consume('user', RATE_LIMIT_CONFIGS.AI_CHAT);
+    if (!rateLimitResult.allowed) {
+      const retryTime = formatRetryAfter(rateLimitResult.retryAfter || 60);
+      setRateLimitError(`Du har skickat för många meddelanden. Vänta ${retryTime}.`);
+      logger.warn('[AIChat] Rate limit exceeded');
+      return;
+    }
+    setRateLimitError(null);
+
+    // Note: input is cleared in handleSend for better UX
     setLastFailedMessage(null);
-    const userMessage: Message = { role: 'user', text: messageText, timestamp: Date.now() };
+    const userMessage: Message = { role: 'user', text: sanitizedMessage, timestamp: Date.now() };
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
     setIsStreaming(true);
@@ -335,17 +368,31 @@ ${isEarlyPostOp ? `- Rekommendera ALDRIG övningar som ökar belastning, vikt el
     }
   };
 
-  const handleSend = () => sendMessage(input);
+  // Debounced send to prevent rapid double-clicks/enters (500ms)
+  const debouncedSendMessage = useDebouncedCallback(
+    (messageText: string) => {
+      sendMessage(messageText);
+    },
+    500
+  );
+
+  const handleSend = () => {
+    if (!input.trim() || isLoading || isStreaming) return;
+    // Use the actual message immediately, debounce prevents duplicates
+    const messageToSend = input.trim();
+    setInput(''); // Clear input immediately for better UX
+    debouncedSendMessage(messageToSend);
+  };
 
   const handleRetry = () => {
     if (lastFailedMessage) {
       setMessages(prev => prev.filter(m => !m.isError));
-      sendMessage(lastFailedMessage);
+      debouncedSendMessage(lastFailedMessage);
     }
   };
 
   const handleSuggestedQuestion = (question: string) => {
-    sendMessage(question);
+    debouncedSendMessage(question);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -528,6 +575,14 @@ ${isEarlyPostOp ? `- Rekommendera ALDRIG övningar som ökar belastning, vikt el
                 >
                   <RefreshCw size={12} /> Försök igen
                 </button>
+              </div>
+            )}
+
+            {/* Rate limit warning */}
+            {rateLimitError && (
+              <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-700 text-xs">
+                <Clock size={14} className="flex-shrink-0" />
+                <span>{rateLimitError}</span>
               </div>
             )}
 

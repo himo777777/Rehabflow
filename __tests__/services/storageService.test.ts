@@ -27,6 +27,7 @@ import type {
   MovementSession,
   CalibrationData
 } from '../../types';
+import { InjuryType } from '../../types';
 
 describe('storageService', () => {
   beforeEach(() => {
@@ -46,6 +47,15 @@ describe('storageService', () => {
       title: 'Test Rehabilitation Program',
       summary: 'A test program for rehabilitation',
       conditionAnalysis: 'Test condition analysis',
+      patientEducation: {
+        diagnosis: 'Test diagnosis',
+        explanation: 'Test explanation',
+        pathology: 'Test pathology',
+        prognosis: 'Test prognosis',
+        scienceBackground: 'Test science background',
+        dailyTips: ['Tip 1', 'Tip 2'],
+        sources: ['Source 1']
+      },
       phases: [
         {
           phaseName: 'Phase 1',
@@ -55,23 +65,18 @@ describe('storageService', () => {
           precautions: ['Avoid heavy lifting'],
           dailyRoutine: [
             {
+              day: 1,
               focus: 'Mobility',
               exercises: [
                 {
                   name: 'Gentle stretch',
                   category: 'mobility',
-                  targetArea: 'knee',
                   description: 'Gentle knee stretch',
                   sets: 3,
                   reps: '10',
-                  restSeconds: 30,
+                  frequency: 'Daily',
+                  tips: 'Move slowly',
                   difficulty: 'Lätt',
-                  instructions: ['Step 1', 'Step 2'],
-                  modifications: {
-                    easier: 'Do fewer reps',
-                    harder: 'Add resistance'
-                  },
-                  safetyNotes: ['Stop if pain']
                 }
               ]
             }
@@ -81,15 +86,22 @@ describe('storageService', () => {
     };
 
     const mockAssessment: UserAssessment = {
+      name: 'Test User',
       age: 35,
-      gender: 'male',
-      injuryType: 'knee',
+      injuryType: InjuryType.CHRONIC,
       injuryLocation: 'Knä',
+      symptoms: ['Pain', 'Stiffness'],
       painLevel: 5,
+      activityPainLevel: 6,
       activityLevel: 'moderate',
-      goals: ['Reduce pain', 'Return to sports'],
-      medicalHistory: [],
-      limitations: []
+      goals: 'Reduce pain and return to sports',
+      specificAnswers: {},
+      lifestyle: {
+        sleep: 'Okej',
+        stress: 'Medel',
+        fearAvoidance: false,
+        workload: 'Stillasittande'
+      }
     };
 
     it('should save and retrieve a program', async () => {
@@ -206,18 +218,19 @@ describe('storageService', () => {
     const today = new Date().toISOString().split('T')[0];
 
     const preCheckIn: WorkoutCheckIn = {
+      type: 'pre',
+      timestamp: new Date().toISOString(),
       painLevel: 4,
       energyLevel: 3,
-      sleepQuality: 4,
-      mood: 'neutral',
+      mood: 'okej',
       notes: 'Feeling okay today'
     };
 
     const postCheckIn: WorkoutCheckIn = {
+      type: 'post',
+      timestamp: new Date().toISOString(),
       painLevel: 3,
-      energyLevel: 4,
-      sleepQuality: 4,
-      mood: 'good',
+      workoutDifficulty: 'lagom',
       notes: 'Felt better after exercise'
     };
 
@@ -292,12 +305,13 @@ describe('storageService', () => {
       exerciseId: `stretch_${Date.now()}`,
       exerciseName: 'Knee Stretch',
       date: today,
-      setsCompleted: 3,
-      repsPerSet: [10, 10, 8],
+      completed: true,
+      actualSets: 3,
+      actualReps: '10',
       duration: 300,
       painDuring: 2,
       painAfter: 1,
-      difficulty: 'moderate',
+      difficulty: 'lagom',
       notes: 'Good form throughout'
     };
 
@@ -327,13 +341,13 @@ describe('storageService', () => {
       await storageService.saveExerciseLog(exerciseLog);
       await storageService.saveExerciseLog({
         ...exerciseLog,
-        setsCompleted: 4 // Updated value
+        actualSets: 4 // Updated value
       });
 
       const logs = storageService.getExerciseLogsForDate(today);
 
       expect(logs).toHaveLength(1);
-      expect(logs[0].setsCompleted).toBe(4);
+      expect(logs[0].actualSets).toBe(4);
     });
 
     it('should return empty array for date with no logs', () => {
@@ -423,15 +437,23 @@ describe('storageService', () => {
   // MOVEMENT SESSION TESTS
   // ===========================================
   describe('movement sessions', () => {
+    const mockRepScore = {
+      overall: 85,
+      breakdown: { rom: 90, tempo: 85, symmetry: 80, stability: 85, depth: 90 },
+      issues: [],
+      timestamp: new Date().toISOString()
+    };
+
     const session: MovementSession = {
+      id: `session_${Date.now()}`,
       exerciseName: 'Knee Bend',
       sessionDate: new Date().toISOString(),
       duration: 180,
       repsCompleted: 10,
       averageScore: 85,
-      romAchieved: { flexion: 90, extension: 0 },
-      formIssues: ['Slight knee valgus'],
-      repScores: [80, 82, 85, 87, 85, 88, 86, 84, 87, 86]
+      romAchieved: 90,
+      formIssues: [{ joint: 'knee', issue: 'VALGUS', severity: 'low', message: 'Slight knee valgus' }],
+      repScores: Array(10).fill(mockRepScore)
     };
 
     it('should save and retrieve movement session', async () => {
@@ -518,12 +540,13 @@ describe('storageService', () => {
         date.setDate(date.getDate() - i);
 
         await storageService.saveMovementSession({
+          id: `session_trend_${i}`,
           exerciseName: 'Knee Bend',
           sessionDate: date.toISOString(),
           duration: 180,
           repsCompleted: 10,
           averageScore: 70 + i * 5, // Improving scores
-          romAchieved: { flexion: 90 },
+          romAchieved: 90,
           formIssues: [],
           repScores: []
         });
@@ -548,19 +571,12 @@ describe('storageService', () => {
   // ===========================================
   describe('calibration', () => {
     const calibration: CalibrationData = {
+      standingHeight: 175,
       armLength: 60,
       shoulderWidth: 45,
-      hipWidth: 35,
       legLength: 85,
-      torsoLength: 55,
-      calibratedAt: new Date().toISOString(),
-      confidenceScores: {
-        armLength: 0.95,
-        shoulderWidth: 0.92,
-        hipWidth: 0.88,
-        legLength: 0.94,
-        torsoLength: 0.90
-      }
+      neutralJointAngles: { knee: 0, hip: 0, shoulder: 0 },
+      capturedAt: new Date().toISOString()
     };
 
     it('should save and load calibration data', async () => {
@@ -570,7 +586,7 @@ describe('storageService', () => {
 
       expect(loaded).toBeDefined();
       expect(loaded?.armLength).toBe(60);
-      expect(loaded?.calibratedAt).toBe(calibration.calibratedAt);
+      expect(loaded?.capturedAt).toBe(calibration.capturedAt);
     });
 
     it('should return null when no calibration exists', async () => {

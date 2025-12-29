@@ -379,13 +379,13 @@ class SessionReplayService {
     if (now - this.lastScroll < this.scrollThrottle) return;
     this.lastScroll = now;
 
-    const target = event.target as HTMLElement;
+    const target = event.target;
     const isWindow = target === document || target === document.documentElement;
 
     this.addEvent('scroll', {
-      x: isWindow ? window.scrollX : target.scrollLeft,
-      y: isWindow ? window.scrollY : target.scrollTop,
-      target: isWindow ? 'window' : this.getSelector(target),
+      x: isWindow ? window.scrollX : (target as HTMLElement).scrollLeft,
+      y: isWindow ? window.scrollY : (target as HTMLElement).scrollTop,
+      target: isWindow ? 'window' : this.getSelector(target as HTMLElement),
     } as ScrollEvent);
   };
 
@@ -520,7 +520,7 @@ class SessionReplayService {
     const self = this;
 
     window.fetch = async function(...args) {
-      const url = typeof args[0] === 'string' ? args[0] : args[0].url;
+      const url = typeof args[0] === 'string' ? args[0] : (args[0] instanceof URL ? args[0].href : args[0].url);
       const method = (args[1]?.method || 'GET').toUpperCase();
       const startTime = Date.now();
 

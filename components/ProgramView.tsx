@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { GeneratedProgram, Exercise, WeeklyAnalysis, Milestone, BaselineROM, UserAssessment } from '../types';
 import ExerciseCard from './ExerciseCard';
 import PatientEducationModule from './PatientEducationModule';
@@ -14,15 +15,51 @@ import { generateWeeklyAnalysis } from '../services/geminiService';
 import { supabase, getUserId } from '../services/supabaseClient';
 import { exportProgramToPDF } from '../services/pdfExport';
 import { useNotifications } from '../services/notificationService';
-import { Calendar, ChevronRight, Activity, Info, BarChart, Printer, Sparkles, ThumbsUp, ShieldAlert, ArrowUpCircle, Zap, BrainCircuit, Star, Target, Crown, ClipboardCheck, X, Flame, TrendingUp, Lock, Unlock, Heart, PartyPopper, Download, Loader2, Bell, BellOff, Clock } from 'lucide-react';
+import { Calendar, ChevronRight, Activity, Info, BarChart, Printer, Sparkles, ThumbsUp, ShieldAlert, ArrowUpCircle, Zap, BrainCircuit, Star, Target, Crown, ClipboardCheck, X, Flame, TrendingUp, Lock, Unlock, Heart, PartyPopper, Download, Loader2, Bell, BellOff, Clock, Award } from 'lucide-react';
 import { logger } from '../utils/logger';
-import Spinner from './ui/Spinner';
+import { GlassCard, Button, Badge, tokens, transitions } from './ui';
 
 // Lazy load ROM Assessment
 const ROMAssessment = lazy(() => import('./ROMAssessment'));
 
 // Get Stripe Link from Environment Variable (null if not configured)
-const STRIPE_CHECKOUT_URL = (import.meta as any).env?.VITE_STRIPE_LINK || null; 
+const STRIPE_CHECKOUT_URL = (import.meta as any).env?.VITE_STRIPE_LINK || null;
+
+// Animation variants
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.1, delayChildren: 0.1 }
+  }
+};
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { type: 'spring', stiffness: 400, damping: 30 }
+  }
+};
+
+const scaleVariants: Variants = {
+  hidden: { opacity: 0, scale: 0.9 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: { type: 'spring', stiffness: 400, damping: 30 }
+  }
+};
+
+const slideVariants: Variants = {
+  hidden: { opacity: 0, x: -20 },
+  visible: {
+    opacity: 1,
+    x: 0,
+    transition: { type: 'spring', stiffness: 400, damping: 30 }
+  }
+}; 
 
 interface ProgramViewProps {
   program: GeneratedProgram;
@@ -422,7 +459,17 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
   };
 
   return (
-    <div className="max-w-6xl mx-auto py-8 pb-24 print:p-0 print:max-w-none overflow-hidden relative">
+    <motion.div
+      initial="hidden"
+      animate="visible"
+      variants={containerVariants}
+      className="max-w-6xl mx-auto py-8 pb-24 print:p-0 print:max-w-none overflow-hidden relative"
+    >
+      {/* Decorative Background Elements */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden print:hidden">
+        <div className="absolute top-20 -left-64 w-[500px] h-[500px] bg-gradient-to-br from-primary-400/10 to-transparent rounded-full blur-3xl" />
+        <div className="absolute bottom-20 -right-64 w-[400px] h-[400px] bg-gradient-to-br from-cyan-400/10 to-transparent rounded-full blur-3xl" />
+      </div>
 
       {/* Toast Notifications */}
       <Toast toasts={toasts} removeToast={removeToast} />
@@ -454,12 +501,28 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
       {/* ROM ASSESSMENT MODAL */}
       {showROMAssessment && (
         <Suspense fallback={
-          <div className="fixed inset-0 bg-white z-50 flex items-center justify-center">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="fixed inset-0 bg-gradient-to-br from-slate-900 via-slate-900/98 to-primary-900/20 z-50 flex items-center justify-center backdrop-blur-xl"
+          >
             <div className="text-center">
-              <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-              <p className="text-slate-600">Laddar rörlighetsmätning...</p>
+              <div className="relative w-16 h-16 mx-auto mb-6">
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
+                  className="absolute inset-0 border-4 border-primary-500/30 rounded-full"
+                />
+                <motion.div
+                  animate={{ rotate: -360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                  className="absolute inset-2 border-4 border-transparent border-t-primary-500 rounded-full"
+                />
+                <Activity className="absolute inset-0 m-auto text-primary-400" size={24} />
+              </div>
+              <p className="text-white/80 font-medium">Laddar rörlighetsmätning...</p>
             </div>
-          </div>
+          </motion.div>
         }>
           <ROMAssessment
             patientAge={userAssessment?.age}
@@ -482,297 +545,601 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
       )}
 
       {/* MILESTONE CELEBRATION MODAL (Fas 6) */}
-      {showMilestoneModal && newMilestones.length > 0 && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-gradient-to-b from-slate-900 to-slate-950 w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-500">
-            {/* Confetti effect */}
-            <div className="absolute inset-0 pointer-events-none overflow-hidden">
-              <div className="absolute top-10 left-10 text-4xl animate-bounce delay-100">🎉</div>
-              <div className="absolute top-20 right-10 text-3xl animate-bounce delay-200">⭐</div>
-              <div className="absolute top-5 right-20 text-2xl animate-bounce delay-300">🎊</div>
-            </div>
+      <AnimatePresence>
+        {showMilestoneModal && newMilestones.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8, y: 40 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              transition={transitions.spring}
+              className="relative bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden"
+            >
+              {/* Premium Glow Effect */}
+              <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/20 via-transparent to-cyan-500/20 opacity-60" />
 
-            <div className="p-8 text-center relative">
-              <div className="text-6xl mb-4 animate-bounce">
-                {newMilestones[0].icon}
+              {/* Animated Particles */}
+              <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                {[...Array(6)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 100, x: Math.random() * 100 }}
+                    animate={{
+                      opacity: [0, 1, 0],
+                      y: [-20, -150],
+                      x: [null, Math.random() * 200 - 100]
+                    }}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity,
+                      delay: i * 0.3,
+                      ease: 'easeOut'
+                    }}
+                    className="absolute bottom-0 left-1/2 text-3xl"
+                  >
+                    {['🎉', '⭐', '🎊', '✨', '🏆', '💎'][i]}
+                  </motion.div>
+                ))}
               </div>
-              <h3 className="text-2xl font-extrabold text-white mb-2">
-                {newMilestones[0].title}
-              </h3>
-              <p className="text-slate-400 mb-6">
-                {newMilestones[0].description}
-              </p>
 
-              <button
-                onClick={() => {
-                  // Mark as celebrated
-                  newMilestones.forEach(m => storageService.markMilestoneCelebrated(m.id));
-                  setShowMilestoneModal(false);
-                  setNewMilestones([]);
-                }}
-                className="w-full py-4 bg-cyan-500 text-slate-900 rounded-2xl font-bold text-lg hover:bg-cyan-400 transition-all"
-              >
-                Tack! 🙌
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              <div className="p-8 text-center relative z-10">
+                <motion.div
+                  initial={{ scale: 0, rotate: -180 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.2 }}
+                  className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-full flex items-center justify-center shadow-lg shadow-yellow-500/30"
+                >
+                  <span className="text-5xl">{newMilestones[0].icon}</span>
+                </motion.div>
+
+                <motion.h3
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                  className="text-2xl font-extrabold text-white mb-2"
+                >
+                  {newMilestones[0].title}
+                </motion.h3>
+                <motion.p
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                  className="text-slate-400 mb-8"
+                >
+                  {newMilestones[0].description}
+                </motion.p>
+
+                <motion.button
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.6 }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    newMilestones.forEach(m => storageService.markMilestoneCelebrated(m.id));
+                    setShowMilestoneModal(false);
+                    setNewMilestones([]);
+                  }}
+                  className="w-full py-4 bg-gradient-to-r from-cyan-500 to-primary-500 text-white rounded-2xl font-bold text-lg shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 transition-shadow"
+                >
+                  Fantastiskt!
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* PREMIUM UPSELL MODAL */}
-      {showPremiumModal && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
-              <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col text-center animate-in zoom-in-95 duration-300">
-                  <div className="h-32 bg-gradient-to-br from-slate-900 to-indigo-900 relative flex items-center justify-center overflow-hidden">
-                      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.1)_1px,transparent_1px)] bg-[size:20px_20px] opacity-30"></div>
-                      <Crown size={64} className="text-yellow-400 drop-shadow-lg relative z-10" />
-                  </div>
-                  <div className="p-8">
-                      <h3 className="text-2xl font-extrabold text-slate-900 mb-2">Lås upp RehabFlow Pro</h3>
-                      <p className="text-slate-500 mb-6">Få tillgång till din fullständiga långsiktiga plan och avancerad AI-analys.</p>
-                      
-                      <div className="space-y-3 mb-8 text-left">
-                          {[
-                              "Veckovis AI-Coach analys",
-                              "Tillgång till Fas 2 & 3 (Styrka & Återgång)",
-                              "Obegränsad chatt med AI-Fysion",
-                              "Djupgående statistik"
-                          ].map((feat, i) => (
-                              <div key={i} className="flex items-center gap-3">
-                                  <div className="p-1 bg-green-100 text-green-600 rounded-full"><div className="w-1.5 h-1.5 bg-green-600 rounded-full"></div></div>
-                                  <span className="text-sm font-bold text-slate-700">{feat}</span>
-                              </div>
-                          ))}
-                      </div>
-
-                      <button onClick={handleUpgradeClick} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-lg shadow-xl hover:bg-slate-800 transition-all hover:scale-[1.02] flex items-center justify-center gap-2">
-                          <Crown size={20} className="text-yellow-400" /> Skaffa Premium
-                      </button>
-
-                      <button onClick={() => setShowPremiumModal(false)} className="mt-4 w-full text-xs font-bold text-slate-400 hover:text-slate-600">
-                          Nej tack, jag fortsätter med basversionen
-                      </button>
-                  </div>
+      <AnimatePresence>
+        {showPremiumModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-xl"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 30 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={transitions.spring}
+              className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col text-center relative"
+            >
+              {/* Premium Header with Animated Crown */}
+              <div className="h-36 bg-gradient-to-br from-slate-900 via-indigo-900 to-purple-900 relative flex items-center justify-center overflow-hidden">
+                <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:20px_20px]" />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-900/50 to-transparent" />
+                <motion.div
+                  initial={{ scale: 0, rotate: -30 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.2 }}
+                  className="relative z-10"
+                >
+                  <div className="absolute inset-0 blur-2xl bg-yellow-400/30 rounded-full scale-150" />
+                  <Crown size={72} className="text-yellow-400 drop-shadow-lg relative" />
+                </motion.div>
               </div>
-          </div>
-      )}
+
+              <div className="p-8">
+                <motion.h3
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="text-2xl font-extrabold text-slate-900 mb-2"
+                >
+                  Lås upp RehabFlow Pro
+                </motion.h3>
+                <motion.p
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.35 }}
+                  className="text-slate-500 mb-6"
+                >
+                  Få tillgång till din fullständiga rehabiliteringsplan
+                </motion.p>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                  className="space-y-3 mb-8 text-left"
+                >
+                  {[
+                    { text: "Veckovis AI-Coach analys", icon: BrainCircuit },
+                    { text: "Tillgång till alla faser", icon: Unlock },
+                    { text: "Obegränsad AI-Fysio chatt", icon: Sparkles },
+                    { text: "Djupgående statistik", icon: TrendingUp }
+                  ].map((feat, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.45 + i * 0.08 }}
+                      className="flex items-center gap-3 p-3 bg-gradient-to-r from-primary-50 to-transparent rounded-xl"
+                    >
+                      <div className="p-2 bg-primary-100 text-primary-600 rounded-lg">
+                        <feat.icon size={16} />
+                      </div>
+                      <span className="text-sm font-bold text-slate-700">{feat.text}</span>
+                    </motion.div>
+                  ))}
+                </motion.div>
+
+                <motion.button
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.7 }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleUpgradeClick}
+                  className="w-full py-4 bg-gradient-to-r from-slate-900 to-indigo-900 text-white rounded-2xl font-bold text-lg shadow-xl shadow-slate-900/30 hover:shadow-slate-900/40 transition-shadow flex items-center justify-center gap-2"
+                >
+                  <Crown size={20} className="text-yellow-400" /> Skaffa Premium
+                </motion.button>
+
+                <motion.button
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.8 }}
+                  onClick={() => setShowPremiumModal(false)}
+                  className="mt-4 w-full text-sm font-medium text-slate-400 hover:text-slate-600 transition-colors py-2"
+                >
+                  Fortsätt med gratisversionen
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* NOTIFICATION SETUP MODAL */}
-      {showNotificationSetup && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-            <div className="h-24 bg-gradient-to-br from-blue-500 to-cyan-600 relative flex items-center justify-center overflow-hidden">
-              <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.1)_1px,transparent_1px)] bg-[size:20px_20px] opacity-30"></div>
-              <Bell size={48} className="text-white drop-shadow-lg relative z-10" />
-            </div>
-            <div className="p-8">
-              <h3 className="text-2xl font-extrabold text-slate-900 mb-2">Träningspåminnelser</h3>
-              <p className="text-slate-500 mb-6">Få dagliga påminnelser så att du aldrig missar ett träningspass.</p>
-
-              {notificationPermission === 'denied' ? (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
-                  <p className="text-red-700 text-sm font-medium">
-                    Notifikationer är blockerade. Aktivera dem i webbläsarens inställningar för att använda påminnelser.
-                  </p>
-                </div>
-              ) : notificationPermission !== 'granted' ? (
-                <button
-                  onClick={async () => {
-                    const result = await requestNotificationPermission();
-                    if (result === 'granted') {
-                      logger.info('[ProgramView] Notification permission granted');
-                    }
-                  }}
-                  className="w-full py-4 bg-blue-500 text-white rounded-2xl font-bold text-lg shadow-lg hover:bg-blue-600 transition-all mb-6 flex items-center justify-center gap-2"
+      <AnimatePresence>
+        {showNotificationSetup && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-xl"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 30 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={transitions.spring}
+              className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="h-28 bg-gradient-to-br from-primary-500 via-primary-600 to-cyan-600 relative flex items-center justify-center overflow-hidden">
+                <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] bg-[size:20px_20px]" />
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.2 }}
                 >
-                  <Bell size={20} />
-                  Aktivera notifikationer
-                </button>
-              ) : (
-                <div className="space-y-4 mb-6">
-                  <div className="flex items-center gap-2 text-green-600 mb-4">
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                    <span className="text-sm font-medium">Notifikationer aktiverade</span>
-                  </div>
+                  <Bell size={52} className="text-white drop-shadow-lg relative z-10" />
+                </motion.div>
+              </div>
+              <div className="p-8">
+                <motion.h3
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="text-2xl font-extrabold text-slate-900 mb-2"
+                >
+                  Träningspåminnelser
+                </motion.h3>
+                <motion.p
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.35 }}
+                  className="text-slate-500 mb-6"
+                >
+                  Få dagliga påminnelser så du aldrig missar ett pass
+                </motion.p>
 
-                  <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-                    <label className="block text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-                      <Clock size={16} />
-                      Välj tid för daglig påminnelse
-                    </label>
-                    <div className="flex gap-2">
-                      <select
-                        value={reminderTime.hour}
-                        onChange={(e) => setReminderTime(prev => ({ ...prev, hour: parseInt(e.target.value) }))}
-                        className="flex-1 px-4 py-3 border border-slate-300 rounded-xl font-medium text-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        {[...Array(24)].map((_, i) => (
-                          <option key={i} value={i}>
-                            {i.toString().padStart(2, '0')}:00
-                          </option>
-                        ))}
-                      </select>
-                      <select
-                        value={reminderTime.minute}
-                        onChange={(e) => setReminderTime(prev => ({ ...prev, minute: parseInt(e.target.value) }))}
-                        className="flex-1 px-4 py-3 border border-slate-300 rounded-xl font-medium text-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        <option value={0}>:00</option>
-                        <option value={15}>:15</option>
-                        <option value={30}>:30</option>
-                        <option value={45}>:45</option>
-                      </select>
+                {notificationPermission === 'denied' ? (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6"
+                  >
+                    <p className="text-red-700 text-sm font-medium">
+                      Notifikationer är blockerade. Aktivera dem i webbläsarens inställningar.
+                    </p>
+                  </motion.div>
+                ) : notificationPermission !== 'granted' ? (
+                  <motion.button
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={async () => {
+                      const result = await requestNotificationPermission();
+                      if (result === 'granted') {
+                        logger.info('[ProgramView] Notification permission granted');
+                      }
+                    }}
+                    className="w-full py-4 bg-gradient-to-r from-primary-500 to-cyan-500 text-white rounded-2xl font-bold text-lg shadow-lg shadow-primary-500/25 hover:shadow-primary-500/40 transition-shadow mb-6 flex items-center justify-center gap-2"
+                  >
+                    <Bell size={20} />
+                    Aktivera notifikationer
+                  </motion.button>
+                ) : (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
+                    className="space-y-4 mb-6"
+                  >
+                    <div className="flex items-center gap-2 text-green-600 mb-4">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                      <span className="text-sm font-medium">Notifikationer aktiverade</span>
                     </div>
-                  </div>
 
-                  {hasScheduledReminder ? (
-                    <button
-                      onClick={() => {
-                        cancelAllNotifications();
-                        setHasScheduledReminder(false);
-                      }}
-                      className="w-full py-4 bg-red-50 text-red-600 border border-red-200 rounded-2xl font-bold text-lg hover:bg-red-100 transition-all flex items-center justify-center gap-2"
-                    >
-                      <BellOff size={20} />
-                      Ta bort påminnelse
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        scheduleExerciseReminder(reminderTime.hour, reminderTime.minute);
-                        setHasScheduledReminder(true);
-                        setShowNotificationSetup(false);
-                      }}
-                      className="w-full py-4 bg-blue-500 text-white rounded-2xl font-bold text-lg shadow-lg hover:bg-blue-600 transition-all flex items-center justify-center gap-2"
-                    >
-                      <Bell size={20} />
-                      Schemalägg daglig påminnelse
-                    </button>
-                  )}
-                </div>
-              )}
+                    <div className="bg-gradient-to-br from-slate-50 to-primary-50/30 rounded-xl p-4 border border-slate-200">
+                      <label className="block text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                        <Clock size={16} className="text-primary-500" />
+                        Välj tid för daglig påminnelse
+                      </label>
+                      <div className="flex gap-2">
+                        <select
+                          value={reminderTime.hour}
+                          onChange={(e) => setReminderTime(prev => ({ ...prev, hour: parseInt(e.target.value) }))}
+                          className="flex-1 px-4 py-3 border border-slate-200 rounded-xl font-medium text-slate-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white"
+                        >
+                          {[...Array(24)].map((_, i) => (
+                            <option key={i} value={i}>
+                              {i.toString().padStart(2, '0')}:00
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          value={reminderTime.minute}
+                          onChange={(e) => setReminderTime(prev => ({ ...prev, minute: parseInt(e.target.value) }))}
+                          className="flex-1 px-4 py-3 border border-slate-200 rounded-xl font-medium text-slate-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white"
+                        >
+                          <option value={0}>:00</option>
+                          <option value={15}>:15</option>
+                          <option value={30}>:30</option>
+                          <option value={45}>:45</option>
+                        </select>
+                      </div>
+                    </div>
 
-              <button
-                onClick={() => setShowNotificationSetup(false)}
-                className="w-full text-sm font-bold text-slate-400 hover:text-slate-600 py-2"
-              >
-                Stäng
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                    {hasScheduledReminder ? (
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          cancelAllNotifications();
+                          setHasScheduledReminder(false);
+                        }}
+                        className="w-full py-4 bg-red-50 text-red-600 border border-red-200 rounded-2xl font-bold text-lg hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <BellOff size={20} />
+                        Ta bort påminnelse
+                      </motion.button>
+                    ) : (
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          scheduleExerciseReminder(reminderTime.hour, reminderTime.minute);
+                          setHasScheduledReminder(true);
+                          setShowNotificationSetup(false);
+                        }}
+                        className="w-full py-4 bg-gradient-to-r from-primary-500 to-cyan-500 text-white rounded-2xl font-bold text-lg shadow-lg shadow-primary-500/25 hover:shadow-primary-500/40 transition-shadow flex items-center justify-center gap-2"
+                      >
+                        <Bell size={20} />
+                        Schemalägg påminnelse
+                      </motion.button>
+                    )}
+                  </motion.div>
+                )}
+
+                <motion.button
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.5 }}
+                  onClick={() => setShowNotificationSetup(false)}
+                  className="w-full text-sm font-medium text-slate-400 hover:text-slate-600 py-2 transition-colors"
+                >
+                  Stäng
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ANALYSIS MODAL */}
-      {showAnalysisModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-              <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom-8">
-                  <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                      <div className="flex items-center gap-2 text-primary-700 font-bold text-lg">
-                          <ClipboardCheck size={24} />
-                          <h3>AI Veckoanalys</h3>
-                      </div>
-                      <button onClick={() => setShowAnalysisModal(false)} className="p-2 hover:bg-slate-200 rounded-full text-slate-500 transition-colors">
-                          <X size={20} />
-                      </button>
+      <AnimatePresence>
+        {showAnalysisModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-xl"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 30 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={transitions.spring}
+              className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-slate-50 to-primary-50/30">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary-100 rounded-xl">
+                    <BrainCircuit size={24} className="text-primary-600" />
                   </div>
-                  
-                  <div className="p-8 overflow-y-auto">
-                      {isAnalyzing ? (
-                          <div className="flex flex-col items-center justify-center py-10">
-                              <Spinner size="xl" text="Analyserar träningsdata..." centered />
-                          </div>
-                      ) : analysis ? (
-                          <div className="space-y-8 animate-in slide-in-from-bottom-4">
-                              <div className="text-center">
-                                  <div className={`inline-flex px-4 py-1.5 rounded-full text-sm font-bold uppercase tracking-wide mb-6 shadow-sm border ${
-                                      analysis.decision === 'progress' ? 'bg-green-100 text-green-700 border-green-200' :
-                                      analysis.decision === 'maintain' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                                      'bg-amber-100 text-amber-700 border-amber-200'
-                                  }`}>
-                                      Rekommendation: {analysis.decision === 'progress' ? 'Gå vidare' : analysis.decision === 'maintain' ? 'Stanna kvar' : 'Backa bandet'}
-                                  </div>
-                                  
-                                  <div className="w-28 h-28 mx-auto rounded-full border-8 border-slate-50 bg-white shadow-xl flex items-center justify-center relative mb-4">
-                                      <span className="text-4xl font-extrabold text-slate-800">{analysis.score}</span>
-                                      <span className="text-[10px] font-bold uppercase absolute bottom-5 text-slate-400">Score</span>
-                                  </div>
-                              </div>
-
-                              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
-                                  <h4 className="font-bold text-slate-800 mb-2">Coach-utlåtande</h4>
-                                  <p className="text-slate-600 text-base leading-relaxed">{analysis.reasoning}</p>
-                              </div>
-
-                              <div>
-                                  <h4 className="font-bold text-slate-800 mb-3 ml-1">Fokus nästa vecka</h4>
-                                  <ul className="space-y-3">
-                                      {analysis.tips.map((tip, idx) => (
-                                          <li key={idx} className="flex gap-3 text-slate-700 bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
-                                              <div className="min-w-[6px] h-[6px] bg-primary-500 rounded-full mt-2.5"></div>
-                                              <span className="text-sm font-medium">{tip}</span>
-                                          </li>
-                                      ))}
-                                  </ul>
-                              </div>
-                          </div>
-                      ) : null}
+                  <div>
+                    <h3 className="font-bold text-slate-800">AI Veckoanalys</h3>
+                    <p className="text-xs text-slate-500">Personlig coaching baserad på din data</p>
                   </div>
+                </div>
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => setShowAnalysisModal(false)}
+                  className="p-2 hover:bg-slate-200 rounded-full text-slate-500 transition-colors"
+                >
+                  <X size={20} />
+                </motion.button>
               </div>
-          </div>
-      )}
+
+              <div className="p-8 overflow-y-auto">
+                {isAnalyzing ? (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex flex-col items-center justify-center py-16"
+                  >
+                    <div className="relative w-20 h-20 mb-6">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+                        className="absolute inset-0 border-4 border-primary-200 rounded-full"
+                      />
+                      <motion.div
+                        animate={{ rotate: -360 }}
+                        transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
+                        className="absolute inset-2 border-4 border-transparent border-t-primary-500 rounded-full"
+                      />
+                      <BrainCircuit className="absolute inset-0 m-auto text-primary-500" size={28} />
+                    </div>
+                    <p className="text-slate-600 font-medium">Analyserar träningsdata...</p>
+                    <p className="text-slate-400 text-sm mt-1">Detta tar några sekunder</p>
+                  </motion.div>
+                ) : analysis ? (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-8"
+                  >
+                    <div className="text-center">
+                      <motion.div
+                        initial={{ scale: 0.8 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.1 }}
+                        className={`inline-flex px-5 py-2 rounded-full text-sm font-bold uppercase tracking-wide shadow-sm border ${
+                          analysis.decision === 'progress' ? 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border-green-200' :
+                          analysis.decision === 'maintain' ? 'bg-gradient-to-r from-blue-100 to-primary-100 text-primary-700 border-primary-200' :
+                          'bg-gradient-to-r from-amber-100 to-orange-100 text-amber-700 border-amber-200'
+                        }`}
+                      >
+                        {analysis.decision === 'progress' ? 'Gå vidare' : analysis.decision === 'maintain' ? 'Stanna kvar' : 'Backa bandet'}
+                      </motion.div>
+
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.2 }}
+                        className="w-32 h-32 mx-auto mt-6 rounded-full bg-gradient-to-br from-slate-100 to-primary-50 shadow-xl flex items-center justify-center relative"
+                      >
+                        <div className="absolute inset-2 rounded-full bg-white shadow-inner flex items-center justify-center flex-col">
+                          <span className="text-5xl font-extrabold bg-gradient-to-br from-slate-800 to-primary-700 bg-clip-text text-transparent">
+                            {analysis.score}
+                          </span>
+                          <span className="text-[10px] font-bold uppercase text-slate-400 mt-1">Poäng</span>
+                        </div>
+                      </motion.div>
+                    </div>
+
+                    <motion.div
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 }}
+                      className="bg-gradient-to-br from-slate-50 to-primary-50/30 p-6 rounded-2xl border border-slate-200"
+                    >
+                      <h4 className="font-bold text-slate-800 mb-2 flex items-center gap-2">
+                        <Award size={18} className="text-primary-500" />
+                        Coach-utlåtande
+                      </h4>
+                      <p className="text-slate-600 text-base leading-relaxed">{analysis.reasoning}</p>
+                    </motion.div>
+
+                    <motion.div
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.4 }}
+                    >
+                      <h4 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+                        <Target size={18} className="text-primary-500" />
+                        Fokus nästa vecka
+                      </h4>
+                      <ul className="space-y-3">
+                        {analysis.tips.map((tip, idx) => (
+                          <motion.li
+                            key={idx}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.45 + idx * 0.08 }}
+                            className="flex gap-3 text-slate-700 bg-white p-4 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow"
+                          >
+                            <div className="min-w-[8px] h-[8px] bg-gradient-to-br from-primary-400 to-cyan-400 rounded-full mt-2" />
+                            <span className="text-sm font-medium">{tip}</span>
+                          </motion.li>
+                        ))}
+                      </ul>
+                    </motion.div>
+                  </motion.div>
+                ) : null}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Header */}
-      <div className="bg-white/80 backdrop-blur-md rounded-3xl p-6 md:p-8 lg:p-10 shadow-lg shadow-slate-200/50 border border-white mb-6 md:mb-8 lg:mb-10 print:border-none print:shadow-none print:p-0 relative overflow-hidden group">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-primary-100 to-transparent opacity-50 rounded-bl-[100px] pointer-events-none transition-transform duration-1000 group-hover:scale-110"></div>
-        
+      <motion.div
+        variants={itemVariants}
+        className="relative bg-white/70 backdrop-blur-xl rounded-3xl p-6 md:p-8 lg:p-10 shadow-xl shadow-slate-200/40 border border-white/80 mb-6 md:mb-8 lg:mb-10 print:border-none print:shadow-none print:p-0 overflow-hidden group"
+      >
+        {/* Premium Background Effects */}
+        <div className="absolute inset-0 bg-gradient-to-br from-primary-50/50 via-transparent to-cyan-50/30 opacity-60" />
+        <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-primary-200/40 to-transparent rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-60 h-60 bg-gradient-to-tr from-cyan-200/30 to-transparent rounded-full blur-2xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+
         <div className="flex flex-col md:flex-row justify-between items-start gap-6 relative z-10">
-            <div className="max-w-full">
-                <h1 className="text-4xl font-extrabold text-slate-900 mb-3 tracking-tight break-words">{program.title}</h1>
-                <p className="text-slate-600 text-lg max-w-2xl leading-relaxed break-words">{program.summary}</p>
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2 }}
+            className="max-w-full"
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 20, delay: 0.3 }}
+                className="p-2 bg-gradient-to-br from-primary-500 to-cyan-500 rounded-xl shadow-lg shadow-primary-500/25"
+              >
+                <Activity size={24} className="text-white" />
+              </motion.div>
+              <Badge variant="primary" size="sm">Ditt program</Badge>
             </div>
-            <div className="flex flex-wrap gap-2 md:gap-3 print:hidden shrink-0">
-                <button 
-                    onClick={runWeeklyAnalysis}
-                    className="flex items-center gap-2 px-5 py-3 bg-white hover:bg-slate-50 text-slate-700 rounded-xl transition-all font-bold border border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 relative overflow-hidden group/btn"
-                >
-                    {!isPremium && <div className="absolute inset-0 bg-slate-100/10 backdrop-blur-[1px] flex items-center justify-center z-20 transition-opacity opacity-0 group-hover/btn:opacity-100"><Lock size={16} className="text-slate-800" /></div>}
-                    <ClipboardCheck size={20} className="text-primary-600" /> AI-Analys
-                </button>
-                <button
-                    onClick={handleExportPDF}
-                    disabled={isExporting}
-                    className="flex items-center gap-2 px-5 py-3 bg-white hover:bg-slate-50 text-slate-700 rounded-xl transition-all font-bold border border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                    aria-label="Exportera program som PDF"
-                >
-                    {isExporting ? (
-                      <Loader2 size={20} className="text-primary-500 animate-spin" />
-                    ) : (
-                      <Download size={20} className="text-primary-500" />
-                    )}
-                    <span className="hidden sm:inline">PDF</span>
-                </button>
-                {notificationsSupported && (
-                    <button
-                        onClick={() => setShowNotificationSetup(true)}
-                        className={`flex items-center gap-2 px-3 py-3 rounded-xl transition-all font-bold border shadow-sm hover:shadow-md hover:-translate-y-0.5 ${
-                          hasScheduledReminder
-                            ? 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200'
-                            : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
-                        }`}
-                        aria-label="Hantera påminnelser"
-                    >
-                        {hasScheduledReminder ? <Bell size={20} className="text-blue-500" /> : <BellOff size={20} className="text-slate-400" />}
-                    </button>
+            <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 mb-3 tracking-tight break-words">
+              {program.title}
+            </h1>
+            <p className="text-slate-600 text-lg max-w-2xl leading-relaxed break-words">
+              {program.summary}
+            </p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.3 }}
+            className="flex flex-wrap gap-2 md:gap-3 print:hidden shrink-0"
+          >
+            <motion.button
+              whileHover={{ scale: 1.02, y: -2 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={runWeeklyAnalysis}
+              className="flex items-center gap-2 px-5 py-3 bg-white/80 hover:bg-white text-slate-700 rounded-xl transition-all font-bold border border-slate-200/80 shadow-sm hover:shadow-lg relative overflow-hidden group/btn backdrop-blur-sm"
+            >
+              {!isPremium && (
+                <div className="absolute inset-0 bg-gradient-to-br from-slate-100/50 to-slate-200/50 backdrop-blur-[1px] flex items-center justify-center z-20 transition-opacity opacity-0 group-hover/btn:opacity-100">
+                  <Lock size={16} className="text-slate-600" />
+                </div>
+              )}
+              <BrainCircuit size={20} className="text-primary-600" />
+              <span className="hidden sm:inline">AI-Analys</span>
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.02, y: -2 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={handleExportPDF}
+              disabled={isExporting}
+              className="flex items-center gap-2 px-4 py-3 bg-white/80 hover:bg-white text-slate-700 rounded-xl transition-all font-bold border border-slate-200/80 shadow-sm hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm"
+              aria-label="Exportera program som PDF"
+            >
+              {isExporting ? (
+                <Loader2 size={20} className="text-primary-500 animate-spin" />
+              ) : (
+                <Download size={20} className="text-primary-500" />
+              )}
+              <span className="hidden sm:inline">PDF</span>
+            </motion.button>
+
+            {notificationsSupported && (
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowNotificationSetup(true)}
+                className={`flex items-center gap-2 p-3 rounded-xl transition-all font-bold border shadow-sm hover:shadow-lg backdrop-blur-sm ${
+                  hasScheduledReminder
+                    ? 'bg-primary-50/80 hover:bg-primary-100 text-primary-700 border-primary-200'
+                    : 'bg-white/80 hover:bg-white text-slate-700 border-slate-200/80'
+                }`}
+                aria-label="Hantera påminnelser"
+              >
+                {hasScheduledReminder ? (
+                  <Bell size={20} className="text-primary-500" />
+                ) : (
+                  <BellOff size={20} className="text-slate-400" />
                 )}
-                <button
-                    onClick={handlePrint}
-                    className="flex items-center gap-2 px-3 py-3 bg-white hover:bg-slate-50 text-slate-700 rounded-xl transition-all font-bold border border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-0.5"
-                    aria-label="Skriv ut program"
-                >
-                    <Printer size={20} className="text-slate-400" />
-                </button>
-            </div>
+              </motion.button>
+            )}
+
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handlePrint}
+              className="flex items-center gap-2 p-3 bg-white/80 hover:bg-white text-slate-700 rounded-xl transition-all font-bold border border-slate-200/80 shadow-sm hover:shadow-lg backdrop-blur-sm"
+              aria-label="Skriv ut program"
+            >
+              <Printer size={20} className="text-slate-400" />
+            </motion.button>
+          </motion.div>
         </div>
         
         {/* PATIENT EDUCATION MODULE */}
@@ -826,124 +1193,193 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
             </div>
           </div>
         )}
-      </div>
+      </motion.div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-12 gap-6 lg:gap-8 print:block">
+      <motion.div
+        variants={containerVariants}
+        className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-12 gap-6 lg:gap-8 print:block"
+      >
         {/* Left: Phase Navigation & Status */}
-        <div className="md:col-span-1 lg:col-span-3 space-y-4 lg:space-y-6 no-print min-w-0">
-            <div className="bg-white/90 backdrop-blur-sm p-4 lg:p-6 rounded-2xl shadow-sm border border-slate-100">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 lg:mb-4 flex items-center gap-2">
-                    <TrendingUp size={14} /> Faser
-                </h3>
-                <div className="space-y-2">
-                    {program.phases.map((phase, idx) => {
-                        const isLocked = !isPremium && idx > 0;
-                        return (
-                        <button
-                            key={idx}
-                            onClick={() => handlePhaseClick(idx)}
-                            className={`w-full text-left p-2 md:p-3 lg:p-4 rounded-xl text-xs md:text-sm font-semibold transition-all duration-300 relative overflow-hidden group min-w-0 ${
-                                idx === activePhaseIndex
-                                ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/20'
-                                : 'text-slate-600 hover:bg-slate-50 border border-transparent hover:border-slate-200'
-                            }`}
-                        >
-                            <div className="flex justify-between items-center mb-1 relative z-10">
-                                <span className="truncate flex items-center gap-2">
-                                    Fas {idx + 1}
-                                    {isLocked && <Lock size={12} className="text-slate-400" />}
-                                </span>
-                                {idx === activePhaseIndex && <ChevronRight size={16} className="shrink-0" />}
-                            </div>
-                            <div className={`text-[10px] lg:text-xs ${idx === activePhaseIndex ? 'text-slate-300' : 'text-slate-400'} relative z-10 truncate hidden md:block`}>
-                                {isLocked ? 'Pro' : phase.durationWeeks}
-                            </div>
-                            {isLocked && (
-                                <div className="absolute inset-0 bg-slate-100/50 backdrop-blur-[2px] z-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Lock size={16} className="text-slate-800" />
-                                </div>
-                            )}
-                        </button>
-                    )})}
-                </div>
-            </div>
-
-            <div className={`p-4 lg:p-8 rounded-2xl text-white shadow-xl shadow-primary-500/20 transition-all duration-700 relative overflow-hidden ${
-                progress === 100 ? 'bg-gradient-to-br from-green-500 to-emerald-600' : 'bg-gradient-to-br from-primary-500 to-indigo-600'
-            }`}>
-                {/* Background Pattern */}
-                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl"></div>
-                
-                <h3 className="font-bold mb-3 flex items-center gap-2 text-white/90 relative z-10">
-                    <BarChart size={20} /> Daglig Status
-                </h3>
-                <div className="flex items-baseline gap-1 relative z-10">
-                    <span className="text-5xl font-extrabold">{progress}</span>
-                    <span className="text-xl opacity-80">%</span>
-                </div>
-                <div className="w-full bg-black/20 h-2 rounded-full mt-6 overflow-hidden relative z-10">
-                    <div className="bg-white h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(255,255,255,0.5)]" style={{ width: `${progress}%` }}></div>
-                </div>
-
-                {/* Post-workout check-in button (Fas 6) */}
-                {progress >= 50 && !hasCompletedPostCheckIn && hasCompletedPreCheckIn && (
-                  <button
-                    onClick={() => setShowPostCheckIn(true)}
-                    className="mt-4 w-full py-3 bg-white/20 hover:bg-white/30 text-white rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 relative z-10"
+        <motion.div
+          variants={itemVariants}
+          className="md:col-span-1 lg:col-span-3 space-y-4 lg:space-y-6 no-print min-w-0"
+        >
+          {/* Phase Navigation Card */}
+          <GlassCard className="p-4 lg:p-6">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 lg:mb-4 flex items-center gap-2">
+              <TrendingUp size={14} className="text-primary-500" /> Faser
+            </h3>
+            <div className="space-y-2">
+              {program.phases.map((phase, idx) => {
+                const isLocked = !isPremium && idx > 0;
+                return (
+                  <motion.button
+                    key={idx}
+                    whileHover={{ scale: 1.02, x: 4 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => handlePhaseClick(idx)}
+                    className={`w-full text-left p-3 lg:p-4 rounded-xl text-xs md:text-sm font-semibold transition-all duration-300 relative overflow-hidden group min-w-0 ${
+                      idx === activePhaseIndex
+                        ? 'bg-gradient-to-r from-slate-900 to-primary-900 text-white shadow-lg shadow-slate-900/30'
+                        : 'text-slate-600 hover:bg-slate-50 border border-transparent hover:border-slate-200'
+                    }`}
                   >
-                    <Heart size={18} />
-                    Avsluta pass & logga smärta
-                  </button>
-                )}
+                    <div className="flex justify-between items-center mb-1 relative z-10">
+                      <span className="truncate flex items-center gap-2">
+                        <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold ${
+                          idx === activePhaseIndex
+                            ? 'bg-white/20 text-white'
+                            : 'bg-slate-100 text-slate-500'
+                        }`}>
+                          {idx + 1}
+                        </span>
+                        <span className="hidden lg:inline">{phase.phaseName.split(' ').slice(0, 2).join(' ')}</span>
+                        {isLocked && <Lock size={12} className="text-slate-400" />}
+                      </span>
+                      {idx === activePhaseIndex && (
+                        <motion.div
+                          initial={{ x: -5, opacity: 0 }}
+                          animate={{ x: 0, opacity: 1 }}
+                        >
+                          <ChevronRight size={16} className="shrink-0" />
+                        </motion.div>
+                      )}
+                    </div>
+                    <div className={`text-[10px] lg:text-xs ${idx === activePhaseIndex ? 'text-white/70' : 'text-slate-400'} relative z-10 truncate hidden md:block ml-8`}>
+                      {isLocked ? 'Premium' : phase.durationWeeks}
+                    </div>
+                    {isLocked && (
+                      <div className="absolute inset-0 bg-gradient-to-br from-slate-100/60 to-slate-200/60 backdrop-blur-[2px] z-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Lock size={16} className="text-slate-600" />
+                      </div>
+                    )}
+                  </motion.button>
+                );
+              })}
+            </div>
+          </GlassCard>
 
-                {hasCompletedPostCheckIn && (
-                  <div className="mt-4 flex items-center justify-center gap-2 text-white/80 text-sm relative z-10">
-                    <PartyPopper size={16} />
-                    <span>Passet loggat!</span>
-                  </div>
-                )}
+          {/* Daily Status Progress Card */}
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            className={`p-5 lg:p-8 rounded-2xl text-white shadow-xl transition-all duration-500 relative overflow-hidden ${
+              progress === 100
+                ? 'bg-gradient-to-br from-emerald-500 via-green-500 to-teal-600 shadow-emerald-500/30'
+                : 'bg-gradient-to-br from-primary-500 via-primary-600 to-indigo-600 shadow-primary-500/30'
+            }`}
+          >
+            {/* Animated Background Effects */}
+            <div className="absolute inset-0 overflow-hidden">
+              <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
+              <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2 blur-xl" />
             </div>
 
-            {/* Coach Level Badge with Progress Bar */}
-            <div className="bg-white/90 backdrop-blur-sm p-4 lg:p-6 rounded-2xl shadow-sm border border-slate-100">
-                <div className="flex items-center gap-4 mb-4">
-                    <div className={`p-3 rounded-2xl ${coachLevel.bg} ${coachLevel.color}`}>
-                        {React.createElement(coachLevel.icon, { size: 24 })}
-                    </div>
-                    <div>
-                        <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Coach Level</div>
-                        <div className="font-bold text-slate-900 text-lg">{coachLevel.name}</div>
-                    </div>
-                </div>
-                
-                {/* Level Progress Bar */}
-                <div className="space-y-2">
-                    <div className="flex justify-between text-[11px] text-slate-400 font-bold uppercase tracking-wider">
-                        <span>XP</span>
-                        <span>{historyCount} / {coachLevel.next}</span>
-                    </div>
-                    <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div 
-                            className={`h-full rounded-full transition-all duration-1000 ${coachLevel.color.replace('text-', 'bg-')}`} 
-                            style={{ width: `${coachLevel.progressPercent}%` }}
-                        ></div>
-                    </div>
-                    <p className="text-xs text-slate-500 font-medium text-center mt-2">
-                        {coachLevel.remaining} pass till nästa nivå
-                    </p>
-                </div>
+            <h3 className="font-bold mb-4 flex items-center gap-2 text-white/90 relative z-10">
+              <BarChart size={20} /> Daglig Status
+            </h3>
 
-                <div className="flex gap-1 mt-4 justify-center">
-                    {[...Array(5)].map((_, i) => (
-                        <Star 
-                            key={i} 
-                            size={12} 
-                            className={i < coachLevel.stars ? "text-yellow-400 fill-yellow-400 drop-shadow-sm" : "text-slate-200"} 
-                        />
-                    ))}
-                </div>
+            <div className="flex items-baseline gap-1 relative z-10">
+              <motion.span
+                key={progress}
+                initial={{ scale: 0.5, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="text-5xl lg:text-6xl font-extrabold"
+              >
+                {progress}
+              </motion.span>
+              <span className="text-xl opacity-80">%</span>
             </div>
-        </div>
+
+            <div className="w-full bg-black/20 h-3 rounded-full mt-6 overflow-hidden relative z-10">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${progress}%` }}
+                transition={{ duration: 1, ease: 'easeOut' }}
+                className="bg-white h-full rounded-full shadow-[0_0_15px_rgba(255,255,255,0.5)]"
+              />
+            </div>
+
+            {/* Post-workout check-in button (Fas 6) */}
+            {progress >= 50 && !hasCompletedPostCheckIn && hasCompletedPreCheckIn && (
+              <motion.button
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setShowPostCheckIn(true)}
+                className="mt-5 w-full py-3 bg-white/20 hover:bg-white/30 text-white rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 relative z-10 border border-white/20"
+              >
+                <Heart size={18} />
+                Avsluta pass & logga
+              </motion.button>
+            )}
+
+            {hasCompletedPostCheckIn && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="mt-4 flex items-center justify-center gap-2 text-white/90 text-sm relative z-10 bg-white/10 rounded-xl py-2"
+              >
+                <PartyPopper size={16} />
+                <span>Passet loggat!</span>
+              </motion.div>
+            )}
+          </motion.div>
+
+          {/* Coach Level Badge with Progress Bar */}
+          <GlassCard className="p-4 lg:p-6">
+            <div className="flex items-center gap-4 mb-4">
+              <motion.div
+                whileHover={{ rotate: 5, scale: 1.1 }}
+                className={`p-3 rounded-2xl shadow-lg ${coachLevel.bg} ${coachLevel.color}`}
+              >
+                {React.createElement(coachLevel.icon, { size: 24 })}
+              </motion.div>
+              <div>
+                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Coach Level</div>
+                <div className="font-bold text-slate-900 text-lg">{coachLevel.name}</div>
+              </div>
+            </div>
+
+            {/* Level Progress Bar */}
+            <div className="space-y-2 mt-4">
+              <div className="flex justify-between text-[11px] text-slate-400 font-bold uppercase tracking-wider">
+                <span>XP</span>
+                <span>{historyCount} / {coachLevel.next}</span>
+              </div>
+              <div className="w-full h-3 bg-gradient-to-r from-slate-100 to-slate-50 rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${coachLevel.progressPercent}%` }}
+                  transition={{ duration: 1, ease: 'easeOut' }}
+                  className={`h-full rounded-full transition-all ${coachLevel.color.replace('text-', 'bg-')} shadow-sm`}
+                />
+              </div>
+              <p className="text-xs text-slate-500 font-medium text-center mt-2">
+                {coachLevel.remaining} pass till nästa nivå
+              </p>
+            </div>
+
+            <div className="flex gap-1 mt-4 justify-center">
+              {[...Array(5)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ scale: 0, rotate: -180 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ delay: i * 0.1, type: 'spring', stiffness: 400, damping: 15 }}
+                >
+                  <Star
+                    size={14}
+                    className={i < coachLevel.stars
+                      ? 'text-yellow-400 fill-yellow-400 drop-shadow-sm'
+                      : 'text-slate-200'
+                    }
+                  />
+                </motion.div>
+              ))}
+            </div>
+          </GlassCard>
+        </motion.div>
 
         {/* Right: Active Phase Content */}
         <div className="md:col-span-3 lg:col-span-9 space-y-8 lg:space-y-10 min-w-0">
@@ -1075,8 +1511,8 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
                 </>
             )}
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 };
 
