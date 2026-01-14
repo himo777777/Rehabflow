@@ -861,12 +861,13 @@ function AppContent() {
           </div>
         )}
         
-        {/* GLOBAL AI CHAT COMPONENT */}
-        {program && (
+        {/* GLOBAL AI CHAT COMPONENT - temporarily disabled due to CommonJS module issue */}
+        {/* TODO: Re-enable when running with vercel dev */}
+        {/* {program && (
           <ChatErrorBoundary>
             <AIChat program={program} />
           </ChatErrorBoundary>
-        )}
+        )} */}
       </main>
 
       {/* Premium Footer */}

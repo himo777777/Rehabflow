@@ -625,13 +625,13 @@ const DailyCheckIn: React.FC<DailyCheckInProps> = ({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
         transition={transitions.spring}
-        className="relative bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 border border-slate-700/50 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl"
+        className="relative bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 border border-slate-700/50 rounded-3xl w-full max-w-md max-h-[90vh] overflow-hidden shadow-2xl flex flex-col"
       >
         {/* Premium Glow Effect */}
         <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 via-transparent to-primary-500/5 pointer-events-none" />
 
-        {/* Header */}
-        <div className="relative flex items-center justify-between p-5 border-b border-slate-800/80">
+        {/* Header - fixed at top */}
+        <div className="relative flex items-center justify-between p-5 border-b border-slate-800/80 flex-shrink-0">
           <div>
             <h2 className="text-lg font-extrabold text-white">
               {type === 'pre' ? 'Före träning' : 'Efter träning'}
@@ -667,15 +667,15 @@ const DailyCheckIn: React.FC<DailyCheckInProps> = ({
           )}
         </div>
 
-        {/* Content */}
-        <div className="p-6 min-h-[400px]">
+        {/* Content - scrollable on small screens */}
+        <div className="p-6 min-h-[250px] flex-1 overflow-y-auto">
           <AnimatePresence mode="wait">
             {renderCurrentStep()}
           </AnimatePresence>
         </div>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-slate-800/80 flex gap-3">
+        {/* Footer - fixed at bottom */}
+        <div className="p-4 border-t border-slate-800/80 flex gap-3 flex-shrink-0">
           {step > 1 && (
             <motion.button
               whileHover={{ scale: 1.02 }}

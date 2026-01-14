@@ -27,9 +27,8 @@ export default defineConfig(({ mode }) => ({
               id.includes('node_modules/jspdf')) {
             return 'pdf-vendor';
           }
-          // AI SDKs (Groq, Google, OpenAI)
+          // AI SDKs (Google only - Groq is server-side only)
           if (id.includes('node_modules/@google/generative-ai') ||
-              id.includes('node_modules/groq-sdk') ||
               id.includes('node_modules/openai')) {
             return 'ai-vendor';
           }
@@ -108,13 +107,16 @@ export default defineConfig(({ mode }) => ({
       'lucide-react',
       'framer-motion',
       'zod',
+      '@google/generative-ai', // Pre-bundle for faster dev startup
+      'long', // CommonJS module - needs pre-bundling with commonjs plugin
     ],
-    // Exclude large libraries that are lazy loaded
+    // Exclude large libraries that are lazy loaded or server-only
     exclude: [
       '@mediapipe/pose',
       '@mediapipe/camera_utils',
       'three',
       '@tensorflow/tfjs',
+      'groq-sdk', // Server-only CommonJS - should never be bundled for client
     ],
     // Use esbuild for dependency pre-bundling
     esbuildOptions: {

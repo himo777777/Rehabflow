@@ -376,7 +376,7 @@ const Avatar3D: React.FC<Avatar3DProps> = ({ exerciseName, steps, onClose }) => 
   const [currentPhase, setCurrentPhase] = useState<string>('');
   const [currentPhaseDescription, setCurrentPhaseDescription] = useState<string>('');
   const [useNewAvatar, setUseNewAvatar] = useState(true);
-  const [useRealisticAvatar, setUseRealisticAvatar] = useState(true); // Use same avatar as AI analysis
+  const [useRealisticAvatar, setUseRealisticAvatar] = useState(false); // Temporarily disabled - use simpler avatar
   const [showAnimationInfo, setShowAnimationInfo] = useState(true);
 
   // NEW: Tempo and camera controls

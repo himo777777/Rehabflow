@@ -290,7 +290,84 @@ class ErrorRecoveryService {
   clearErrors(): void {
     this.errors.clear();
   }
+
+  /**
+   * Log an error (used by ErrorBoundary)
+   */
+  logError(error: Error | unknown, context?: { componentStack?: string }, componentName?: string): void {
+    const message = error instanceof Error ? error.message : String(error);
+
+    logger.error(`[ErrorRecovery] ${componentName || 'Component'} error:`, message, context?.componentStack || '');
+
+    // Create and handle the error through the normal flow
+    this.handleError(error instanceof Error ? error : new Error(message));
+  }
 }
 
 export const errorRecoveryService = new ErrorRecoveryService();
+
+// ============================================================================
+// UTILITY FUNCTIONS (used by ErrorBoundary)
+// ============================================================================
+
+/**
+ * Sanitize error message for display (remove sensitive info)
+ */
+export function sanitizeErrorMessage(error: Error | unknown): string {
+  if (!error) return 'Ett okänt fel uppstod';
+
+  const message = error instanceof Error ? error.message : String(error);
+
+  // Remove potential sensitive information
+  return message
+    .replace(/https?:\/\/[^\s]+/g, '[URL]')
+    .replace(/api[_-]?key[=:][^\s&]+/gi, '[API_KEY]')
+    .replace(/token[=:][^\s&]+/gi, '[TOKEN]')
+    .replace(/password[=:][^\s&]+/gi, '[PASSWORD]')
+    .replace(/Bearer\s+[^\s]+/gi, '[AUTH]')
+    .slice(0, 200); // Limit length
+}
+
+/**
+ * Get user-friendly error message
+ */
+export function getUserFriendlyMessage(error: Error | unknown): string {
+  if (!error) return 'Något gick fel. Försök igen.';
+
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+
+  // Network errors
+  if (message.includes('network') || message.includes('fetch') || message.includes('offline')) {
+    return 'Nätverksfel. Kontrollera din internetanslutning.';
+  }
+
+  // Camera errors
+  if (message.includes('camera') || message.includes('getusermedia') || message.includes('notallowed')) {
+    return 'Kameraåtkomst nekad. Aktivera kameran i webbläsarinställningarna.';
+  }
+
+  // Storage errors
+  if (message.includes('quota') || message.includes('storage')) {
+    return 'Lagringsutrymmet är fullt. Rensa lite data och försök igen.';
+  }
+
+  // ML model errors
+  if (message.includes('model') || message.includes('tensorflow') || message.includes('mediapipe')) {
+    return 'AI-modellen kunde inte laddas. Prova att ladda om sidan.';
+  }
+
+  // Chunk loading errors (common in Vite/React)
+  if (message.includes('chunk') || message.includes('loading')) {
+    return 'Applikationen kunde inte laddas helt. Prova att ladda om sidan.';
+  }
+
+  // Syntax/module errors
+  if (message.includes('syntax') || message.includes('unexpected')) {
+    return 'Ett tekniskt fel uppstod. Ladda om sidan.';
+  }
+
+  // Default message
+  return 'Ett oväntat fel uppstod. Försök igen eller ladda om sidan.';
+}
+
 export default errorRecoveryService;

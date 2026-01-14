@@ -1,14 +1,13 @@
 /**
  * Unified AI Client
  *
- * Provides a unified interface for AI calls that automatically routes
- * to either the server-side proxy (production) or direct Groq SDK (development).
+ * All AI calls go through the server-side proxy (/api/ai/completion).
+ * This keeps API keys secure and avoids CommonJS compatibility issues.
  *
- * In production: All calls go through /api/ai/completion (secure)
- * In development: Falls back to direct Groq SDK for convenience
+ * In development: Run `vercel dev` to have the API routes available
+ * In production: Deployed API routes handle requests
  */
 
-import Groq from "groq-sdk";
 import { logger } from "./logger";
 
 const MODEL = "llama-3.3-70b-versatile";
@@ -31,100 +30,18 @@ export interface AIStreamOptions extends AICompletionOptions {
   onComplete?: () => void;
 }
 
-// Development mode Groq client (only initialized if needed)
-let devGroqClient: Groq | null = null;
-
-function getDevGroqClient(): Groq | null {
-  if (import.meta.env.PROD) return null;
-
-  if (!devGroqClient) {
-    const apiKey = (import.meta as any).env?.VITE_GROQ_API_KEY;
-    if (apiKey) {
-      devGroqClient = new Groq({
-        apiKey,
-        dangerouslyAllowBrowser: true,
-      });
-    }
-  }
-  return devGroqClient;
-}
-
-/**
- * Check if we should use the server proxy
- */
-function shouldUseProxy(): boolean {
-  // Always use proxy in production
-  if (import.meta.env.PROD) {
-    return true;
-  }
-
-  // In development, check if we're running with Vercel dev
-  // If not, fall back to direct Groq calls
-  return false; // Will be true when using `vercel dev`
-}
-
 /**
  * Make a non-streaming AI completion request
  */
 export async function aiCompletion(options: AICompletionOptions): Promise<string> {
-  const { messages, model, temperature, max_tokens } = options;
-
-  if (shouldUseProxy()) {
-    return await proxyCompletion(options);
-  }
-
-  // Development fallback: direct Groq call
-  const groq = getDevGroqClient();
-  if (!groq) {
-    throw new Error("No AI client available. Set VITE_GROQ_API_KEY in .env.local");
-  }
-
-  const completion = await groq.chat.completions.create({
-    messages,
-    model: model || MODEL,
-    temperature: temperature ?? 0.7,
-    max_tokens: max_tokens || 4096,
-  });
-
-  return completion.choices[0]?.message?.content || "";
+  return await proxyCompletion(options);
 }
 
 /**
  * Make a streaming AI completion request
  */
 export async function aiCompletionStream(options: AIStreamOptions): Promise<string> {
-  const { messages, model, temperature, max_tokens, onChunk, onComplete } = options;
-
-  if (shouldUseProxy()) {
-    return await proxyStreamCompletion(options);
-  }
-
-  // Development fallback: direct Groq streaming
-  const groq = getDevGroqClient();
-  if (!groq) {
-    throw new Error("No AI client available. Set VITE_GROQ_API_KEY in .env.local");
-  }
-
-  let fullResponse = "";
-
-  const stream = await groq.chat.completions.create({
-    messages,
-    model: model || MODEL,
-    temperature: temperature ?? 0.7,
-    max_tokens: max_tokens || 4096,
-    stream: true,
-  });
-
-  for await (const chunk of stream) {
-    const content = chunk.choices[0]?.delta?.content || "";
-    if (content) {
-      fullResponse += content;
-      onChunk(content);
-    }
-  }
-
-  onComplete?.();
-  return fullResponse;
+  return await proxyStreamCompletion(options);
 }
 
 // ============================================

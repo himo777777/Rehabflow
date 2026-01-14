@@ -8,7 +8,7 @@
 import React, { useRef, Suspense, useMemo, useEffect, useState, useCallback } from 'react';
 import { Canvas, useFrame, useLoader } from '@react-three/fiber';
 import { OrbitControls, Environment, ContactShadows, useGLTF } from '@react-three/drei';
-import { MeshoptDecoder } from 'meshoptimizer';
+import { MeshoptDecoder } from 'three-stdlib';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as THREE from 'three';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
@@ -2426,7 +2426,16 @@ const AvatarModel: React.FC<AvatarModelProps> = ({ mode, modelPath, bodyPosition
     GLTFLoader,
     modelPath,
     (loader) => {
-      loader.setMeshoptDecoder(MeshoptDecoder);
+      // three-stdlib MeshoptDecoder can be a function or object
+      // Make it optional - models might not use meshopt compression
+      try {
+        if (MeshoptDecoder) {
+          loader.setMeshoptDecoder(typeof MeshoptDecoder === 'function' ? MeshoptDecoder() : MeshoptDecoder);
+        }
+      } catch (e) {
+        // MeshoptDecoder not available, continue without it
+        console.warn('MeshoptDecoder not available, loading model without it');
+      }
     }
   );
   const scene = gltf.scene;
@@ -3481,7 +3490,13 @@ export default RealisticAvatar3D;
 
 // Configure loader with MeshoptDecoder for preloading
 const configureGltfLoader = (loader: GLTFLoader) => {
-  loader.setMeshoptDecoder(MeshoptDecoder);
+  try {
+    if (MeshoptDecoder) {
+      loader.setMeshoptDecoder(typeof MeshoptDecoder === 'function' ? MeshoptDecoder() : MeshoptDecoder);
+    }
+  } catch (e) {
+    // MeshoptDecoder not available, continue without it
+  }
 };
 
 // Preload hook for both models
