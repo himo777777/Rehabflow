@@ -476,7 +476,7 @@ export const PainPredictionDashboard: React.FC = () => {
                   <p className="text-2xl font-bold text-gray-900">
                     {state.accuracyMetrics.totalPredictions}
                   </p>
-                  <p className="text-xs text-gray-500">validated</p>
+                  <p className="text-xs text-gray-500">registrerade jämförelser</p>
                 </div>
               </div>
             </div>

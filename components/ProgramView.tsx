@@ -1153,7 +1153,7 @@ const ProgramView: React.FC<ProgramViewProps> = ({ program: initialProgram }) =>
         {!program.patientEducation && (
             <div className="bg-blue-50/80 border border-blue-100 rounded-2xl p-6 mt-6 print:border-slate-200 print:bg-white max-w-full">
                 <h3 className="flex items-center gap-2 text-blue-800 font-bold text-lg mb-2 print:text-slate-800">
-                    <Activity size={24} /> Klinisk Analys
+                    <Activity size={24} /> Programöversikt
                 </h3>
                 <p className="text-blue-900/80 leading-relaxed text-base print:text-slate-700 break-words">
                     {program.conditionAnalysis}

@@ -70,8 +70,8 @@ const PageLoader = () => (
 
 const LOADING_MESSAGES = [
   "Analyserar din skadeprofil...",
-  "Konsulterar kliniska riktlinjer...",
-  "Väljer ut evidensbaserade övningar...",
+  "Bearbetar dina svar...",
+  "Väljer övningar från programmets bibliotek...",
   "Strukturerar rehabiliteringsfaser...",
   "Optimerar belastningsnivåer...",
   "Färdigställer ditt program..."
@@ -224,7 +224,7 @@ function AppContent() {
                   animate={{ opacity: [0.5, 1, 0.5] }}
                   transition={{ duration: 1.5, repeat: Infinity }}
                 >
-                  Hämtar din journal...
+                  Hämtar sparade programdata...
                 </motion.p>
               </div>
 
@@ -652,7 +652,7 @@ function AppContent() {
                             >
                               <Sparkles size={14} className="text-primary-500" />
                             </motion.div>
-                            AI-Powered Fysioterapi
+                            AI-stött rehabiliterings-MVP
                           </motion.div>
 
                           {/* Main Heading */}
@@ -692,10 +692,9 @@ function AppContent() {
                             transition={{ delay: 0.4 }}
                             className="max-w-2xl mx-auto text-lg sm:text-xl text-slate-500 leading-relaxed"
                           >
-                            Få ett skräddarsytt återhämtningsprogram baserat på{' '}
-                            <span className="text-slate-700 font-medium">klinisk evidens</span>,{' '}
-                            din skadehistorik och den senaste{' '}
-                            <span className="text-slate-700 font-medium">medicinska forskningen</span>.
+                            Utforska ett personanpassat programutkast baserat på{' '}
+                            <span className="text-slate-700 font-medium">dina syntetiska eller egna inmatade uppgifter</span>{' '}
+                            och programmets strukturerade övningsbibliotek.
                           </motion.p>
 
                           {/* Trust indicators */}
@@ -706,9 +705,9 @@ function AppContent() {
                             className="flex flex-wrap justify-center gap-6 mt-10"
                           >
                             {[
-                              { icon: Activity, text: 'Evidensbaserat' },
+                              { icon: Activity, text: 'Strukturerat programflöde' },
                               { icon: Brain, text: 'AI-analys' },
-                              { icon: ShieldAlert, text: 'GDPR-säkert' },
+                              { icon: ShieldAlert, text: 'Dataskydd kräver verifiering' },
                             ].map((item, i) => (
                               <div
                                 key={i}

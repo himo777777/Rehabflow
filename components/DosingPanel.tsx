@@ -112,7 +112,7 @@ const DosingPanel: React.FC<DosingPanelProps> = ({
         </div>
         <div>
           <h3 className="font-bold text-slate-900">Doserings-assistent</h3>
-          <p className="text-sm text-slate-500">Evidensbaserad träningsdosering</p>
+          <p className="text-sm text-slate-500">Strukturerat förslag på träningsdosering</p>
         </div>
       </div>
 

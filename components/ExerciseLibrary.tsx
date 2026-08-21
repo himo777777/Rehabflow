@@ -231,7 +231,7 @@ const ExerciseLibrary: React.FC = () => {
         <h1 className="text-4xl font-extrabold text-slate-900 mb-4 tracking-tight">Övningsbibliotek</h1>
         <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white rounded-full border border-slate-200 shadow-sm text-slate-500 text-sm font-medium">
           <BookOpen size={16} className="text-primary-500"/>
-          <span><strong>{EXERCISE_DATABASE.length}</strong> evidensbaserade rehabövningar med vetenskapliga källor</span>
+          <span><strong>{EXERCISE_DATABASE.length}</strong> rehabövningar med angivna källhänvisningar för vidare granskning</span>
         </div>
       </div>
 
@@ -348,7 +348,7 @@ const ExerciseLibrary: React.FC = () => {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-5 h-5 text-emerald-600" />
-                <span className="text-sm font-semibold text-slate-700">Protokoll-säkerhetsfilter</span>
+                <span className="text-sm font-semibold text-slate-700">Regelbaserat urvalsfilter</span>
               </div>
               <label className="flex items-center gap-2 cursor-pointer">
                 <span className="text-xs text-slate-500">Aktivera</span>

@@ -26,7 +26,7 @@ const PatientEducationModule: React.FC<PatientEducationModuleProps> = ({ educati
           <div>
             <div className="flex items-center gap-2 mb-1">
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Patientinformation</span>
-                <span className="bg-primary-100 text-primary-700 text-[10px] px-2 py-0.5 rounded-full font-bold">Evidensbaserad</span>
+                <span className="bg-primary-100 text-primary-700 text-[10px] px-2 py-0.5 rounded-full font-bold">Källor angivna</span>
             </div>
             <h2 className="text-xl font-bold text-slate-800">{education.diagnosis}</h2>
             <p className="text-slate-500 text-sm mt-1 max-w-2xl">{education.explanation}</p>
@@ -97,7 +97,7 @@ const PatientEducationModule: React.FC<PatientEducationModuleProps> = ({ educati
             {/* Sources Footer */}
             <div className="mt-8 pt-6 border-t border-slate-100">
                 <h4 className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
-                    <Quote size={12} /> Baserat på kliniska riktlinjer
+                    <Quote size={12} /> Angivna källor kräver oberoende granskning
                 </h4>
                 <div className="flex flex-wrap gap-2">
                     {education.sources.map((source, idx) => (

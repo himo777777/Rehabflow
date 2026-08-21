@@ -47,6 +47,8 @@ A binding asset sale should not be completed until every applicable item is pass
 ### Known technical issues
 
 - Chromium end-to-end execution was attempted, but the environment did not contain the required Playwright browser binary. All 56 cases stopped at browser launch; this is an environment block, not evidence that the product flows passed or failed.
+- A cloud browser could not access the local Vite address, and no public or sandbox deployment was available. Therefore no fresh browser-flow pass is claimed.
+- The existing Playwright specifications are not sufficient buyer proof: several core interactions are conditional and the navigation assumptions do not fully match the current onboarding-first product state.
 - Critical buyer-facing workflows still require manual verification with synthetic data.
 - Production bundles include large ML, Three.js, and PDF chunks; this is a performance warning, not a build failure.
 - The mixed static/dynamic import of `data/voicePhrases.ts` prevents that module from being split into a separate chunk.
@@ -74,7 +76,8 @@ A binding asset sale should not be completed until every applicable item is pass
 ### Clinical and regulatory claims
 
 - [ ] Use “pose estimate”, “estimated joint angle”, and “rule-based feedback”
-- [ ] Remove or qualify unsupported diagnostic, biomechanical, emotional-intelligence, efficacy, evidence, and safety claims
+- [x] High-visibility landing, onboarding, programme, education, dosing, and progress labels were qualified on the audit branch so they no longer present the MVP as clinically validated, diagnostically authoritative, or GDPR-verified
+- [ ] Complete a full content-level review of exercise evidence labels, educational content, source claims, and all secondary screens
 - [ ] Do not claim medical-device status, clinical validation, accuracy, outcomes, or regulatory readiness
 - [ ] Buyer accepts responsibility for intended use and independent clinical, privacy, security, and regulatory diligence
 
