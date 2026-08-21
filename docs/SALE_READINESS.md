@@ -13,6 +13,43 @@ RehabFlow is a pre-revenue development MVP. It is not represented as:
 - production-ready for unsupervised patient care
 - a business with verified users, revenue, contracts, or outcomes
 
+## Technical audit result - 21 August 2026
+
+Audit branch and tested commit: `1fa27525016fa68a3c7220206ba334943170bbc5`
+
+The audit was run from a clean shallow clone with a separate npm cache.
+
+| Check | Result | Evidence |
+|---|---|---|
+| `npm ci` | PASS | 778 packages installed from the lockfile |
+| `npm run build` | PASS | Vite transformed 4,405 modules and produced a production bundle |
+| `npm run typecheck` | FAIL | Type and interface mismatches in tests, UI components, coaching orchestration, mood detection, and voice guidance |
+| `npm run test:run` | FAIL | 325 tests passed and 33 failed across 14 test files |
+| Manual critical-flow test | NOT RUN | Requires a configured synthetic test environment |
+| Playwright end-to-end test | NOT RUN | Browser runtime and deterministic test environment not yet verified |
+
+### Build observations
+
+- Production build completed successfully.
+- Vite warned about a module that is both statically and dynamically imported.
+- Several chunks exceed the configured 600 kB warning threshold.
+- The largest reported uncompressed chunks included ML, Three.js, and PDF vendor bundles.
+
+### Failure concentration
+
+All 33 runtime test failures were reported in `__tests__/services/errorRecoveryService.test.ts`. The suite expects methods, exports, configuration behavior, sanitisation tokens, and error structures that do not match the current implementation. Several tests also timed out.
+
+Type checking additionally reported mismatches in:
+
+- `components/Achievements.tsx`
+- `components/SettingsPanel.tsx`
+- `services/coachingSessionOrchestrator.ts`
+- `services/moodDetectionService.ts`
+- `services/voiceGuidanceService.ts`
+- `__tests__/services/errorRecoveryService.test.ts`
+
+These findings do not prove that every affected runtime path is broken, but they prevent a clean quality claim. They must be fixed or explicitly disclosed before a sale.
+
 ## Verified repository facts
 
 - React 18, TypeScript, Vite, and Tailwind application
@@ -32,14 +69,14 @@ A binding asset sale should not be completed until every applicable item is pass
 
 ### Technical integrity
 
-- [ ] Clean clone or verified private backup created
-- [ ] Exact commit SHA recorded
-- [ ] `npm ci` passes from a clean environment
+- [x] Clean clone created
+- [x] Exact audit commit SHA recorded
+- [x] `npm ci` passes from a clean environment
 - [ ] `npm run typecheck` passes
-- [ ] `npm run build` passes
-- [ ] `npm run test:run` passes or failures are documented
+- [x] `npm run build` passes
+- [x] `npm run test:run` failures documented
 - [ ] Critical flows manually verified with synthetic data
-- [ ] Known-issues schedule produced
+- [x] Initial known-issues evidence produced
 - [ ] Buyer-facing demonstration recorded and reviewed
 
 ### Security and privacy
@@ -63,9 +100,9 @@ A binding asset sale should not be completed until every applicable item is pass
 
 ### Clinical and regulatory claims
 
-- [ ] Use “pose estimate”, “estimated joint angle”, and “rule-based feedback”
-- [ ] Remove or qualify unsupported diagnostic, biomechanical, emotional-intelligence, efficacy, evidence, and safety claims
-- [ ] Do not claim medical-device status, clinical validation, accuracy, outcomes, or regulatory readiness
+- [x] Documentation uses “pose estimate”, “estimated joint angle”, and “rule-based feedback”
+- [x] Unsupported diagnostic, biomechanical, emotional-intelligence, efficacy, evidence, and safety claims are qualified in the audit documentation
+- [x] Audit documentation does not claim medical-device status, clinical validation, accuracy, outcomes, or regulatory readiness
 - [ ] Buyer accepts responsibility for intended use and independent clinical, privacy, security, and regulatory diligence
 
 ## Proposed transaction boundaries
