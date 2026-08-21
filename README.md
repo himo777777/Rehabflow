@@ -1,23 +1,41 @@
 # RehabFlow
 
-AI-driven rehabiliteringsapp som genererar personliga träningsprogram baserat på din skadeprofil.
+RehabFlow är en **pre-revenue utvecklings-MVP** för AI-stödd muskuloskeletal rehabilitering och guidad träning.
 
-## Funktioner
+Projektet är inte kliniskt validerat, CE-märkt, FDA-godkänt eller verifierat för diagnostik, behandling eller osuperviserad patientanvändning. Den som vill driftsätta eller kommersialisera koden måste göra egen teknisk, säkerhetsmässig, klinisk, regulatorisk och juridisk granskning.
 
-- **AI-genererade program** - Skräddarsydda rehabiliteringsprogram baserat på klinisk evidens
-- **Interaktiv onboarding** - 3D kroppsscanner för att välja skadeområde
-- **Progress tracking** - Spåra dina framsteg dag för dag
-- **AI Coach chatt** - Ställ frågor till din virtuella fysioterapeut
-- **Övningsbibliotek** - Sök bland evidensbaserade övningar
-- **Movement Coach** - Kamerabaserad rörelseanalys med MediaPipe
+## Verifierade programvarufunktioner
 
-## Tech Stack
+- **AI-stödda programflöden** med strukturerad outputvalidering via Zod
+- **Onboarding och säkerhetsfrågor** som måste kliniskt valideras före vårdanvändning
+- **Progress-, smärt- och träningsloggning**
+- **AI-chatt och patientutbildningsstrukturer**
+- **Övningsbibliotek och fasbaserade program**
+- **Movement Coach** med kameraintegration via MediaPipe Pose
+- **Pose-estimering och uppskattade ledvinklar**
+- **Regelbaserad repetitions-, tempo-, kompensations- och rörelsefeedback**
+- **Supabase-schema** med row-level security policies
+- **Server-side AI-endpoint** med Groq
+- **Rate limiting** via Upstash Redis med utvecklingsfallback
+
+## Viktig teknisk tolkning
+
+Kamerafunktionen använder MediaPipe-landmärken och deterministiska regler. Resultaten ska beskrivas som pose-estimat, uppskattade ledvinklar och regelbaserad feedback - inte som validerad biomekanisk scanning, diagnostik eller klinisk mätprecision.
+
+Funktioner som benämns emotionell intelligens använder rörelse- och engagemangsheuristik, exempelvis tempo, pauser, upprepade försök och fullföljande. De är inte ett validerat system för emotionell diagnostik eller affektigenkänning.
+
+AI-genererat innehåll är programvaruoutput och behöver mänsklig kvalitetskontroll, produktmässiga skydd och klinisk validering före patientanvändning.
+
+## Tech stack
 
 - **Frontend:** React 18, TypeScript, Tailwind CSS
 - **Build:** Vite
-- **AI:** Google Gemini 2.5 Flash
-- **Backend:** Supabase (databas + auth)
+- **AI:** Groq server-side proxy; standardmodell i nuvarande kod är `llama-3.3-70b-versatile`
+- **Backend:** Supabase
 - **Rörelseanalys:** MediaPipe Pose
+- **Validering:** Zod
+- **Tester:** Vitest och Playwright
+- **Rate limiting:** Upstash Redis eller in-memory fallback för utveckling
 
 ## Snabbstart
 
@@ -31,168 +49,94 @@ cd Rehabflow
 ### 2. Installera beroenden
 
 ```bash
-npm install
+npm ci
 ```
 
 ### 3. Konfigurera miljövariabler
 
-Kopiera `.env.example` till `.env.local`:
+Kopiera `.env.example` till `.env.local`.
 
-```bash
-cp .env.example .env.local
-```
-
-Fyll i dina API-nycklar:
+Server-side variabler för en Vercel-liknande deployment:
 
 ```env
-# Google Gemini API Key (från https://aistudio.google.com/)
-VITE_GEMINI_API_KEY=din_gemini_api_nyckel
-
-# Supabase (från https://supabase.com/)
-VITE_SUPABASE_URL=https://ditt-projekt.supabase.co
-VITE_SUPABASE_ANON_KEY=din_supabase_anon_nyckel
-
-# Valfritt: Stripe betalningslänk
-VITE_STRIPE_LINK=https://buy.stripe.com/din_länk
+GROQ_API_KEY=din_groq_api_nyckel
+UPSTASH_REDIS_REST_URL=din_upstash_url
+UPSTASH_REDIS_REST_TOKEN=din_upstash_token
 ```
+
+Klientvariabler:
+
+```env
+VITE_SUPABASE_URL=https://ditt-projekt.supabase.co
+VITE_SUPABASE_ANON_KEY=din_supabase_anon_key
+VITE_STRIPE_LINK=https://buy.stripe.com/din_lank
+```
+
+Lägg aldrig produktionshemligheter i repot. Kontrollera alltid vilka variabler som exponeras av Vite till webbläsaren.
 
 ### 4. Konfigurera Supabase
 
-1. Skapa ett nytt projekt på [Supabase](https://supabase.com/)
-2. Gå till SQL Editor
-3. Kör innehållet i `db_schema.sql`
+1. Skapa ett Supabase-projekt.
+2. Granska SQL-schemat och migrationsfilerna för den avsedda deploymenten.
+3. Kör relevanta migrationer.
+4. Verifiera autentisering och row-level security mot den faktiska miljön.
 
-### 5. Starta utvecklingsservern
+### 5. Kör lokalt
 
 ```bash
 npm run dev
 ```
 
-Öppna [http://localhost:5173](http://localhost:5173) i din webbläsare.
-
-## Google AI Studio
-
-Denna app skapades ursprungligen i Google AI Studio. För att köra i AI Studio:
-- Appen finns här: https://ai.studio/apps/drive/1eK3rPANYhJJieFvC9JBRsozFnitak2x8
-- API-nyckeln tillhandahålls automatiskt via `process.env.API_KEY`
-
-## Projektstruktur
-
-```
-Rehabflow/
-├── components/
-│   ├── AIChat.tsx            # Chattkomponent med AI-fysioterapeut
-│   ├── AIMovementCoach.tsx   # Kamerabaserad rörelseanalys
-│   ├── ExerciseCard.tsx      # Övningskort med guide och video
-│   ├── ExerciseLibrary.tsx   # Sökbart övningsbibliotek
-│   ├── Logo.tsx              # App-logotyp
-│   ├── Onboarding.tsx        # Flerstegigt bedömningsformulär
-│   ├── PatientEducationModule.tsx  # Patientutbildning
-│   ├── ProgramView.tsx       # Huvudvy för träningsprogrammet
-│   ├── ProgressDashboard.tsx # Dashboard för framsteg
-│   └── Toast.tsx             # Notifikationskomponent
-├── services/
-│   ├── geminiService.ts      # AI-integration med Gemini
-│   ├── storageService.ts     # Lokal + molnlagring
-│   ├── supabaseClient.ts     # Supabase-klient
-│   └── imageDb.ts            # Bildhantering
-├── data/
-│   └── exerciseDatabase.ts   # Lokal övningsdatabas
-├── App.tsx                   # Huvudapplikation med routing
-├── types.ts                  # TypeScript-typdefinitioner
-├── db_schema.sql             # Databasschema för Supabase
-└── index.html                # HTML-entry med Tailwind config
-```
-
-## API-krav
-
-### Google Gemini API
-
-1. Gå till [Google AI Studio](https://aistudio.google.com/)
-2. Skapa ett projekt och generera en API-nyckel
-3. Lägg till nyckeln som `VITE_GEMINI_API_KEY`
-
-### Supabase
-
-1. Skapa konto på [Supabase](https://supabase.com/)
-2. Skapa ett nytt projekt
-3. Kopiera URL och anon key från Project Settings > API
-4. Kör `db_schema.sql` i SQL Editor
-
-## Skript
+## Kvalitetskontroller
 
 ```bash
-# Utveckling
-npm run dev
-
-# Bygg för produktion
+npm run typecheck
 npm run build
-
-# Förhandsgranska produktionsbygge
-npm run preview
+npm run test:run
+npm run test:e2e
 ```
 
-## Databasschema
+CI kör typkontroll, build och enhetstester. Playwright-strukturen finns, men end-to-end-tester kräver en fungerande testmiljö och ska verifieras separat.
 
-### Tabeller
+## AI-arkitektur
 
-- **users** - Användarprofiler och prenumerationsstatus
-- **programs** - Genererade rehabiliteringsprogram
-- **progress** - Daglig framstegsspårning
+Klienten anropar projektets server-side completion-endpoint. Endpointen skyddar Groq-nyckeln på serversidan och stöder streaming, icke-streaming och rate limiting.
 
-Se `db_schema.sql` för fullständigt schema med index och RLS-policies.
+README beskrev tidigare Gemini som primär implementation. Nuvarande kod använder Groq/Llama som standard. Gemini-paket och reservkonfiguration kan fortfarande förekomma och ska bedömas eller rensas av den som färdigställer produkten.
 
-## Funktioner i detalj
+## Databas
 
-### Onboarding
-1. Profilinformation (namn, ålder, aktivitetsnivå)
-2. 3D kroppsscanner för skademarkering
-3. Säkerhetskontroll (röda flaggor)
-4. Klinisk diagnostik med specifika frågor
-5. Livsstilsbedömning
+`db_schema.sql` innehåller tabeller för bland annat:
 
-### AI-programgenerering
-- Använder Gemini 2.5 Flash
-- Genererar flerstegs rehabiliteringsprogram
-- Inkluderar patientutbildning och diagnos
-- Anpassar efter biopsykosociala faktorer
+- användarprofiler
+- program
+- progress
+- smärtloggar
+- träningsloggar
+- milestones
 
-### Progress Tracking
-- Markera övningar som klara
-- Streak-räkning för motivation
-- Coach Level gamification
-- Veckovis AI-analys (Premium)
+SQL-filer är inte bevis för en säker produktionskonfiguration. Auth, policies, dataminimering, retention, export, radering och tredjepartsflöden måste testas i den faktiska deploymenten.
 
-## Premium-funktioner
+## Test- och release-status
 
-- Tillgång till alla faser (Fas 2 & 3)
-- AI-veckoanalys
-- Obegränsad chatt med AI-fysion
-- Avancerad statistik
+Projektet innehåller Vitest- och Playwright-struktur. En grön build eller ett grönt testresultat bevisar inte klinisk säkerhet, medicinsk effekt, regulatorisk efterlevnad eller produktionsberedskap.
 
-## Säkerhet
+Se [docs/SALE_READINESS.md](docs/SALE_READINESS.md) för kända begränsningar och försäljningsgrindar.
 
-- Row Level Security (RLS) i Supabase
-- Anonym användare via localStorage UUID
-- Ingen känslig data exponeras till klienten
-- API-nycklar hanteras via miljövariabler
+## Licens och överlåtelse
 
-## Bidra
+README angav tidigare MIT, men ingen fristående `LICENSE`-fil har verifierats. Licens- och överlåtelserätt är därför **under granskning**.
 
-1. Forka repot
-2. Skapa en feature-branch (`git checkout -b feature/min-funktion`)
-3. Commita ändringar (`git commit -m 'Lägg till funktion'`)
-4. Pusha till branchen (`git push origin feature/min-funktion`)
-5. Skapa en Pull Request
+Innan distribution eller försäljning måste följande verifieras:
 
-## Licens
+- bidragsgivare och äganderätt
+- tredjepartsberoenden och licenser
+- AI-genererad kod och tillämpliga verktygsvillkor
+- bilder, videor, 3D-modeller, typsnitt, dataset, övningsmaterial, protokoll och textkällor
+- exakt vilka tillgångar som får överlåtas
 
-MIT
+Tolka inte denna README som en licens eller som ett tillstånd att använda koden utöver vad tillämplig rätt och ett separat avtal medger.
 
-## Support
+## Medicinsk och regulatorisk begränsning
 
-För frågor eller problem, skapa en issue på GitHub.
-
----
-
-**Medicinsk friskrivning:** RehabFlow är ett verktyg för egenvård och ersätter inte professionell medicinsk rådgivning, diagnos eller behandling. Sök alltid råd från läkare eller annan kvalificerad vårdgivare vid frågor om ett medicinskt tillstånd.
+RehabFlow är utvecklingsprogramvara. Projektet ersätter inte professionell bedömning och erbjuds inte som en validerad diagnos-, behandlings- eller medicinteknisk produkt. Den framtida operatören ansvarar för avsedd användning, klassificering, riskhantering, klinisk utvärdering, dataskydd, cybersäkerhet och övrig efterlevnad.
