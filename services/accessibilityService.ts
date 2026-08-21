@@ -86,6 +86,9 @@ export interface AccessibilityConfig {
   manageFocus: boolean;
   wcagLevel: WCAGLevel;
   customRules: AccessibilityRule[];
+  highContrast: boolean;
+  reduceMotion: boolean;
+  largeText: boolean;
 }
 
 export interface AccessibilityRule {
@@ -115,6 +118,9 @@ const DEFAULT_CONFIG: AccessibilityConfig = {
   manageFocus: true,
   wcagLevel: 'AA',
   customRules: [],
+  highContrast: false,
+  reduceMotion: false,
+  largeText: false,
 };
 
 // Focusable element selectors
@@ -402,6 +408,21 @@ class AccessibilityService {
     }
 
     logger.info('[Accessibility] Initialized');
+  }
+
+  public updateSettings(updates: Partial<Pick<AccessibilityConfig, 'highContrast' | 'reduceMotion' | 'largeText'>>): void {
+    const definedUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([, value]) => value !== undefined)
+    ) as Partial<AccessibilityConfig>;
+    this.config = { ...this.config, ...definedUpdates };
+    this.saveConfig();
+
+    if (typeof document !== 'undefined') {
+      const root = document.documentElement;
+      root.classList.toggle('high-contrast', this.config.highContrast);
+      root.classList.toggle('reduce-motion', this.config.reduceMotion);
+      root.classList.toggle('large-text', this.config.largeText);
+    }
   }
 
   // --------------------------------------------------------------------------

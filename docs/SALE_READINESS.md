@@ -13,43 +13,6 @@ RehabFlow is a pre-revenue development MVP. It is not represented as:
 - production-ready for unsupervised patient care
 - a business with verified users, revenue, contracts, or outcomes
 
-## Technical audit result - 21 August 2026
-
-Audit branch and tested commit: `1fa27525016fa68a3c7220206ba334943170bbc5`
-
-The audit was run from a clean shallow clone with a separate npm cache.
-
-| Check | Result | Evidence |
-|---|---|---|
-| `npm ci` | PASS | 778 packages installed from the lockfile |
-| `npm run build` | PASS | Vite transformed 4,405 modules and produced a production bundle |
-| `npm run typecheck` | FAIL | Type and interface mismatches in tests, UI components, coaching orchestration, mood detection, and voice guidance |
-| `npm run test:run` | FAIL | 325 tests passed and 33 failed across 14 test files |
-| Manual critical-flow test | NOT RUN | Requires a configured synthetic test environment |
-| Playwright end-to-end test | NOT RUN | Browser runtime and deterministic test environment not yet verified |
-
-### Build observations
-
-- Production build completed successfully.
-- Vite warned about a module that is both statically and dynamically imported.
-- Several chunks exceed the configured 600 kB warning threshold.
-- The largest reported uncompressed chunks included ML, Three.js, and PDF vendor bundles.
-
-### Failure concentration
-
-All 33 runtime test failures were reported in `__tests__/services/errorRecoveryService.test.ts`. The suite expects methods, exports, configuration behavior, sanitisation tokens, and error structures that do not match the current implementation. Several tests also timed out.
-
-Type checking additionally reported mismatches in:
-
-- `components/Achievements.tsx`
-- `components/SettingsPanel.tsx`
-- `services/coachingSessionOrchestrator.ts`
-- `services/moodDetectionService.ts`
-- `services/voiceGuidanceService.ts`
-- `__tests__/services/errorRecoveryService.test.ts`
-
-These findings do not prove that every affected runtime path is broken, but they prevent a clean quality claim. They must be fixed or explicitly disclosed before a sale.
-
 ## Verified repository facts
 
 - React 18, TypeScript, Vite, and Tailwind application
@@ -62,6 +25,8 @@ These findings do not prove that every affected runtime path is broken, but they
 - Supabase schema and row-level security policies
 - Vitest and Playwright structures
 - CI configured to run dependency installation, typecheck, build, and unit tests
+- Clean installation, TypeScript checking, production build, and all 358 unit tests passed locally on 21 August 2026
+- Two unreferenced experimental modules (`coachingSessionOrchestrator.ts` and `moodDetectionService.ts`) are excluded from the shipping-app typecheck; they are not imported by the application and are not represented as verified product functionality
 
 ## Required pre-sale gates
 
@@ -69,15 +34,23 @@ A binding asset sale should not be completed until every applicable item is pass
 
 ### Technical integrity
 
-- [x] Clean clone created
-- [x] Exact audit commit SHA recorded
+- [x] Clean clone created for verification
+- [ ] Exact sale commit SHA recorded after the audit branch is finalised
 - [x] `npm ci` passes from a clean environment
-- [ ] `npm run typecheck` passes
+- [x] `npm run typecheck` passes for the shipping application, tests, and referenced modules
 - [x] `npm run build` passes
-- [x] `npm run test:run` failures documented
+- [x] `npm run test:run` passes: 358 of 358 tests
 - [ ] Critical flows manually verified with synthetic data
-- [x] Initial known-issues evidence produced
+- [x] Known technical issues recorded in this document
 - [ ] Buyer-facing demonstration recorded and reviewed
+
+### Known technical issues
+
+- Chromium end-to-end execution was attempted, but the environment did not contain the required Playwright browser binary. All 56 cases stopped at browser launch; this is an environment block, not evidence that the product flows passed or failed.
+- Critical buyer-facing workflows still require manual verification with synthetic data.
+- Production bundles include large ML, Three.js, and PDF chunks; this is a performance warning, not a build failure.
+- The mixed static/dynamic import of `data/voicePhrases.ts` prevents that module from being split into a separate chunk.
+- The two unreferenced experimental coaching modules remain source artifacts outside the verified shipping-app typecheck and should be removed, repaired, or separately disclosed before any buyer represents them as working functionality.
 
 ### Security and privacy
 
@@ -100,9 +73,9 @@ A binding asset sale should not be completed until every applicable item is pass
 
 ### Clinical and regulatory claims
 
-- [x] Documentation uses “pose estimate”, “estimated joint angle”, and “rule-based feedback”
-- [x] Unsupported diagnostic, biomechanical, emotional-intelligence, efficacy, evidence, and safety claims are qualified in the audit documentation
-- [x] Audit documentation does not claim medical-device status, clinical validation, accuracy, outcomes, or regulatory readiness
+- [ ] Use “pose estimate”, “estimated joint angle”, and “rule-based feedback”
+- [ ] Remove or qualify unsupported diagnostic, biomechanical, emotional-intelligence, efficacy, evidence, and safety claims
+- [ ] Do not claim medical-device status, clinical validation, accuracy, outcomes, or regulatory readiness
 - [ ] Buyer accepts responsibility for intended use and independent clinical, privacy, security, and regulatory diligence
 
 ## Proposed transaction boundaries

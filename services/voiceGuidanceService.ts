@@ -270,7 +270,7 @@ class VoiceGuidanceService {
 
     // Critical corrections bypass queue
     speechService.stop();
-    speechService.speak(correction, { rate: 1.1, priority: true });
+    speechService.speak(correction, { rate: 1.1, volume: this.config.volume });
     hapticService.warning();
   }
 
@@ -337,6 +337,19 @@ class VoiceGuidanceService {
    */
   getConfig(): VoiceGuidanceConfig {
     return { ...this.config };
+  }
+
+  mute(): void {
+    this.setConfig({ enabled: false });
+    this.stop();
+  }
+
+  unmute(): void {
+    this.setConfig({ enabled: true });
+  }
+
+  setVolume(volume: number): void {
+    this.setConfig({ volume: Math.max(0, Math.min(1, volume)) });
   }
 
   /**
@@ -457,7 +470,7 @@ class VoiceGuidanceService {
     try {
       await speechService.speak(item.text, {
         rate: item.priority === 'critical' ? 1.1 : 1.0,
-        priority: item.priority === 'critical',
+        volume: this.config.volume,
       });
     } catch (error) {
       logger.warn('[VoiceGuidance] Speech failed', error);

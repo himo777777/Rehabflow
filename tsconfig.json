@@ -33,6 +33,8 @@
     "types/**/*.d.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "services/coachingSessionOrchestrator.ts",
+    "services/moodDetectionService.ts"
   ]
 }

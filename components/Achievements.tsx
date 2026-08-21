@@ -15,7 +15,19 @@ interface AchievementsProps {
 }
 
 // Badge definitions with metadata
-const BADGE_DEFINITIONS: Record<MilestoneType, {
+type DisplayedBadgeType =
+  | 'first_workout'
+  | 'streak_3'
+  | 'streak_7'
+  | 'streak_14'
+  | 'streak_30'
+  | 'week_complete'
+  | 'month_complete'
+  | 'phase_complete'
+  | 'pain_reduction_25'
+  | 'pain_reduction_50';
+
+const BADGE_DEFINITIONS: Record<DisplayedBadgeType, {
   title: string;
   description: string;
   icon: React.ElementType;
@@ -105,7 +117,7 @@ const BADGE_DEFINITIONS: Record<MilestoneType, {
   }
 };
 
-const ALL_BADGE_TYPES: MilestoneType[] = [
+const ALL_BADGE_TYPES: DisplayedBadgeType[] = [
   'first_workout',
   'streak_3',
   'streak_7',
